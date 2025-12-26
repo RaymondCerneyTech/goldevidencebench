@@ -81,6 +81,10 @@ These are the CLI defaults (picked to create long-ish documents with frequent di
 
 This benchmark isolates a specific long-context failure mode: **state changes over time** (updates + clears), embedded in a long document with misleading restatements. It's motivated by reports that transformer LLMs can struggle with consistent state tracking across long sequences (see: MIT News, 2025-12-17).
 
+## Attribution & method
+
+This project uses AI-assisted coding and writing, with human review and iteration. The benchmark design, experiments, and results are reproducible; the goal is clarity and scientific usefulness over authorship style.
+
 ## Install
 
 Python 3.12 is assumed.
@@ -198,7 +202,18 @@ final N steps distractor-only (no updates), creating a longer tail after the las
 
 ## Efficient testing workflow (fast -> slow)
 
+Selector+answerer preset (reranker baseline):
+
+```powershell
+.\scripts\run_selector_bench.ps1 -Preset quick -ModelPath "C:\AI\models\your-model.gguf"
+.\scripts\run_selector_bench.ps1 -Preset quick -ModelPath "C:\AI\models\your-model.gguf" -UseRerank
+```
+
 Estimate runtime before a sweep:
+
+```powershell
+python .\scripts\estimate_runtime.py --from-combined .\runs\combined.json --seeds 3 --episodes 1 --queries 12 --state-modes 2 --distractor-profiles 2 --twins
+```
 
 ```powershell
 python .\scripts\estimate_runtime.py --seeds 3 --episodes 1 --queries 12 --state-modes 2 --distractor-profiles 2 --twins --seconds-per-q 30
@@ -373,6 +388,14 @@ Reranker k-curve (same_key, shuffle, s3q16), accuracy_when_gold_present:
 Deterministic reranking dominates as k grows, highlighting selection as the bottleneck.
 
 Reranker k-curve (same_key, shuffle, s5q24), accuracy_when_gold_present:
+
+Selector quick preset (same_key, shuffle, s2q12):
+
+- no rerank: k=2 0.5417, k=4 0.3333, k=8 0.2917
+- rerank latest_step: k=2 1.0, k=4 1.0, k=8 1.0
+
+Quick preset takeaway: even a small reranker makes selection near-perfect in fast runs.
+
 
 - k=2: rerank none 0.3167, rerank latest_step 0.6667
 - k=4: rerank none 0.1667, rerank latest_step 0.6250

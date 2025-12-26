@@ -1,0 +1,63 @@
+accuracy_when_gold_present,cite_f1,decomposition_line,drop_rate,entailment,exact_acc,gold_present_rate,mtime,pattern,rows,run_dir,run_name,selection_rate,value_acc
+0.0,0.0,1.0000 -> 0.0000 -> 0.0000 -> 0.0000,0.0,1.0,0.0,1.0,1766720337.3248098,runs,1,C:\AI\code\GoldEvidenceBench\runs,runs,0.0,0.0
+0.0,0.0,,0.3125,1.0,0.0,,1766554634.8488016,ab_pick_0_gold_first_k4_same,3,C:\AI\code\GoldEvidenceBench\runs\ab_pick_0_gold_first_k4_same_s3q16,ab_pick_0_gold_first_k4_same_s3q16,0.0,0.0
+0.5625,0.5625,,0.4375,1.0,0.5625,,1766557722.7828567,ab_pick_0_gold_last_k4_same,3,C:\AI\code\GoldEvidenceBench\runs\ab_pick_0_gold_last_k4_same_s3q16,ab_pick_0_gold_last_k4_same_s3q16,0.5625,0.5625
+0.0,0.0,,0.4375,1.0,0.0,,1766556185.8244164,ab_pick_0_gold_middle_k4_same,3,C:\AI\code\GoldEvidenceBench\runs\ab_pick_0_gold_middle_k4_same_s3q16,ab_pick_0_gold_middle_k4_same_s3q16,0.0,0.0
+0.20833333333333334,0.20833333333333334,,0.375,1.0,0.20833333333333334,,1766559280.3825288,ab_pick_0_shuffle_k4_same,3,C:\AI\code\GoldEvidenceBench\runs\ab_pick_0_shuffle_k4_same_s3q16,ab_pick_0_shuffle_k4_same_s3q16,0.20833333333333334,0.20833333333333334
+0.0,0.0,,0.4375,1.0,0.0,,1766561745.8155448,ab_pick_1_gold_first_k4_same,3,C:\AI\code\GoldEvidenceBench\runs\ab_pick_1_gold_first_k4_same_s3q16,ab_pick_1_gold_first_k4_same_s3q16,0.0,0.0
+0.4166666666666667,0.4166666666666667,,0.3125,1.0,0.4166666666666667,,1766566664.2252853,ab_pick_1_gold_last_k4_same,3,C:\AI\code\GoldEvidenceBench\runs\ab_pick_1_gold_last_k4_same_s3q16,ab_pick_1_gold_last_k4_same_s3q16,0.4166666666666667,0.4166666666666667
+0.020833333333333332,0.020833333333333332,,0.625,1.0,0.020833333333333332,,1766564187.206563,ab_pick_1_gold_middle_k4_same,3,C:\AI\code\GoldEvidenceBench\runs\ab_pick_1_gold_middle_k4_same_s3q16,ab_pick_1_gold_middle_k4_same_s3q16,0.020833333333333332,0.020833333333333332
+0.20833333333333334,0.20833333333333334,,0.375,1.0,0.20833333333333334,,1766569150.61781,ab_pick_1_shuffle_k4_same,3,C:\AI\code\GoldEvidenceBench\runs\ab_pick_1_shuffle_k4_same_s3q16,ab_pick_1_shuffle_k4_same_s3q16,0.20833333333333334,0.20833333333333334
+0.4375,0.4375,,0.5625,1.0,0.4375,,1766614745.9110205,ab_rerank_latest_step_k1_same_shuffle,3,C:\AI\code\GoldEvidenceBench\runs\ab_rerank_latest_step_k1_same_shuffle_s3q16,ab_rerank_latest_step_k1_same_shuffle_s3q16,0.4375,0.4375
+0.6666666666666666,0.6666666666666666,1.0000 -> 0.6667 -> 0.6667 -> 0.6667,0.3333333333333333,1.0,0.6666666666666666,1.0,1766693072.6862533,ab_rerank_latest_step_k2_same_shuffle,5,C:\AI\code\GoldEvidenceBench\runs\ab_rerank_latest_step_k2_same_shuffle_s5q24,ab_rerank_latest_step_k2_same_shuffle_s5q24,0.6666666666666666,0.6666666666666666
+0.625,0.625,1.0000 -> 0.6250 -> 0.6250 -> 0.6250,0.375,1.0,0.625,1.0,1766695796.5745661,ab_rerank_latest_step_k4_same_shuffle,5,C:\AI\code\GoldEvidenceBench\runs\ab_rerank_latest_step_k4_same_shuffle_s5q24,ab_rerank_latest_step_k4_same_shuffle_s5q24,0.625,0.625
+0.4166666666666667,0.4166666666666667,1.0000 -> 0.4167 -> 0.4167 -> 0.4167,0.5833333333333334,1.0,0.4166666666666667,1.0,1766698528.2630062,ab_rerank_latest_step_k8_same_shuffle,5,C:\AI\code\GoldEvidenceBench\runs\ab_rerank_latest_step_k8_same_shuffle_s5q24,ab_rerank_latest_step_k8_same_shuffle_s5q24,0.4166666666666667,0.4166666666666667
+0.5,0.5,,0.1875,1.0,0.5,,1766605903.1912894,ab_rerank_none_k1_same_shuffle,3,C:\AI\code\GoldEvidenceBench\runs\ab_rerank_none_k1_same_shuffle_s3q16,ab_rerank_none_k1_same_shuffle_s3q16,0.5,0.5
+0.31666666666666665,0.31666666666666665,1.0000 -> 0.3167 -> 0.3167 -> 0.3167,0.4166666666666667,1.0,0.31666666666666665,1.0,1766677012.7666106,ab_rerank_none_k2_same_shuffle,5,C:\AI\code\GoldEvidenceBench\runs\ab_rerank_none_k2_same_shuffle_s5q24,ab_rerank_none_k2_same_shuffle_s5q24,0.31666666666666665,0.31666666666666665
+0.16666666666666666,0.16666666666666666,1.0000 -> 0.1667 -> 0.1667 -> 0.1667,0.4166666666666667,1.0,0.16666666666666666,1.0,1766683126.8531523,ab_rerank_none_k4_same_shuffle,5,C:\AI\code\GoldEvidenceBench\runs\ab_rerank_none_k4_same_shuffle_s5q24,ab_rerank_none_k4_same_shuffle_s5q24,0.16666666666666666,0.16666666666666666
+0.15833333333333333,0.15833333333333333,1.0000 -> 0.1583 -> 0.1583 -> 0.1583,0.4583333333333333,1.0,0.15833333333333333,1.0,1766690351.7563844,ab_rerank_none_k8_same_shuffle,5,C:\AI\code\GoldEvidenceBench\runs\ab_rerank_none_k8_same_shuffle_s5q24,ab_rerank_none_k8_same_shuffle_s5q24,0.15833333333333333,0.15833333333333333
+0.0,0.0,,0.375,1.0,0.0,,1766540837.1140325,ab_sandwich_0_gold_first_k4_same,3,C:\AI\code\GoldEvidenceBench\runs\ab_sandwich_0_gold_first_k4_same_s3q16,ab_sandwich_0_gold_first_k4_same_s3q16,0.0,0.0
+0.5625,0.5625,,0.4375,1.0,0.5625,,1766543469.2377071,ab_sandwich_0_gold_last_k4_same,3,C:\AI\code\GoldEvidenceBench\runs\ab_sandwich_0_gold_last_k4_same_s3q16,ab_sandwich_0_gold_last_k4_same_s3q16,0.5625,0.5625
+0.020833333333333332,0.020833333333333332,,0.5,1.0,0.020833333333333332,,1766542183.892018,ab_sandwich_0_gold_middle_k4_same,3,C:\AI\code\GoldEvidenceBench\runs\ab_sandwich_0_gold_middle_k4_same_s3q16,ab_sandwich_0_gold_middle_k4_same_s3q16,0.020833333333333332,0.020833333333333332
+0.4583333333333333,0.4583333333333333,,0.25,1.0,0.4583333333333333,,1766544814.25153,ab_sandwich_0_shuffle_k4_same,3,C:\AI\code\GoldEvidenceBench\runs\ab_sandwich_0_shuffle_k4_same_s3q16,ab_sandwich_0_shuffle_k4_same_s3q16,0.4583333333333333,0.4583333333333333
+0.0,0.0,,0.3125,1.0,0.0,,1766546636.6286867,ab_sandwich_1_gold_first_k4_same,3,C:\AI\code\GoldEvidenceBench\runs\ab_sandwich_1_gold_first_k4_same_s3q16,ab_sandwich_1_gold_first_k4_same_s3q16,0.0,0.0
+0.5625,0.5625,,0.4375,1.0,0.5625,,1766550710.4699607,ab_sandwich_1_gold_last_k4_same,3,C:\AI\code\GoldEvidenceBench\runs\ab_sandwich_1_gold_last_k4_same_s3q16,ab_sandwich_1_gold_last_k4_same_s3q16,0.5625,0.5625
+0.0,0.0,,0.25,1.0,0.0,,1766548843.0554569,ab_sandwich_1_gold_middle_k4_same,3,C:\AI\code\GoldEvidenceBench\runs\ab_sandwich_1_gold_middle_k4_same_s3q16,ab_sandwich_1_gold_middle_k4_same_s3q16,0.0,0.0
+0.1875,0.1875,,0.3125,1.0,0.1875,,1766552468.2377133,ab_sandwich_1_shuffle_k4_same,3,C:\AI\code\GoldEvidenceBench\runs\ab_sandwich_1_shuffle_k4_same_s3q16,ab_sandwich_1_shuffle_k4_same_s3q16,0.1875,0.1875
+,0.0,,0.0,1.0,0.0,,1766467288.184072,ambig_gold_first_k1,3,C:\AI\code\GoldEvidenceBench\runs\ambig_gold_first_k1_s3q16,ambig_gold_first_k1_s3q16,,0.0
+,0.0,,0.0,1.0,0.0,,1766447446.0861897,ambig_gold_first_k2,2,C:\AI\code\GoldEvidenceBench\runs\ambig_gold_first_k2,ambig_gold_first_k2,,0.0
+,0.0,,0.0,0.9916666666666666,0.0,,1766472822.194646,ambig_gold_first_k4,5,C:\AI\code\GoldEvidenceBench\runs\ambig_gold_first_k4_s5q24,ambig_gold_first_k4_s5q24,,0.0
+,0.0,,0.0,1.0,0.0,,1766517198.542905,ambig_gold_first_k4_other_key,3,C:\AI\code\GoldEvidenceBench\runs\ambig_gold_first_k4_other_key_s3q16,ambig_gold_first_k4_other_key_s3q16,,0.0
+,0.0,,0.0,1.0,0.0,,1766513009.5088444,ambig_gold_first_k4_same_key,3,C:\AI\code\GoldEvidenceBench\runs\ambig_gold_first_k4_same_key_s3q16,ambig_gold_first_k4_same_key_s3q16,,0.0
+,0.0,,0.0,1.0,0.0,,1766467288.5610611,ambig_gold_first_k8,3,C:\AI\code\GoldEvidenceBench\runs\ambig_gold_first_k8_s3q16,ambig_gold_first_k8_s3q16,,0.0
+,1.0,,0.0,1.0,1.0,,1766467288.7370553,ambig_gold_last_k1,3,C:\AI\code\GoldEvidenceBench\runs\ambig_gold_last_k1_s3q16,ambig_gold_last_k1_s3q16,,1.0
+,1.0,,0.0,1.0,1.0,,1766449300.2577443,ambig_gold_last_k2,2,C:\AI\code\GoldEvidenceBench\runs\ambig_gold_last_k2,ambig_gold_last_k2,,1.0
+,1.0,,0.0,1.0,1.0,,1766479152.5788054,ambig_gold_last_k4,5,C:\AI\code\GoldEvidenceBench\runs\ambig_gold_last_k4_s5q24,ambig_gold_last_k4_s5q24,,1.0
+,0.8541666666666666,,0.0,1.0,0.8541666666666666,,1766518534.9566588,ambig_gold_last_k4_other_key,3,C:\AI\code\GoldEvidenceBench\runs\ambig_gold_last_k4_other_key_s3q16,ambig_gold_last_k4_other_key_s3q16,,0.8541666666666666
+,1.0,,0.0,1.0,1.0,,1766514399.167164,ambig_gold_last_k4_same_key,3,C:\AI\code\GoldEvidenceBench\runs\ambig_gold_last_k4_same_key_s3q16,ambig_gold_last_k4_same_key_s3q16,,1.0
+,0.7916666666666666,,0.0,1.0,0.7916666666666666,,1766467289.1055107,ambig_gold_last_k8,3,C:\AI\code\GoldEvidenceBench\runs\ambig_gold_last_k8_s3q16,ambig_gold_last_k8_s3q16,,0.7916666666666666
+,0.25,,0.0,1.0,0.25,,1766476026.8841364,ambig_gold_middle_k4,5,C:\AI\code\GoldEvidenceBench\runs\ambig_gold_middle_k4_s5q24,ambig_gold_middle_k4_s5q24,,0.25
+,0.375,,0.0,1.0,0.375,,1766444548.3596265,ambig_k1,2,C:\AI\code\GoldEvidenceBench\runs\ambig_k1,ambig_k1,,0.375
+,0.375,,0.0,1.0,0.375,,1766444959.7562053,ambig_k2,2,C:\AI\code\GoldEvidenceBench\runs\ambig_k2,ambig_k2,,0.375
+,0.5,,0.0,1.0,0.5,,1766445454.1705115,ambig_k4,2,C:\AI\code\GoldEvidenceBench\runs\ambig_k4,ambig_k4,,0.5
+,0.25,,0.0,1.0,0.25,,1766446125.2191837,ambig_k8,2,C:\AI\code\GoldEvidenceBench\runs\ambig_k8,ambig_k8,,0.25
+,0.625,,0.0,1.0,0.625,,1766467289.2855058,ambig_shuffle_k1,3,C:\AI\code\GoldEvidenceBench\runs\ambig_shuffle_k1_s3q16,ambig_shuffle_k1_s3q16,,0.625
+,0.75,,0.0,1.0,0.75,,1766451180.6775284,ambig_shuffle_k2,2,C:\AI\code\GoldEvidenceBench\runs\ambig_shuffle_k2,ambig_shuffle_k2,,0.75
+,0.21666666666666665,,0.0,1.0,0.21666666666666665,,1766482342.9882324,ambig_shuffle_k4,5,C:\AI\code\GoldEvidenceBench\runs\ambig_shuffle_k4_s5q24,ambig_shuffle_k4_s5q24,,0.21666666666666665
+,0.625,,0.0,1.0,0.625,,1766519917.300117,ambig_shuffle_k4_other_key,3,C:\AI\code\GoldEvidenceBench\runs\ambig_shuffle_k4_other_key_s3q16,ambig_shuffle_k4_other_key_s3q16,,0.625
+,0.4166666666666667,,0.0,1.0,0.4166666666666667,,1766515865.8557596,ambig_shuffle_k4_same_key,3,C:\AI\code\GoldEvidenceBench\runs\ambig_shuffle_k4_same_key_s3q16,ambig_shuffle_k4_same_key_s3q16,,0.4166666666666667
+,0.3958333333333333,,0.0,1.0,0.3958333333333333,,1766467289.6545,ambig_shuffle_k8,3,C:\AI\code\GoldEvidenceBench\runs\ambig_shuffle_k8_s3q16,ambig_shuffle_k8_s3q16,,0.3958333333333333
+,1.0,,,1.0,1.0,,1766438144.27854,drop_0,2,C:\AI\code\GoldEvidenceBench\runs\drop_0,drop_0,,1.0
+,0.625,,,1.0,0.625,,1766438572.5961056,drop_0_2,2,C:\AI\code\GoldEvidenceBench\runs\drop_0_2,drop_0_2,,0.625
+,0.625,,,1.0,0.625,,1766438994.3084743,drop_0_4,2,C:\AI\code\GoldEvidenceBench\runs\drop_0_4,drop_0_4,,0.625
+,0.25,,,1.0,0.25,,1766439424.9867425,drop_0_6,2,C:\AI\code\GoldEvidenceBench\runs\drop_0_6,drop_0_6,,0.25
+,0.125,,,1.0,0.125,,1766439963.533077,drop_0_8,2,C:\AI\code\GoldEvidenceBench\runs\drop_0_8,drop_0_8,,0.125
+,0.4333333333333333,,0.16666666666666666,1.0,0.4333333333333333,,1766532684.5598817,drop_k4_shuffle_p0.2,5,C:\AI\code\GoldEvidenceBench\runs\drop_k4_shuffle_p0.2_s5q24,drop_k4_shuffle_p0.2_s5q24,,0.4333333333333333
+,0.4333333333333333,,0.2916666666666667,1.0,0.4333333333333333,,1766536143.7273238,drop_k4_shuffle_p0.4,5,C:\AI\code\GoldEvidenceBench\runs\drop_k4_shuffle_p0.4_s5q24,drop_k4_shuffle_p0.4_s5q24,,0.4333333333333333
+,0.5083333333333333,,0.0,1.0,0.5083333333333333,,1766529445.658887,drop_k4_shuffle_p0,5,C:\AI\code\GoldEvidenceBench\runs\drop_k4_shuffle_p0_s5q24,drop_k4_shuffle_p0_s5q24,,0.5083333333333333
+1.0,1.0,1.0000 -> 1.0000 -> 1.0000 -> 1.0000,0.0,1.0,1.0,1.0,1766720907.713045,selector_quick_latest_step_k2,2,C:\AI\code\GoldEvidenceBench\runs\selector_quick_latest_step_k2,selector_quick_latest_step_k2,1.0,1.0
+1.0,1.0,1.0000 -> 1.0000 -> 1.0000 -> 1.0000,0.0,1.0,1.0,1.0,1766721343.742308,selector_quick_latest_step_k4,2,C:\AI\code\GoldEvidenceBench\runs\selector_quick_latest_step_k4,selector_quick_latest_step_k4,1.0,1.0
+1.0,1.0,1.0000 -> 1.0000 -> 1.0000 -> 1.0000,0.0,1.0,1.0,1.0,1766721775.574224,selector_quick_latest_step_k8,2,C:\AI\code\GoldEvidenceBench\runs\selector_quick_latest_step_k8,selector_quick_latest_step_k8,1.0,1.0
+0.5416666666666666,0.5416666666666667,1.0000 -> 0.5417 -> 0.5417 -> 0.5417,0.0,1.0,0.5416666666666667,1.0,1766714799.5240333,selector_quick_none_k2,2,C:\AI\code\GoldEvidenceBench\runs\selector_quick_none_k2,selector_quick_none_k2,0.5416666666666666,0.5416666666666667
+0.3333333333333333,0.3333333333333333,1.0000 -> 0.3333 -> 0.3333 -> 0.3333,0.0,1.0,0.3333333333333333,1.0,1766715460.0660408,selector_quick_none_k4,2,C:\AI\code\GoldEvidenceBench\runs\selector_quick_none_k4,selector_quick_none_k4,0.3333333333333333,0.3333333333333333
+0.2916666666666667,0.29166666666666663,1.0000 -> 0.2917 -> 0.2917 -> 0.2917,0.0,1.0,0.29166666666666663,1.0,1766716299.1366153,selector_quick_none_k8,2,C:\AI\code\GoldEvidenceBench\runs\selector_quick_none_k8,selector_quick_none_k8,0.2916666666666667,0.29166666666666663
