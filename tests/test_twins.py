@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from tagbench.generate import EpisodeConfig, generate_dataset
-from tagbench.grade import grade_rows
+from goldevidencebench.generate import EpisodeConfig, generate_dataset
+from goldevidencebench.grade import grade_rows
 
 
 def test_twins_consistency_metric() -> None:

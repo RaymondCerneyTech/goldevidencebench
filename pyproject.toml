@@ -3,7 +3,7 @@ requires = ["setuptools>=69", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "tagbench"
+name = "goldevidencebench"
 version = "0.1.0"
 description = "Benchmark for long-context evolving-state tracking via book artifacts (chapters, glossary/tags, ledger)."
 readme = "README.md"
@@ -16,7 +16,7 @@ dependencies = ["pydantic>=2.7"]
 dev = ["pytest>=8", "ruff>=0.5"]
 
 [project.scripts]
-tagbench = "tagbench.cli:main"
+goldevidencebench = "goldevidencebench.cli:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from tagbench.grade import grade_rows
+from goldevidencebench.grade import grade_rows
 
 
 def test_grader_citation_required_affects_exact() -> None:

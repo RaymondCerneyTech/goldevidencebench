@@ -5,8 +5,9 @@ from dataclasses import dataclass
 from typing import Any
 import random
 
-from tagbench.baselines import parse_book_ledger
-from tagbench.book import LedgerEntry, render_book
+from goldevidencebench.baselines import parse_book_ledger
+from goldevidencebench.book import LedgerEntry, render_book
+from goldevidencebench.adapters.llama_prompt import extract_ledger, truncate_tokens, build_prompt
 
 
 @dataclass(frozen=True)
@@ -19,6 +20,8 @@ class RetrievalConfig:
     order: str = "shuffle"  # shuffle|gold_first|gold_middle|gold_last
     order_seed: int = 0
     query_sandwich: bool = False
+    pick_then_answer: bool = False
+    rerank_mode: str = "none"  # none|latest_step
 
 
 def _sorted_entries(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -104,6 +107,12 @@ def _apply_order(
     return rest[:mid] + gold + rest[mid:], "gold_middle"
 
 
+def _rerank_latest_step(entries: list[dict[str, Any]]) -> dict[str, Any] | None:
+    if not entries:
+        return None
+    return max(entries, key=lambda e: int(e.get("step", -1)))
+
+
 def _build_min_book(*, entry: dict[str, Any], key: str, episode_id: str) -> str:
     ledger = [
         LedgerEntry(
@@ -116,7 +125,7 @@ def _build_min_book(*, entry: dict[str, Any], key: str, episode_id: str) -> str:
     ]
     glossary = {key: f"Synthetic tag {key} used for state-tracking."}
     return render_book(
-        title=f"TagBench Retrieval {episode_id}",
+        title=f"GoldEvidenceBench Retrieval {episode_id}",
         chapters=[""],
         glossary=glossary,
         ledger=ledger,
@@ -137,11 +146,35 @@ def _build_multi_book(*, entries: list[dict[str, Any]], episode_id: str) -> str:
     keys = sorted({entry["key"] for entry in entries})
     glossary = {k: f"Synthetic tag {k} used for state-tracking." for k in keys}
     return render_book(
-        title=f"TagBench Retrieval {episode_id}",
+        title=f"GoldEvidenceBench Retrieval {episode_id}",
         chapters=[""],
         glossary=glossary,
         ledger=ledger,
     )
+
+
+def _selection_question(question: str, key: str) -> str:
+    return (
+        f"{question}\n"
+        f"Select the single correct support_id for {key} from the ledger above. "
+        "Return value null."
+    )
+
+
+def _norm_support_list(value: Any) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, list):
+        out: list[str] = []
+        for item in value:
+            if item is None:
+                continue
+            s = str(item).strip()
+            if s:
+                out.append(s)
+        return out
+    s = str(value).strip()
+    return [s] if s else []
 
 
 class RetrievalLlamaCppAdapter:
@@ -168,6 +201,8 @@ class RetrievalLlamaCppAdapter:
         order_env = os.getenv("TAGBENCH_RETRIEVAL_ORDER", "shuffle").strip().lower()
         order_seed_env = os.getenv("TAGBENCH_RETRIEVAL_ORDER_SEED", "0").strip()
         sandwich_env = os.getenv("TAGBENCH_RETRIEVAL_QUERY_SANDWICH", "0").strip().lower()
+        pick_env = os.getenv("TAGBENCH_RETRIEVAL_PICK_THEN_ANSWER", "0").strip().lower()
+        rerank_env = os.getenv("TAGBENCH_RETRIEVAL_RERANK", "none").strip().lower()
         try:
             k_val = int(k_env)
         except ValueError:
@@ -195,8 +230,10 @@ class RetrievalLlamaCppAdapter:
             order=order_env,
             order_seed=order_seed,
             query_sandwich=sandwich_env in {"1", "true", "yes"},
+            pick_then_answer=pick_env in {"1", "true", "yes"},
+            rerank_mode=rerank_env if rerank_env in {"none", "latest_step"} else "none",
         )
-        from tagbench.adapters.llama_cpp_adapter import LlamaCppAdapter
+        from goldevidencebench.adapters.llama_cpp_adapter import LlamaCppAdapter
 
         self._answerer = LlamaCppAdapter(
             model_path=model_path,
@@ -267,6 +304,53 @@ class RetrievalLlamaCppAdapter:
             mini_book = _build_min_book(entry=entry, key=key, episode_id=row.get("episode_id", "E0000"))
         else:
             mini_book = _build_multi_book(entries=selected, episode_id=row.get("episode_id", "E0000"))
+        if self.cfg.rerank_mode == "latest_step":
+            chosen = _rerank_latest_step(selected)
+            self._last_diag = {
+                **(self._last_diag or {}),
+                "rerank_mode": "latest_step",
+                "reranked_uid": chosen.get("uid") if chosen else None,
+            }
+            if chosen:
+                mini_book = _build_min_book(
+                    entry=chosen,
+                    key=chosen["key"],
+                    episode_id=row.get("episode_id", "E0000"),
+                )
+        elif self.cfg.pick_then_answer and len(selected) > 1:
+            ledger = extract_ledger(mini_book)
+            ledger = truncate_tokens(
+                ledger,
+                self.max_book_tokens,
+                tokenize=getattr(self._answerer.llm, "tokenize", None),
+                detokenize=getattr(self._answerer.llm, "detokenize", None),
+            )
+            pick_prompt = build_prompt(
+                ledger=ledger,
+                question=_selection_question(row["question"], key),
+                require_citations=True,
+                query_sandwich=self.cfg.query_sandwich,
+            )
+            picked = self._answerer.predict_raw_from_prompt(
+                prompt=pick_prompt, require_citations=True
+            )
+            picked_ids = _norm_support_list(
+                (picked or {}).get("support_ids") or (picked or {}).get("support_id")
+            )
+            chosen = picked_ids[0] if picked_ids else None
+            self._last_diag = {
+                **(self._last_diag or {}),
+                "pick_then_answer": True,
+                "picked_support_id": chosen,
+            }
+            if chosen:
+                chosen_entry = next((e for e in selected if e.get("uid") == chosen), None)
+                if chosen_entry:
+                    mini_book = _build_min_book(
+                        entry=chosen_entry,
+                        key=chosen_entry["key"],
+                        episode_id=row.get("episode_id", "E0000"),
+                    )
         row_for_adapter = {**row, "book": mini_book}
         return self._answerer.predict(row_for_adapter, protocol=protocol)
 

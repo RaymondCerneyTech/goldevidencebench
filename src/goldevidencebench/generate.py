@@ -5,7 +5,7 @@ import re
 from dataclasses import asdict, dataclass
 from typing import Any
 
-from tagbench.book import LedgerEntry, render_book
+from goldevidencebench.book import LedgerEntry, render_book
 
 
 @dataclass(frozen=True)
@@ -293,7 +293,7 @@ def generate_episode(*, seed: int, episode_id: str, cfg: EpisodeConfig) -> dict[
     used_uids: set[str] = set()
     log_lines: list[str] = []
 
-    log_lines.append(f"# TagBench Episode {episode_id}")
+    log_lines.append(f"# GoldEvidenceBench Episode {episode_id}")
     log_lines.append("")
     log_lines.append("## Episode Log")
 
@@ -414,7 +414,7 @@ def generate_episode(*, seed: int, episode_id: str, cfg: EpisodeConfig) -> dict[
 
     chapter_texts = ["\n".join(lines).strip() for lines in chapters]
     book = render_book(
-        title=f"TagBench Episode {episode_id}",
+        title=f"GoldEvidenceBench Episode {episode_id}",
         chapters=chapter_texts,
         glossary=glossary,
         ledger=ledger,
@@ -552,7 +552,7 @@ def _make_counterfactual_twin(
     base_book: str = base_rows[0]["book"]
 
     # Parse authoritative updates from the base episode log (document).
-    from tagbench.baselines import parse_updates
+    from goldevidencebench.baselines import parse_updates
 
     updates = parse_updates(base_doc)
     state_mode = base_rows[0]["meta"].get("state_mode", "kv")

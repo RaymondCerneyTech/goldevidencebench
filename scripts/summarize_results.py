@@ -7,9 +7,9 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
-from tagbench import grade as grade_mod
-from tagbench.baselines import parse_model_json_answer, parse_updates
-from tagbench.util import read_jsonl
+from goldevidencebench import grade as grade_mod
+from goldevidencebench.baselines import parse_model_json_answer, parse_updates
+from goldevidencebench.util import read_jsonl
 
 
 def _flatten(row: dict[str, Any]) -> dict[str, Any]:
@@ -138,6 +138,58 @@ def _bucket_label(value: int, edges: list[int]) -> str:
 def _parse_edges(raw: str | None, default: str) -> list[int]:
     text = raw if raw is not None else default
     return [int(s) for s in text.split(",") if s.strip()]
+
+
+def _compute_decomposition(
+    *,
+    data_rows: list[dict[str, Any]],
+    pred_by_id: dict[str, dict[str, Any]],
+    retrieval_stats: list[dict[str, Any]],
+) -> dict[str, Any] | None:
+    retrieval_by_id: dict[str, dict[str, Any]] = {}
+    for stat in retrieval_stats:
+        rid = stat.get("id")
+        if rid:
+            retrieval_by_id[rid] = stat
+    total = len(retrieval_stats)
+    if total == 0:
+        return None
+    included = 0
+    value_ok = 0
+    selection_total = 0
+    selection_ok = 0
+    for row in data_rows:
+        rid = row.get("id")
+        if not rid:
+            continue
+        pred = pred_by_id.get(rid)
+        if pred is None:
+            continue
+        diag = retrieval_by_id.get(rid)
+        if not diag or diag.get("correct_included") is not True:
+            continue
+        included += 1
+        gold_value = _norm_value(row.get("gold", {}).get("value"))
+        pred_value = _norm_value(pred.get("value"))
+        if gold_value == pred_value:
+            value_ok += 1
+        gold_supports = _norm_support_list(
+            row.get("gold", {}).get("support_ids") or row.get("gold", {}).get("support_id")
+        )
+        correct_uid = diag.get("correct_uid") or (gold_supports[0] if gold_supports else None)
+        if correct_uid:
+            selection_total += 1
+            pred_supports = _norm_support_list(pred.get("support_ids") or pred.get("support_id"))
+            if correct_uid in pred_supports:
+                selection_ok += 1
+    gold_present_rate = included / total if total else 0.0
+    acc_when = (value_ok / included) if included else 0.0
+    selection_rate = (selection_ok / selection_total) if selection_total else None
+    return {
+        "gold_present_rate": gold_present_rate,
+        "accuracy_when_gold_present": acc_when,
+        "selection_rate": selection_rate,
+    }
 
 
 def _pred_index(pred_rows: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
@@ -362,10 +414,17 @@ def summarize(rows: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Summarize tagbench results JSON into CSV/JSON.")
+    parser = argparse.ArgumentParser(description="Summarize goldevidencebench results JSON into CSV/JSON.")
     parser.add_argument("--in", dest="input_path", type=Path, default=Path("runs/combined.json"))
     parser.add_argument("--out-csv", dest="out_csv", type=Path, default=Path("runs/summary.csv"))
     parser.add_argument("--out-json", dest="out_json", type=Path, default=Path("runs/summary.json"))
+    parser.add_argument(
+        "--out-decomp-csv",
+        dest="out_decomp_csv",
+        type=Path,
+        default=None,
+        help="Optional path for decomposition CSV output (one row per run).",
+    )
     parser.add_argument(
         "--recency-buckets",
         type=str,
@@ -397,6 +456,7 @@ def main() -> int:
     gold_present_value_ok = 0
     selection_total = 0
     selection_ok = 0
+    decomp_rows: list[dict[str, Any]] = []
 
     recency_rows = []
     for row in rows:
@@ -411,6 +471,37 @@ def main() -> int:
         pred_by_id = _pred_index(preds)
         retrieval_by_id: dict[str, dict[str, Any]] = {}
         stats = row.get("retrieval_stats")
+        if isinstance(stats, list):
+            decomp = _compute_decomposition(
+                data_rows=data_rows, pred_by_id=pred_by_id, retrieval_stats=stats
+            )
+            if decomp:
+                first = stats[0] if stats else {}
+                metrics = row.get("metrics", {})
+                decomp_rows.append(
+                    {
+                        "baseline": row.get("baseline") or row.get("adapter"),
+                        "seed": row.get("seed"),
+                        "state_mode": row.get("state_mode"),
+                        "distractor_profile": row.get("distractor_profile"),
+                        "steps": row.get("steps"),
+                        "queries": row.get("data", {}).get("n"),
+                        "max_book_tokens": row.get("config", {}).get("max_book_tokens"),
+                        "retrieval_k": first.get("k"),
+                        "retrieval_wrong_type": first.get("wrong_type"),
+                        "retrieval_order": first.get("order"),
+                        "retrieval_drop_prob": first.get("drop_prob"),
+                        "retrieval_rerank": first.get("rerank_mode"),
+                        "pick_then_answer": first.get("pick_then_answer"),
+                        "gold_present_rate": decomp["gold_present_rate"],
+                        "selection_rate": decomp["selection_rate"],
+                        "accuracy_when_gold_present": decomp["accuracy_when_gold_present"],
+                        "overall_value_acc": metrics.get("value_acc"),
+                        "overall_exact_acc": metrics.get("exact_acc"),
+                        "overall_cite_f1": metrics.get("cite_f1"),
+                        "overall_entailment": metrics.get("entailment"),
+                    }
+                )
         if isinstance(stats, list):
             for stat in stats:
                 if not isinstance(stat, dict):
@@ -462,6 +553,16 @@ def main() -> int:
         retrieval_summary["gold_present_count"] = gold_present_total
         retrieval_summary["accuracy_when_gold_present"] = gold_present_value_ok / gold_present_total
         retrieval_summary["selection_rate"] = (selection_ok / selection_total) if selection_total else None
+        if "gold_in_context_rate" in retrieval_summary:
+            retrieval_summary["gold_present_rate"] = retrieval_summary["gold_in_context_rate"]
+        overall_acc = summary.get("overall", {}).get("value_acc_mean")
+        gold_rate = retrieval_summary.get("gold_present_rate")
+        sel_rate = retrieval_summary.get("selection_rate")
+        acc_when = retrieval_summary.get("accuracy_when_gold_present")
+        if None not in (gold_rate, sel_rate, acc_when, overall_acc):
+            retrieval_summary["decomposition_line"] = (
+                f"{gold_rate:.4f} -> {sel_rate:.4f} -> {acc_when:.4f} -> {overall_acc:.4f}"
+            )
 
     if recency_rows:
         summary["recency"] = {
@@ -477,6 +578,11 @@ def main() -> int:
             writer = csv.DictWriter(f, fieldnames=sorted(flat[0].keys()))
             writer.writeheader()
             writer.writerows(flat)
+    if args.out_decomp_csv and decomp_rows:
+        with args.out_decomp_csv.open("w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=sorted(decomp_rows[0].keys()))
+            writer.writeheader()
+            writer.writerows(decomp_rows)
     args.out_json.write_text(json.dumps(summary, indent=2), encoding="utf-8")
     print(f"Wrote {args.out_csv} and {args.out_json}")
     return 0

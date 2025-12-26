@@ -44,7 +44,7 @@ $args = @(
     "--queries", $queries,
     "--state-modes", $stateModes,
     "--distractor-profiles", $profiles,
-    "--adapter", "tagbench.adapters.llama_cpp_adapter:create_adapter",
+    "--adapter", "goldevidencebench.adapters.llama_cpp_adapter:create_adapter",
     "--results-json", (Join-Path $OutDir "combined.json")
 )
 
@@ -55,5 +55,5 @@ if (-not $RequireCitations) {
     $args += "--no-require-citations"
 }
 
-& tagbench @args
+& goldevidencebench @args
 exit $LASTEXITCODE

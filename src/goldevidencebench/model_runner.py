@@ -6,7 +6,7 @@ from typing import Any, Protocol
 
 from pydantic import BaseModel, ValidationError, field_validator, model_validator
 
-from tagbench.baselines import parse_book_ledger, parse_updates, validate_book_artifact
+from goldevidencebench.baselines import parse_book_ledger, parse_updates, validate_book_artifact
 
 
 class ModelAdapter(Protocol):

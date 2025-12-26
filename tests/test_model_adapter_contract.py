@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import pytest
 
-from tagbench.adapters.ledger_adapter import create_adapter
-from tagbench.adapters.log_to_book_adapter import LogToBookAdapter
-from tagbench.generate import EpisodeConfig, generate_dataset
-from tagbench.model_runner import run_adapter, validate_adapter_output
+from goldevidencebench.adapters.ledger_adapter import create_adapter
+from goldevidencebench.adapters.log_to_book_adapter import LogToBookAdapter
+from goldevidencebench.generate import EpisodeConfig, generate_dataset
+from goldevidencebench.model_runner import run_adapter, validate_adapter_output
 
 
 def test_adapter_closed_book_receives_no_document() -> None:

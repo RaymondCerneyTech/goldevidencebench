@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from tagbench.adapters.llm_book_builder_adapter import (
+from goldevidencebench.adapters.llm_book_builder_adapter import (
     build_book_from_updates,
     build_book_per_key_deterministic,
 )
-from tagbench.baselines import parse_book_ledger, parse_updates
-from tagbench.generate import EpisodeConfig, generate_dataset
+from goldevidencebench.baselines import parse_book_ledger, parse_updates
+from goldevidencebench.generate import EpisodeConfig, generate_dataset
 
 
 def test_builder_helpers_match_latest_updates() -> None:

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from tagbench.baselines import predict_ledger_row
+from goldevidencebench.baselines import predict_ledger_row
 
 
 class LedgerAdapter:

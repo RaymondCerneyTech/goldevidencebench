@@ -8,11 +8,11 @@ import time
 from pathlib import Path
 from typing import Any
 
-from tagbench.baselines import iter_predictions, parse_model_json_answer
-from tagbench.generate import EpisodeConfig, generate_dataset
-from tagbench.grade import grade_rows
-from tagbench.model_runner import load_adapter, run_adapter
-from tagbench.util import read_jsonl, write_jsonl
+from goldevidencebench.baselines import iter_predictions, parse_model_json_answer
+from goldevidencebench.generate import EpisodeConfig, generate_dataset
+from goldevidencebench.grade import grade_rows
+from goldevidencebench.model_runner import load_adapter, run_adapter
+from goldevidencebench.util import read_jsonl, write_jsonl
 
 
 def _estimate_tokens(text: str) -> int:
@@ -481,10 +481,10 @@ def _cmd_sweep(ns: argparse.Namespace) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="tagbench")
+    p = argparse.ArgumentParser(prog="goldevidencebench")
     sub = p.add_subparsers(dest="cmd", required=True)
 
-    g = sub.add_parser("generate", help="Generate a synthetic TagBench dataset (JSONL).")
+    g = sub.add_parser("generate", help="Generate a synthetic GoldEvidenceBench dataset (JSONL).")
     g.add_argument("--out", required=True, type=Path, help="Output JSONL path.")
     g.add_argument("--seed", type=int, default=0)
     g.add_argument("--episodes", type=int, default=20)

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from tagbench.adapters.llama_prompt import build_prompt, extract_ledger, truncate_tokens
+from goldevidencebench.adapters.llama_prompt import build_prompt, extract_ledger, truncate_tokens
 
 
 def test_extract_ledger_returns_ledger_section() -> None:

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from tagbench.adapters.log_to_book_adapter import LogToBookAdapter
-from tagbench.generate import EpisodeConfig, generate_dataset
-from tagbench.model_runner import run_adapter
+from goldevidencebench.adapters.log_to_book_adapter import LogToBookAdapter
+from goldevidencebench.generate import EpisodeConfig, generate_dataset
+from goldevidencebench.model_runner import run_adapter
 
 
 def test_artifact_stats_present_for_build_adapter() -> None:

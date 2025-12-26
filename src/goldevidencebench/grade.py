@@ -280,7 +280,7 @@ def grade_rows(
 
             if entailment_check:
                 # "Entailment from citations": using only cited authoritative updates, the answer must follow.
-                from tagbench.baselines import parse_updates
+                from goldevidencebench.baselines import parse_updates
 
                 uid_to_entry = {e["uid"]: e for e in parse_updates(row["document"])}
                 cited_entries = [uid_to_entry.get(uid) for uid in pred_supports_scored]

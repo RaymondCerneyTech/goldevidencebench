@@ -10,9 +10,9 @@ try:
 except Exception:  # pragma: no cover - optional dependency
     LlamaGrammar = None
 
-from tagbench.adapters.llama_prompt import truncate_tokens
-from tagbench.baselines import parse_updates
-from tagbench.book import LedgerEntry, render_book
+from goldevidencebench.adapters.llama_prompt import truncate_tokens
+from goldevidencebench.baselines import parse_updates
+from goldevidencebench.book import LedgerEntry, render_book
 
 JSON_UPDATES_GRAMMAR = r"""
 root   ::= ws "{" ws "\"updates\"" ws ":" ws array ws "}" ws
@@ -107,7 +107,7 @@ def _render_book_from_state(*, document: str, episode_id: str, last_by_key: dict
         keys = sorted({entry["key"] for entry in last_by_key.values()})
         glossary = {k: f"Synthetic tag {k} used for state-tracking." for k in keys}
     return render_book(
-        title=f"TagBench Teacher {episode_id}",
+        title=f"GoldEvidenceBench Teacher {episode_id}",
         chapters=[""],
         glossary=glossary,
         ledger=ledger,
@@ -152,7 +152,7 @@ class LlmBookBuilderAdapter:
         except ImportError as exc:  # pragma: no cover - optional dependency
             raise ImportError("llama_cpp not installed; install via `pip install llama-cpp-python`") from exc
         self._builder = Llama(model_path=builder_model_path or model_path, n_ctx=n_ctx, n_threads=n_threads)
-        from tagbench.adapters.llama_cpp_adapter import LlamaCppAdapter
+        from goldevidencebench.adapters.llama_cpp_adapter import LlamaCppAdapter
         self._answerer = LlamaCppAdapter(
             model_path=model_path,
             n_ctx=n_ctx,

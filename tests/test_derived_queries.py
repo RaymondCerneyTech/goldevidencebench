@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from tagbench.baselines import iter_predictions
-from tagbench.generate import EpisodeConfig, generate_dataset
-from tagbench.grade import grade_rows
+from goldevidencebench.baselines import iter_predictions
+from goldevidencebench.generate import EpisodeConfig, generate_dataset
+from goldevidencebench.grade import grade_rows
 
 
 def test_set_mode_derived_queries_are_scored() -> None:

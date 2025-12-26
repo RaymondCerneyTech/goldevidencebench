@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from tagbench.baselines import predict_ledger_row
-from tagbench.book import LedgerEntry, render_book
+from goldevidencebench.baselines import predict_ledger_row
+from goldevidencebench.book import LedgerEntry, render_book
 
 
 class LogToBookAdapter:
@@ -15,14 +15,14 @@ class LogToBookAdapter:
         self.artifacts: dict[str, str] = {}
 
     def build_artifact(self, *, document: str, episode_id: str, protocol: str = "open_book") -> str:
-        from tagbench.baselines import parse_updates
+        from goldevidencebench.baselines import parse_updates
 
         updates = parse_updates(document)
         ledger = [
             LedgerEntry(uid=u["uid"], step=u["step"], op=u["op"], key=u["key"], value=u["value"])
             for u in updates
         ]
-        artifact = render_book(title=f"TagBench Rebuilt {episode_id}", chapters=[], glossary={}, ledger=ledger)
+        artifact = render_book(title=f"GoldEvidenceBench Rebuilt {episode_id}", chapters=[], glossary={}, ledger=ledger)
         self.artifacts[episode_id] = artifact
         return artifact
 

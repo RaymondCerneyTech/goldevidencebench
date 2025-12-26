@@ -5,9 +5,9 @@ import json
 from dataclasses import dataclass
 from typing import Any, Iterable
 
-from tagbench.baselines import parse_updates
-from tagbench.book import LedgerEntry, render_book
-from tagbench.adapters.llama_prompt import truncate_tokens
+from goldevidencebench.baselines import parse_updates
+from goldevidencebench.book import LedgerEntry, render_book
+from goldevidencebench.adapters.llama_prompt import truncate_tokens
 
 try:
     from llama_cpp import LlamaGrammar
@@ -101,7 +101,7 @@ def build_streaming_book(*, document: str, episode_id: str, cfg: StreamingConfig
         keys = sorted({entry["key"] for entry in last_by_key.values()})
         glossary = {k: f"Synthetic tag {k} used for state-tracking." for k in keys}
     return render_book(
-        title=f"TagBench Streaming {episode_id}",
+        title=f"GoldEvidenceBench Streaming {episode_id}",
         chapters=[""],
         glossary=glossary,
         ledger=ledger,
@@ -134,7 +134,7 @@ class StreamingLlamaCppAdapter:
         if stream_mode is None:
             stream_mode = os.getenv("TAGBENCH_STREAM_MODE", "llm").strip().lower()
         self.cfg = StreamingConfig(chunk_tokens=chunk_tokens)
-        from tagbench.adapters.llama_cpp_adapter import LlamaCppAdapter
+        from goldevidencebench.adapters.llama_cpp_adapter import LlamaCppAdapter
 
         self._llm = LlamaCppAdapter(
             model_path=model_path,
@@ -287,7 +287,7 @@ def _render_stream_book(*, document: str, episode_id: str, last_by_key: dict[str
         keys = sorted({entry["key"] for entry in last_by_key.values()})
         glossary = {k: f"Synthetic tag {k} used for state-tracking." for k in keys}
     return render_book(
-        title=f"TagBench Streaming {episode_id}",
+        title=f"GoldEvidenceBench Streaming {episode_id}",
         chapters=[""],
         glossary=glossary,
         ledger=ledger,

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from tagbench.baselines import parse_book_ledger, validate_book_artifact
-from tagbench.generate import EpisodeConfig, generate_dataset
+from goldevidencebench.baselines import parse_book_ledger, validate_book_artifact
+from goldevidencebench.generate import EpisodeConfig, generate_dataset
 
 
 def test_book_artifact_does_not_embed_update_lines_verbatim() -> None:
@@ -27,7 +27,7 @@ def test_closed_book_ignores_document() -> None:
     for r in rows:
         poisoned.append({**r, "document": r["document"] + "\n- [UBADBAD] UPDATE step=999 SET tag.00 = poison\n"})
 
-    from tagbench.baselines import iter_predictions
+    from goldevidencebench.baselines import iter_predictions
     preds = list(iter_predictions(poisoned, baseline="ledger", protocol="closed_book"))
     gold = {r["id"]: r["gold"]["value"] for r in rows}
 

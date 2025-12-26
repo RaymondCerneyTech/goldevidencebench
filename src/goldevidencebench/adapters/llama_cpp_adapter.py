@@ -11,8 +11,8 @@ try:
 except ImportError as exc:  # pragma: no cover - optional dependency
     raise ImportError("llama_cpp not installed; install via `pip install llama-cpp-python`") from exc
 
-from tagbench.adapters.llama_prompt import build_prompt, extract_ledger, truncate_tokens
-from tagbench.baselines import parse_book_ledger
+from goldevidencebench.adapters.llama_prompt import build_prompt, extract_ledger, truncate_tokens
+from goldevidencebench.baselines import parse_book_ledger
 
 try:  # optional low-level perf API
     from llama_cpp import llama_cpp as llama_cpp_lib
@@ -77,6 +77,13 @@ class LlamaCppAdapter:
         self._last_perf: dict[str, Any] | None = None
         self._last_raw: dict[str, Any] | None = None
 
+    def predict_raw_from_prompt(self, *, prompt: str, require_citations: bool) -> dict[str, Any] | None:
+        text = _generate_text(self, prompt=prompt, require_citations=require_citations)
+        parsed = _parse_json(text=text, require_citations=require_citations)
+        if parsed is not None and require_citations:
+            self._last_raw = {"value": parsed.get("value"), "support_ids": parsed.get("support_ids")}
+        return parsed
+
     def predict(self, row: dict[str, Any], *, protocol: str = "closed_book") -> dict[str, Any]:
         if protocol != "closed_book":
             raise ValueError("LlamaCppAdapter supports closed_book only.")
@@ -99,69 +106,18 @@ class LlamaCppAdapter:
             require_citations=self.require_citations,
             query_sandwich=self.query_sandwich,
         )
-        # Prefer JSON response_format if supported; fall back to plain text.
-        text = ""
-        max_ctx = _get_ctx(self.llm, default=2048)
-        max_output_tokens = 64
-        prompt_safe, max_output_tokens = _fit_prompt(
-            llm=self.llm,
-            prompt=prompt,
-            max_ctx=max_ctx,
-            max_output_tokens=max_output_tokens,
-        )
-        prompt_tokens = _count_tokens(self.llm, prompt_safe)
-        print(
-            f"[tagbench] llama prompt_tokens={prompt_tokens} max_ctx={max_ctx} max_output_tokens={max_output_tokens}",
-            file=sys.stderr,
-        )
-        _perf_reset(self.llm)
-        grammar = self.grammar_single if self.require_citations else self.grammar_empty
-        if grammar is not None and hasattr(self.llm, "create_completion"):
-            resp = self.llm.create_completion(
-                prompt=prompt_safe,
-                max_tokens=max_output_tokens,
-                stop=STOP_SEQS,
-                grammar=grammar,
-            )
-            text = resp["choices"][0]["text"]
-        else:
-            try:
-                resp = self.llm(
-                    prompt_safe,
-                    stop=STOP_SEQS,
-                    max_tokens=max_output_tokens,
-                    response_format={"type": "json_object"},
-                )
-                text = resp["choices"][0]["text"]
-            except TypeError:
-                if hasattr(self.llm, "create_completion"):
-                    resp = self.llm.create_completion(
-                        prompt=prompt_safe,
-                        max_tokens=max_output_tokens,
-                        stop=STOP_SEQS,
-                        grammar=grammar,
-                    )
-                    text = resp["choices"][0]["text"]
-                else:  # pragma: no cover
-                    resp = self.llm(prompt_safe, max_tokens=64, stop=STOP_SEQS)
-                    text = resp["choices"][0]["text"]
-        self._last_perf = _perf_snapshot(self.llm)
-        try:
-            parsed = json.loads(text)
-            if isinstance(parsed, dict):
-                parsed.setdefault("value", None)
-                if not self.require_citations:
-                    parsed["support_ids"] = []
-                    parsed.pop("support_id", None)
-                else:
-                    parsed.setdefault("support_ids", [])
-                    self._last_raw = {"value": parsed.get("value"), "support_ids": parsed.get("support_ids")}
-                    selected = _select_support_id(book, row, parsed.get("value"))
-                    parsed["support_ids"] = [selected] if selected else []
-                    parsed.pop("support_id", None)
-                return parsed
-        except json.JSONDecodeError:
-            pass
+        text = _generate_text(self, prompt=prompt, require_citations=self.require_citations)
+        parsed = _parse_json(text=text, require_citations=self.require_citations)
+        if isinstance(parsed, dict):
+            if not self.require_citations:
+                parsed["support_ids"] = []
+                parsed.pop("support_id", None)
+            else:
+                self._last_raw = {"value": parsed.get("value"), "support_ids": parsed.get("support_ids")}
+                selected = _select_support_id(book, row, parsed.get("value"))
+                parsed["support_ids"] = [selected] if selected else []
+                parsed.pop("support_id", None)
+            return parsed
         if not self.require_citations:
             return {"value": None, "support_ids": []}
         return {"value": None, "support_ids": [], "output": text}
@@ -229,6 +185,72 @@ def _load_grammar(grammar: str) -> LlamaGrammar | None:
         return LlamaGrammar.from_string(grammar)
     except Exception:
         return None
+
+
+def _parse_json(*, text: str, require_citations: bool) -> dict[str, Any] | None:
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(parsed, dict):
+        return None
+    parsed.setdefault("value", None)
+    if require_citations:
+        parsed.setdefault("support_ids", [])
+    else:
+        parsed["support_ids"] = []
+        parsed.pop("support_id", None)
+    return parsed
+
+
+def _generate_text(self: LlamaCppAdapter, *, prompt: str, require_citations: bool) -> str:
+    text = ""
+    max_ctx = _get_ctx(self.llm, default=2048)
+    max_output_tokens = 64
+    prompt_safe, max_output_tokens = _fit_prompt(
+        llm=self.llm,
+        prompt=prompt,
+        max_ctx=max_ctx,
+        max_output_tokens=max_output_tokens,
+    )
+    prompt_tokens = _count_tokens(self.llm, prompt_safe)
+    print(
+        f"[goldevidencebench] llama prompt_tokens={prompt_tokens} max_ctx={max_ctx} max_output_tokens={max_output_tokens}",
+        file=sys.stderr,
+    )
+    _perf_reset(self.llm)
+    grammar = self.grammar_single if require_citations else self.grammar_empty
+    if grammar is not None and hasattr(self.llm, "create_completion"):
+        resp = self.llm.create_completion(
+            prompt=prompt_safe,
+            max_tokens=max_output_tokens,
+            stop=STOP_SEQS,
+            grammar=grammar,
+        )
+        text = resp["choices"][0]["text"]
+    else:
+        try:
+            resp = self.llm(
+                prompt_safe,
+                stop=STOP_SEQS,
+                max_tokens=max_output_tokens,
+                response_format={"type": "json_object"},
+            )
+            text = resp["choices"][0]["text"]
+        except TypeError:
+            if hasattr(self.llm, "create_completion"):
+                resp = self.llm.create_completion(
+                    prompt=prompt_safe,
+                    max_tokens=max_output_tokens,
+                    stop=STOP_SEQS,
+                    grammar=grammar,
+                )
+                text = resp["choices"][0]["text"]
+            else:  # pragma: no cover
+                resp = self.llm(prompt_safe, max_tokens=64, stop=STOP_SEQS)
+                text = resp["choices"][0]["text"]
+    self._last_perf = _perf_snapshot(self.llm)
+    return text
 
 
 def _select_support_id(book: str, row: dict[str, Any], value: Any) -> str | None:

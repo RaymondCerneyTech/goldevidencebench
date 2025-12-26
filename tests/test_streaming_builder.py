@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from tagbench.adapters.streaming_llama_cpp_adapter import build_streaming_book, StreamingConfig
-from tagbench.baselines import parse_book_ledger, parse_updates
-from tagbench.generate import EpisodeConfig, generate_dataset
+from goldevidencebench.adapters.streaming_llama_cpp_adapter import build_streaming_book, StreamingConfig
+from goldevidencebench.baselines import parse_book_ledger, parse_updates
+from goldevidencebench.generate import EpisodeConfig, generate_dataset
 
 
 def test_streaming_builder_keeps_latest_per_key() -> None:

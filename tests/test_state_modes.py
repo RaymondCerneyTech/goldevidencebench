@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from tagbench.baselines import parse_updates
-from tagbench.generate import EpisodeConfig, generate_dataset
+from goldevidencebench.baselines import parse_updates
+from goldevidencebench.generate import EpisodeConfig, generate_dataset
 
 
 def test_counter_state_mode_produces_numeric_values() -> None:

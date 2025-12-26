@@ -2,15 +2,16 @@ from __future__ import annotations
 
 import random
 
-from tagbench.adapters.retrieval_llama_cpp_adapter import (
+from goldevidencebench.adapters.retrieval_llama_cpp_adapter import (
     _apply_drop_with_rng,
     _apply_order,
     _build_min_book,
     _latest_entry_for_key,
+    _rerank_latest_step,
     _select_entries_for_key,
 )
-from tagbench.baselines import parse_book_ledger
-from tagbench.generate import EpisodeConfig, generate_dataset
+from goldevidencebench.baselines import parse_book_ledger
+from goldevidencebench.generate import EpisodeConfig, generate_dataset
 
 
 def test_latest_entry_for_key_picks_last_step() -> None:
@@ -94,3 +95,14 @@ def test_order_gold_middle_inserts_in_center() -> None:
     ordered, applied = _apply_order(selected=selected, correct_uid="U000003", order="gold_middle")
     assert applied == "gold_middle"
     assert ordered[len(ordered) // 2]["uid"] == "U000003"
+
+
+def test_rerank_latest_step_picks_max_step() -> None:
+    entries = [
+        {"uid": "U000001", "step": 2},
+        {"uid": "U000002", "step": 10},
+        {"uid": "U000003", "step": 5},
+    ]
+    chosen = _rerank_latest_step(entries)
+    assert chosen is not None
+    assert chosen["uid"] == "U000002"
