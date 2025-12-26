@@ -202,6 +202,12 @@ final N steps distractor-only (no updates), creating a longer tail after the las
 
 ## Efficient testing workflow (fast -> slow)
 
+Reference system (baseline vs reranker in one command):
+
+```powershell
+.\scripts\run_reference.ps1 -Preset quick -ModelPath "C:\AI\models\your-model.gguf"
+```
+
 Selector+answerer preset (reranker baseline):
 
 ```powershell
