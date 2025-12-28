@@ -12,6 +12,19 @@ GoldEvidenceBench is a small benchmark + reference codebase for testing whether 
 
 GoldEvidenceBench shows whether your AI system can reliably pick the right piece of evidence when several similar candidates exist. It builds long, noisy logs with changing facts, then checks if the model chooses the most recent, correct update and cites it. The key benefit is that it separates "the evidence was available" from "the model chose the right evidence," so you can improve the exact part of your system that is failing (retrieval vs selection vs formatting).
 
+This helps fix a common real-world failure: the right evidence is retrieved, but the model still picks the wrong snippet. GoldEvidenceBench isolates that selection bottleneck and shows when a simple selector/reranker fixes it.
+
+Example (plain English):
+
+Log:
+- Update 1: "Shipping address = 12 Oak St"
+- Update 2: "Shipping address = 99 Pine Ave"
+- Note: "Customer mentioned they used to live on Oak St"
+
+Question: "Where should we ship the order?"
+
+Correct evidence is Update 2 (99 Pine Ave). The NOTE is contextual but not authoritative. GoldEvidenceBench measures whether the system chooses the correct update and cites it, even when nearby notes mention older facts.
+
 ## Primary flow (the done path)
 
 1) Run one command to reproduce the headline:
@@ -413,6 +426,14 @@ Order-bias (selector on: latest_step, same settings):
 | shuffle | 1.0000 | 0.9750 | 0.9750 |
 
 Selector removes order bias in this regime.
+
+Plot the reranker k-curve:
+
+```powershell
+python .\scripts\plot_rerank_curve.py --in-csv .\runs\summary_all.csv --out .\docs\figures\rerank_k_curve_s5q24.png
+```
+
+![Reranker k-curve (same_key, shuffle, s5q24)](docs/figures/rerank_k_curve_s5q24.png)
 
 Multi-model spot check (Meta-Llama-3.1-8B-Instruct Q4_K_M vs Qwen, s3q16):
 
