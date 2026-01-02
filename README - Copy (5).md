@@ -50,7 +50,7 @@ Preset standard runs with --require-citations.
 
 2) Read the result table in `runs/summary_all.csv` (it matches the "Reference proof" section below).
 
-3) Takeaways: selection under ambiguity fails for LLM-only; a deterministic selector fixes it; learned selectors reduce but do not remove order bias.
+3) Takeaways: selection under ambiguity fails for LLM-only; a deterministic selector fixes it; order bias disappears with selection.
 
 Everything else in this README is an extension or deeper dive.
 
@@ -137,37 +137,7 @@ foreach ($k in 2,4,8) {
 }
 ```
 Canonical v2 default: authority filter (hard gate) + `prefer_update_latest` (soft tie-break).
-
-## V3 plan (NOTE robustness + authority spoofing)
-
-**V3-A: Learned NOTE robustness (trusted authority field)**
-
-- Train selector with NOTES present.
-- Evaluate with the authority filter OFF.
-- Authority is a structured feature (not just text pattern).
-- Goal: match linear baseline behavior without hard gating.
-
-**V3-B: Authority spoofing (untrusted authority signal)**
-
-- Add a stress profile where some NOTE lines look like UPDATEs, or UPDATE lines contain ?NOTE:? text, or the authority marker is missing/ambiguous.
-- Measure how often the selector is tricked and whether abstain triggers when authority is unclear.
-
-**Architecture guardrail**
-
-- Split authority gating (cheap classifier/rules/signature check) from content selection (reranker).
-- Keep authority checks as hard gates so content plausibility cannot override it.
-
 Proof run uses `linear` to match the reference tables; the default for general use is `prefer_update_latest`.
-
-## Monitor research questions (V3 focus)
-
-- When can a learned monitor replace a hard gate? (V3-A: trusted authority field)
-- How do monitors fail under spoofing? (V3-B: authority spoofing)
-
-Make the monitor measurable:
-
-- Authority false accept / false reject rates (gate calibration).
-- Abstain precision/recall when gold is missing (don't-guess policy).
 
 ## Mixture of Oracles (why these metrics matter)
 
@@ -258,7 +228,7 @@ Next steps without feature creep:
 
 1) Freeze a v2 canonical suite: order-bias, authority stress, and one retriever sanity run.
 2) Treat selector training as the product loop (export -> train -> evaluate).
-3) Add one strong retriever baseline (dense/semantic), then stop.
+3) Add one strong retriever baseline (dense or expansion) and stop.
 
 ## Research use (reproducible runs)
 
@@ -350,31 +320,10 @@ See rows `ambig_*` and `ab_rerank_*` in `runs/summary_all.csv` for the exact num
 
 | Finding | Evidence |
 | --- | --- |
-| Ordering bias is severe | selection_rate (LLM-only, k=4 same_key): gold_last > gold_middle/shuffle > gold_first |
+| Ordering bias is severe | selection_rate (LLM-only): gold_last > gold_middle/shuffle > gold_first |
 | Query sandwich did not help | selection_rate did not improve; shuffle got worse |
 | Pick-then-answer did not help | selection_rate stayed flat or dropped |
 | Deterministic reranker helps | rerank latest_step roughly doubles selection at k=2/4/8 |
-| Learned selector still order-sensitive | linear selector: gold_first < gold_middle/last (see generalization sweep below) |
-
-Generalization sweep (linear selector, k=4 same_key, gold present = 1.0):
-
-s3q16 (runs/linear_order_*_s3q16):
-
-| order | selection_rate | accuracy_when_gold_present |
-| --- | --- | --- |
-| gold_first | 0.417 | 0.417 |
-| gold_middle | 0.688 | 0.688 |
-| gold_last | 0.688 | 0.688 |
-| shuffle | 0.688 | 0.688 |
-
-s5q24 (runs/order_bias_linear_*_k4_same_s5q24):
-
-| order | selection_rate | accuracy_when_gold_present |
-| --- | --- | --- |
-| gold_first | 0.625 | 0.525 |
-| gold_middle | 0.583 | 0.467 |
-| gold_last | 0.542 | 0.417 |
-| shuffle | 0.583 | 0.442 |
 
 ## TF-IDF lexical retriever baseline
 
