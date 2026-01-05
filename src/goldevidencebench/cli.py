@@ -12,6 +12,8 @@ from goldevidencebench.baselines import iter_predictions, parse_model_json_answe
 from goldevidencebench.generate import EpisodeConfig, generate_dataset
 from goldevidencebench.grade import grade_rows
 from goldevidencebench.model_runner import load_adapter, run_adapter
+from goldevidencebench.ui_eval import score_post_action_verification, score_ui_rows
+from goldevidencebench.ui_fixture import validate_ui_fixture_path
 from goldevidencebench.util import get_env, read_jsonl, write_jsonl
 
 
@@ -231,6 +233,63 @@ def _cmd_model(ns: argparse.Namespace) -> int:
                 "state_integrity_rate": raw_res.state_integrity_rate,
             }
         Path(ns.results_json).write_text(json.dumps(results_payload, indent=2), encoding="utf-8")
+    return 0
+
+
+def _load_observed_deltas(path: Path, rows: list[dict[str, Any]]) -> list[dict[str, Any] | None]:
+    observed_rows = list(read_jsonl(path))
+    observed_by_id: dict[str, Any] = {}
+    for row in observed_rows:
+        if not isinstance(row, dict):
+            continue
+        row_id = row.get("id")
+        observed = row.get("observed_delta")
+        if isinstance(row_id, str):
+            observed_by_id[row_id] = observed
+    observed_deltas: list[dict[str, Any] | None] = []
+    for row in rows:
+        row_id = row.get("id")
+        observed_deltas.append(observed_by_id.get(row_id))
+    return observed_deltas
+
+
+def _cmd_ui_score(ns: argparse.Namespace) -> int:
+    fixture_path = Path(ns.fixture)
+    if not fixture_path.exists():
+        print(f"Fixture not found: {fixture_path}")
+        return 1
+
+    errors = validate_ui_fixture_path(fixture_path)
+    if errors:
+        print("Fixture validation failed:")
+        for error in errors:
+            print(f"- {error}")
+        return 1
+
+    rows = list(read_jsonl(fixture_path))
+    adapter = load_adapter(ns.adapter)
+    selected_ids: list[str | None] = []
+    for row in rows:
+        pred = adapter.predict(row, protocol="ui")
+        value = pred.get("value")
+        if isinstance(value, str) and value.strip():
+            selected_ids.append(value)
+        else:
+            selected_ids.append(None)
+
+    metrics = score_ui_rows(rows, selected_ids)
+    if ns.observed:
+        observed_path = Path(ns.observed)
+        if not observed_path.exists():
+            print(f"Observed deltas not found: {observed_path}")
+            return 1
+        observed_deltas = _load_observed_deltas(observed_path, rows)
+        metrics.update(score_post_action_verification(rows, observed_deltas))
+
+    payload = {"rows": len(rows), "adapter": ns.adapter, "metrics": metrics}
+    if ns.out:
+        Path(ns.out).write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    print(json.dumps(payload, indent=2))
     return 0
 
 
@@ -605,6 +664,28 @@ def build_parser() -> argparse.ArgumentParser:
     m.add_argument("--out", type=Path, default=None)
     m.add_argument("--results-json", type=Path, default=None, help="Optional machine-readable metrics output (JSON).")
     m.set_defaults(func=_cmd_model)
+
+    ui = sub.add_parser("ui-score", help="Score UI fixture rows with a UI adapter.")
+    ui.add_argument(
+        "--fixture",
+        type=Path,
+        default=Path("data/ui_same_label_fixture.jsonl"),
+        help="UI fixture JSONL path.",
+    )
+    ui.add_argument(
+        "--adapter",
+        type=str,
+        default="goldevidencebench.adapters.ui_fixture_adapter:create_adapter",
+        help="Adapter spec module:factory.",
+    )
+    ui.add_argument(
+        "--observed",
+        type=Path,
+        default=None,
+        help="Optional JSONL with {id, observed_delta} rows for post-action verification.",
+    )
+    ui.add_argument("--out", type=Path, default=None, help="Optional JSON output path.")
+    ui.set_defaults(func=_cmd_ui_score)
 
     s = sub.add_parser("sweep", help="Run a small sweep over seeds/state_modes/distractors.")
     s.add_argument("--out", required=True, type=Path, help="Output directory for sweep runs.")

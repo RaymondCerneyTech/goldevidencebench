@@ -911,6 +911,50 @@ Minimal UI candidate schema (example):
 }
 ```
 
+Stub assets (UI same_label):
+
+- Config: `configs/ui_same_label.json`
+- Fixture: `data/ui_same_label_fixture.jsonl`
+- Script: `scripts/run_ui_same_label_stub.ps1`
+
+Run the stub script (validates paths, no adapter yet):
+
+```powershell
+.\scripts\run_ui_same_label_stub.ps1
+```
+
+Validate the fixture directly:
+
+```powershell
+python .\scripts\validate_ui_fixture.py --fixture .\data\ui_same_label_fixture.jsonl
+```
+
+Score the fixture with simple selection modes:
+
+```powershell
+python .\scripts\score_ui_fixture.py --fixture .\data\ui_same_label_fixture.jsonl --mode gold
+python .\scripts\score_ui_fixture.py --fixture .\data\ui_same_label_fixture.jsonl --mode first
+```
+
+Score with post-action verification (observed deltas):
+
+```powershell
+python .\scripts\score_ui_fixture.py --fixture .\data\ui_same_label_fixture.jsonl `
+  --observed .\data\ui_same_label_observed_ok.jsonl --mode gold
+```
+
+Run the UI adapter stub (fixture-based selection):
+
+```powershell
+python .\scripts\run_ui_adapter_stub.py --fixture .\data\ui_same_label_fixture.jsonl
+```
+
+Run the CLI command (same adapter, JSON output):
+
+```powershell
+goldevidencebench ui-score --fixture .\data\ui_same_label_fixture.jsonl --out .\runs\ui_same_label_metrics.json
+```
+
 ## Impact / use-case profiles
 
 These are concrete, world-facing uses and the minimum checks that keep them safe. Each profile maps to a failure mode and a short sweep that validates it.
