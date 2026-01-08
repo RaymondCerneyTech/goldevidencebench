@@ -27,6 +27,8 @@ Set `GOLDEVIDENCEBENCH_UI_OVERLAY_FILTER=1` to drop popup/overlay candidates unl
 `allow_overlay=true` (or `meta.allow_overlay=true`).
 Set `GOLDEVIDENCEBENCH_UI_PRESELECT_RULES=1` to apply a deterministic pre-selector that uses
 instruction cues (main page, modal/dialog, primary/secondary, top/bottom, left/right) before the LLM chooses.
+The adapter also applies a default tie-breaker for duplicate labels, keeping the candidate with the largest
+`bbox_x + bbox_y` (bottom-right).
 Env var names use the `GOLDEVIDENCEBENCH_` prefix.
 Set `GOLDEVIDENCEBENCH_RETRIEVAL_K` to include top-k latest entries for the key (default 1). Set
 `GOLDEVIDENCEBENCH_RETRIEVAL_WRONG_TYPE` to `none`, `same_key`, or `other_key` to inject a wrong line for robustness

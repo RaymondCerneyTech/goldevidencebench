@@ -999,8 +999,6 @@ Set `GOLDEVIDENCEBENCH_UI_OVERLAY_FILTER=1` to drop popup/overlay candidates unl
 `allow_overlay=true` (or `meta.allow_overlay=true`).
 Set `GOLDEVIDENCEBENCH_UI_PRESELECT_RULES=1` to apply deterministic pre-selection based on instruction cues
 (main page vs modal/dialog, primary/secondary, top/bottom, left/right) before the LLM chooses.
-For duplicate labels, the adapter applies a default tie-breaker that keeps the bottom-right candidate
-(max `bbox_x + bbox_y`) before the LLM chooses.
 
 Run the CLI command (same adapter, JSON output):
 
@@ -1151,15 +1149,11 @@ Release checklist (optional; runs UI same_label stub, canonical update_burst swe
 .\scripts\run_release_check.ps1 -ModelPath "C:\AI\models\your-model.gguf" -RunSweeps
 ```
 
-UI release checklist (UI stubs + wall sweep; optional LLM gate + config update):
+UI release checklist (UI stubs + wall sweep, optional config update):
 
 ```powershell
-.\scripts\run_ui_release_check.ps1 -RunAdapterGate -UiModelPath "C:\AI\models\your-model.gguf" -UpdateConfig
+.\scripts\run_ui_release_check.ps1 -UpdateConfig
 ```
-
-`-RunAdapterGate` runs the UI Llama adapter with overlay filtering + preselect rules and writes:
-`runs/ui_same_label_llm_gate.json` and `runs/ui_popup_overlay_llm_gate.json` (warn-level gates in
-`configs/usecase_checks.json`).
 
 Instruction override gate (deterministic answer + copy-clamp; updates `runs/release_gates`):
 

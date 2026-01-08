@@ -2,6 +2,7 @@ from goldevidencebench.ui_policy import (
     allow_overlay_from_row,
     filter_overlay_candidates,
     preselect_candidates,
+    tie_break_same_label_candidates,
 )
 
 
@@ -86,3 +87,48 @@ def test_preselect_candidates_prefers_overlay_when_requested() -> None:
         apply_rules=True,
     )
     assert [c["candidate_id"] for c in filtered] == ["btn_continue_popup"]
+
+
+def test_tie_break_same_label_candidates_bottom_right() -> None:
+    candidates = [
+        {
+            "candidate_id": "btn_next_top",
+            "label": "Next",
+            "bbox": [820, 220, 90, 28],
+        },
+        {
+            "candidate_id": "btn_next_bottom",
+            "label": "Next",
+            "bbox": [820, 620, 90, 28],
+        },
+        {
+            "candidate_id": "btn_save",
+            "label": "Save",
+            "bbox": [120, 240, 80, 28],
+        },
+    ]
+    filtered = tie_break_same_label_candidates(candidates)
+    assert [c["candidate_id"] for c in filtered] == ["btn_next_bottom", "btn_save"]
+
+
+def test_preselect_candidates_applies_tie_breaker_by_default() -> None:
+    row = {}
+    candidates = [
+        {
+            "candidate_id": "btn_next_top",
+            "label": "Next",
+            "bbox": [820, 220, 90, 28],
+        },
+        {
+            "candidate_id": "btn_next_bottom",
+            "label": "Next",
+            "bbox": [820, 620, 90, 28],
+        },
+    ]
+    filtered = preselect_candidates(
+        row,
+        candidates,
+        apply_overlay_filter=False,
+        apply_rules=False,
+    )
+    assert [c["candidate_id"] for c in filtered] == ["btn_next_bottom"]

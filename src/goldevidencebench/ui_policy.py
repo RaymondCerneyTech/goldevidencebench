@@ -85,6 +85,60 @@ def _filter_by_candidate_id(
     return filtered or candidates
 
 
+def _bbox_sum(candidate: dict[str, Any]) -> float | None:
+    bbox = candidate.get("bbox")
+    if not isinstance(bbox, list) or len(bbox) != 4:
+        return None
+    x = bbox[0]
+    y = bbox[1]
+    if not isinstance(x, (int, float)) or not isinstance(y, (int, float)):
+        return None
+    return float(x) + float(y)
+
+
+def tie_break_same_label_candidates(
+    candidates: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    best_by_label: dict[str, dict[str, Any]] = {}
+    best_score: dict[str, float] = {}
+    labels_with_bbox: set[str] = set()
+    seen_labels: set[str] = set()
+
+    for candidate in candidates:
+        label = candidate.get("label")
+        if not isinstance(label, str) or not label.strip():
+            continue
+        label = label.strip()
+        seen_labels.add(label)
+        score = _bbox_sum(candidate)
+        if score is None:
+            continue
+        labels_with_bbox.add(label)
+        if label not in best_by_label or score > best_score.get(label, float("-inf")):
+            best_by_label[label] = candidate
+            best_score[label] = score
+
+    if not labels_with_bbox:
+        return candidates
+
+    filtered: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for candidate in candidates:
+        label = candidate.get("label")
+        if not isinstance(label, str) or not label.strip():
+            filtered.append(candidate)
+            continue
+        label = label.strip()
+        if label not in labels_with_bbox:
+            filtered.append(candidate)
+            continue
+        if label in seen:
+            continue
+        seen.add(label)
+        filtered.append(best_by_label.get(label, candidate))
+    return filtered or candidates
+
+
 def preselect_candidates(
     row: dict[str, Any],
     candidates: list[dict[str, Any]],
@@ -136,4 +190,5 @@ def preselect_candidates(
     if apply_rules and wants_right:
         candidates = _filter_by_bbox(candidates, axis=0, pick_max=True)
 
+    candidates = tie_break_same_label_candidates(candidates)
     return candidates
