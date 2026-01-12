@@ -22,13 +22,20 @@ Retrieval-first answerer (use only the latest ledger entry for the key): `goldev
 UI fixture stub adapter (fixture-based candidate selection for computer-use scaffolding): `goldevidencebench.adapters.ui_fixture_adapter:create_adapter`.
 UI Llama adapter (UI candidate selection from row fields): `goldevidencebench.adapters.ui_llama_cpp_adapter:create_adapter`.
 Set `GOLDEVIDENCEBENCH_UI_MODEL` (or `GOLDEVIDENCEBENCH_MODEL`) to a GGUF path. It reads
-`instruction`/`goal`/`question` fields on the row (or `meta`) to guide selection.
+`instruction`/`goal`/`question` fields on the row (or `meta`) to guide deterministic pre-selection.
 Set `GOLDEVIDENCEBENCH_UI_OVERLAY_FILTER=1` to drop popup/overlay candidates unless the row sets
-`allow_overlay=true` (or `meta.allow_overlay=true`).
+`allow_overlay=true` (or `meta.allow_overlay=true`) or the instruction explicitly mentions a modal/popup/overlay.
+When `allow_overlay` is true, overlay candidates are allowed but main-scope candidates are still preferred
+unless the instruction explicitly calls for a modal/popup/overlay.
 Set `GOLDEVIDENCEBENCH_UI_PRESELECT_RULES=1` to apply a deterministic pre-selector that uses
-instruction cues (main page, modal/dialog, primary/secondary, top/bottom, left/right) before the LLM chooses.
-The adapter also applies a default tie-breaker for duplicate labels, keeping the candidate with the largest
-`bbox_x + bbox_y` (bottom-right).
+instruction cues (main page, modal/dialog, primary/secondary, top/bottom, left/right) before selection.
+The deterministic policy rejects non-main candidates unless a modal/popup is requested, prefers
+enabled/visible/clickable candidates, prefers non-overlay candidates, then uses geometry as a last
+tie-breaker. If it resolves to a single candidate, the adapter returns it without invoking the LLM.
+If it still cannot safely disambiguate, it abstains.
+Set `GOLDEVIDENCEBENCH_UI_TRACE_PATH` to emit a JSONL decision trace (candidates in, post-filter sets,
+final choice, and reason codes).
+By default the trace file is overwritten each run; set `GOLDEVIDENCEBENCH_UI_TRACE_APPEND=1` to append instead.
 Env var names use the `GOLDEVIDENCEBENCH_` prefix.
 Set `GOLDEVIDENCEBENCH_RETRIEVAL_K` to include top-k latest entries for the key (default 1). Set
 `GOLDEVIDENCEBENCH_RETRIEVAL_WRONG_TYPE` to `none`, `same_key`, or `other_key` to inject a wrong line for robustness

@@ -8,7 +8,7 @@ import os
 
 
 def read_jsonl(path: str | Path) -> Iterator[dict[str, Any]]:
-    with Path(path).open("r", encoding="utf-8") as f:
+    with Path(path).open("r", encoding="utf-8-sig") as f:
         for line in f:
             line = line.strip()
             if not line:

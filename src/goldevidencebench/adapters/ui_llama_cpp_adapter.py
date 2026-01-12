@@ -10,7 +10,10 @@ try:
 except ImportError as exc:  # pragma: no cover - optional dependency
     raise ImportError("llama_cpp not installed; install via `pip install llama-cpp-python`") from exc
 
-from goldevidencebench.ui_policy import preselect_candidates
+from goldevidencebench.ui_policy import (
+    preselect_candidates,
+    preselect_candidates_with_trace,
+)
 from goldevidencebench.ui_prompt import build_ui_prompt
 from goldevidencebench.util import get_env
 
@@ -52,6 +55,13 @@ class UILlamaCppAdapter:
         self.grammar = _load_grammar(UI_JSON_GRAMMAR)
         self.filter_overlay = _env_flag("UI_OVERLAY_FILTER", default="0")
         self.preselect_rules = _env_flag("UI_PRESELECT_RULES", default="0")
+        self.trace_path = get_env("UI_TRACE_PATH")
+        self.trace_append = _env_flag("UI_TRACE_APPEND", default="0")
+        if self.trace_path and not self.trace_append:
+            try:
+                Path(self.trace_path).unlink(missing_ok=True)
+            except OSError:
+                pass
 
     def predict(self, row: dict[str, Any], *, protocol: str = "ui") -> dict[str, Any]:
         if protocol != "ui":
@@ -60,25 +70,47 @@ class UILlamaCppAdapter:
         candidates = row.get("candidates")
         if not isinstance(candidates, list):
             raise ValueError("UI row must include a candidates list.")
+        selected = None
 
-        candidates = preselect_candidates(
-            row,
-            candidates,
-            apply_overlay_filter=self.filter_overlay,
-            apply_rules=self.preselect_rules,
-        )
-
+        trace: dict[str, Any] | None = None
+        if self.trace_path:
+            candidates, trace = preselect_candidates_with_trace(
+                row,
+                candidates,
+                apply_overlay_filter=self.filter_overlay,
+                apply_rules=self.preselect_rules,
+            )
+        else:
+            candidates = preselect_candidates(
+                row,
+                candidates,
+                apply_overlay_filter=self.filter_overlay,
+                apply_rules=self.preselect_rules,
+            )
+        if not candidates:
+            if trace is not None:
+                trace["final_choice"] = None
+                _append_trace(self.trace_path, trace)
+            return {"value": None, "support_ids": []}
         candidate_ids = [
             candidate.get("candidate_id")
             for candidate in candidates
             if isinstance(candidate, dict) and isinstance(candidate.get("candidate_id"), str)
         ]
+        if len(candidate_ids) == 1:
+            if trace is not None:
+                trace["final_choice"] = candidate_ids[0]
+                _append_trace(self.trace_path, trace)
+            return {"value": candidate_ids[0], "support_ids": []}
         prompt = build_ui_prompt(row, candidates)
         text = _generate_text(self, prompt=prompt)
         parsed = _parse_json(text)
         selected = _normalize_value(parsed.get("value") if parsed else None)
         if selected not in candidate_ids:
             selected = None
+        if trace is not None:
+            trace["final_choice"] = selected
+            _append_trace(self.trace_path, trace)
         return {"value": selected, "support_ids": []}
 
 
@@ -117,6 +149,13 @@ def _parse_json(text: str) -> dict[str, Any] | None:
 def _env_flag(key: str, *, default: str = "0") -> bool:
     value = (get_env(key, default) or default).strip().lower()
     return value in {"1", "true", "yes", "on"}
+
+
+def _append_trace(path: str | None, trace: dict[str, Any]) -> None:
+    if not path:
+        return
+    with open(path, "a", encoding="utf-8") as handle:
+        handle.write(json.dumps(trace, ensure_ascii=True) + "\n")
 
 
 def _generate_text(self: UILlamaCppAdapter, *, prompt: str) -> str:

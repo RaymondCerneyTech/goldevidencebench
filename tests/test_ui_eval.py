@@ -30,6 +30,8 @@ def test_score_ui_rows() -> None:
     assert metrics["wrong_action_rate"] == 0.0
     assert metrics["abstain_rate"] == 0.5
     assert metrics["accuracy_when_gold_present"] == 0.5
+    assert metrics["abstain_expected_rate"] == 0.0
+    assert metrics["abstain_expected_count"] == 0.0
 
 
 def test_score_post_action_verification() -> None:
@@ -40,6 +42,16 @@ def test_score_post_action_verification() -> None:
     observed = [{"page": "checkout_shipping"}, {"toast": "Wrong"}]
     metrics = score_post_action_verification(rows, observed)
     assert metrics["post_action_verify_rate"] == 0.5
+
+
+def test_score_post_action_verification_skips_abstain_expected() -> None:
+    rows = [
+        {"id": "step_0001", "expected_delta": {"page": "checkout_shipping"}},
+        {"id": "step_0002", "abstain_expected": True, "expected_delta": {"toast": "Saved"}},
+    ]
+    observed = [{"page": "checkout_shipping"}, {"toast": "Saved"}]
+    metrics = score_post_action_verification(rows, observed)
+    assert metrics["post_action_verify_rate"] == 1.0
 
 
 def test_score_ui_sequences_single_task_passes() -> None:
@@ -83,6 +95,28 @@ def test_score_ui_sequences_wrong_action_fails_task() -> None:
     metrics = score_ui_sequences(rows, selected)
     assert metrics["task_pass_rate"] == 0.0
     assert metrics["task_wrong_action_rate"] == 1.0
+
+
+def test_score_ui_sequences_abstain_expected_allows_pass() -> None:
+    rows = [
+        {
+            "id": "step_0001",
+            "task_id": "task_a",
+            "candidates": [{"candidate_id": "btn_a"}],
+            "gold": {"candidate_id": "btn_a"},
+        },
+        {
+            "id": "step_0002",
+            "task_id": "task_a",
+            "abstain_expected": True,
+            "candidates": [{"candidate_id": "btn_b"}, {"candidate_id": "btn_c"}],
+            "gold": {"candidate_id": "btn_b"},
+        },
+    ]
+    selected = ["btn_a", None]
+    metrics = score_ui_sequences(rows, selected)
+    assert metrics["task_pass_rate"] == 1.0
+    assert metrics["task_wrong_action_rate"] == 0.0
 
 
 def test_ui_fixture_adapter_selects_gold(monkeypatch) -> None:

@@ -46,6 +46,51 @@ def _as_float(value: Any) -> float | None:
         return None
 
 
+def _condition_met(summary: dict[str, Any], condition: dict[str, Any]) -> bool:
+    path = condition.get("path")
+    if not isinstance(path, str) or not path.strip():
+        return False
+    raw_value = _get_path(summary, path)
+    if raw_value is None:
+        return False
+    if "equals" in condition:
+        return raw_value == condition.get("equals")
+    value = _as_float(raw_value)
+    if value is None:
+        return False
+    min_value = condition.get("min")
+    max_value = condition.get("max")
+    if min_value is not None and value < float(min_value):
+        return False
+    if max_value is not None and value > float(max_value):
+        return False
+    return True
+
+
+def _skip_metric(summary: dict[str, Any], metric: dict[str, Any]) -> bool:
+    skip_if = metric.get("skip_if")
+    if isinstance(skip_if, list):
+        if not skip_if:
+            return False
+        return all(
+            isinstance(condition, dict) and _condition_met(summary, condition)
+            for condition in skip_if
+        )
+    if isinstance(skip_if, dict):
+        if "all" in skip_if and isinstance(skip_if["all"], list):
+            return all(
+                isinstance(condition, dict) and _condition_met(summary, condition)
+                for condition in skip_if["all"]
+            )
+        if "any" in skip_if and isinstance(skip_if["any"], list):
+            return any(
+                isinstance(condition, dict) and _condition_met(summary, condition)
+                for condition in skip_if["any"]
+            )
+        return _condition_met(summary, skip_if)
+    return False
+
+
 def evaluate_checks(config: dict[str, Any], *, root: Path) -> tuple[list[Issue], int]:
     issues: list[Issue] = []
     error_count = 0
@@ -70,6 +115,17 @@ def evaluate_checks(config: dict[str, Any], *, root: Path) -> tuple[list[Issue],
         metrics = check.get("metrics", [])
         for metric in metrics:
             metric_path = str(metric.get("path", ""))
+            if _skip_metric(summary, metric):
+                issues.append(
+                    Issue(
+                        check_id=check_id,
+                        metric_path=metric_path,
+                        status="skipped",
+                        message="skipped (condition met)",
+                        severity=severity,
+                    )
+                )
+                continue
             allow_missing = bool(metric.get("allow_missing", False))
             raw_value = _get_path(summary, metric_path) if metric_path else None
             value = _as_float(raw_value)

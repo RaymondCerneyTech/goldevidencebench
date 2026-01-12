@@ -79,7 +79,9 @@ def build_ui_prompt(row: dict[str, Any], candidates: list[dict[str, Any]]) -> st
     parts = [
         "You are selecting a UI action from candidates.",
         f"Instruction: {instruction}",
-        "Avoid popup/overlay candidates unless the instruction explicitly requires using a popup or overlay.",
+        "Popup/overlay options are traps unless the instruction explicitly mentions a modal, dialog, popup, or overlay.",
+        "Prefer modal_scope=\"main\" unless the instruction requires a modal.",
+        "Treat overlay/overlay_present/z_index as indicators of overlays.",
     ]
     if context:
         parts.append(f"Context: {context}")

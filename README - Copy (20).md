@@ -805,8 +805,7 @@ Micro sweep (seeds=3; full pipeline, linear + step_bucket=10 + k=16):
 Step_bucket=5 pin run (seeds=3; full pipeline, linear + step_bucket=5 + k=16):
 
 - `runs/wall_update_burst_full_linear_bucket5_pin_20260110_002140` (0.12, 0.14, 0.16, 0.18)
-- `runs/wall_update_burst_full_linear_bucket5_adaptive_20260110_131216` (0.08, 0.12, 0.16, 0.168, 0.176, 0.184, 0.192, 0.20, 0.24)
-- Stable gate path (frozen for checks): `runs/release_gates/update_burst_full_linear_k16_bucket5_rate0.12`
+- Stable gate path (frozen for checks): `runs/release_gates/update_burst_full_linear_k16_bucket5_rate0.16`
 
 Legacy prefer_update_latest sweep (reference, not used in checks):
 
@@ -828,8 +827,7 @@ Selector-only auto-pin run (diagnostic only; value_acc not meaningful): `runs/wa
 Plan going forward:
 
 1) Keep the linear+bucket10 stress regime as diagnostic only (always beyond the 0.10 gate).
-2) Use the linear+bucket5 gate at update_burst_rate=0.12 as the production check in `configs/usecase_checks.json`.
-3) Re-run the adaptive sweep only when model/selector/k/bucket changes.
+2) Use the prefer_update_latest 0.99 full-pipeline run above as the production gate in `configs/usecase_checks.json`.
 3) Wall not found up to 0.99; treat the production default as robust in update_burst at this scale.
 4) Keep the UI same_label gate (`runs/ui_same_label_gate.json`) as a release check for UI-adapter readiness.
 
@@ -947,22 +945,6 @@ Stub assets (UI fixtures):
 - Mini pilot config: `configs/ui_minipilot.json`
 - Mini pilot fixture: `data/ui_minipilot_fixture.jsonl`
 - Mini pilot script: `scripts/run_ui_minipilot_stub.ps1`
-- Mini pilot notepad config: `configs/ui_minipilot_notepad.json`
-- Mini pilot notepad fixture: `data/ui_minipilot_notepad_fixture.jsonl`
-- Mini pilot notepad script: `scripts/run_ui_minipilot_notepad_stub.ps1`
-- Mini pilot notepad state-gate fixture: `data/ui_minipilot_notepad_state_gate_fixture.jsonl`
-- Mini pilot notepad state-gate observed: `data/ui_minipilot_notepad_state_gate_observed_ok.jsonl`
-- Mini pilot notepad state-gate script: `scripts/run_ui_minipilot_notepad_state_gate.ps1`
-- Mini pilot notepad ambiguous fixture: `data/ui_minipilot_notepad_ambiguous_fixture.jsonl`
-- Mini pilot notepad ambiguous observed: `data/ui_minipilot_notepad_ambiguous_observed_ok.jsonl`
-- Mini pilot notepad ambiguous script: `scripts/run_ui_minipilot_notepad_ambiguous.ps1`
-- Mini pilot notepad wrong-directory fixture: `data/ui_minipilot_notepad_wrong_directory_fixture.jsonl`
-- Mini pilot notepad wrong-directory observed: `data/ui_minipilot_notepad_wrong_directory_observed_ok.jsonl`
-- Mini pilot notepad wrong-directory script: `scripts/run_ui_minipilot_notepad_wrong_directory.ps1`
-- Mini pilot notepad wrong-directory detour fixture: `data/ui_minipilot_notepad_wrong_directory_detour_fixture.jsonl`
-- Mini pilot notepad wrong-directory detour observed: `data/ui_minipilot_notepad_wrong_directory_detour_observed_ok.jsonl`
-- Mini pilot notepad wrong-directory detour script: `scripts/run_ui_minipilot_notepad_wrong_directory_detour.ps1`
-- Mini pilot notepad demo script: `scripts/run_notepad_demo.ps1`
 - Mini pilot form config: `configs/ui_minipilot_form.json`
 - Mini pilot form fixture: `data/ui_minipilot_form_fixture.jsonl`
 - Mini pilot form script: `scripts/run_ui_minipilot_form_stub.ps1`
@@ -984,10 +966,6 @@ Stub assets (UI fixtures):
 - Mini pilot local-optimum role mismatch observed: `data/ui_minipilot_local_optimum_role_mismatch_observed_ok.jsonl`
 - Mini pilot local-optimum blocking modal fixture: `data/ui_minipilot_local_optimum_blocking_modal_fixture.jsonl`
 - Mini pilot local-optimum blocking modal observed: `data/ui_minipilot_local_optimum_blocking_modal_observed_ok.jsonl`
-- Mini pilot local-optimum blocking modal detour fixture: `data/ui_minipilot_local_optimum_blocking_modal_detour_fixture.jsonl`
-- Mini pilot local-optimum blocking modal detour observed: `data/ui_minipilot_local_optimum_blocking_modal_detour_observed_ok.jsonl`
-- Mini pilot local-optimum tab detour fixture: `data/ui_minipilot_local_optimum_tab_detour_fixture.jsonl`
-- Mini pilot local-optimum tab detour observed: `data/ui_minipilot_local_optimum_tab_detour_observed_ok.jsonl`
 - Mini pilot local-optimum blocking modal unmentioned fixture: `data/ui_minipilot_local_optimum_blocking_modal_unmentioned_fixture.jsonl`
 - Mini pilot local-optimum blocking modal unmentioned observed: `data/ui_minipilot_local_optimum_blocking_modal_unmentioned_observed_ok.jsonl`
 - Mini pilot local-optimum blocking modal unmentioned ambiguous fixture: `data/ui_minipilot_local_optimum_blocking_modal_unmentioned_ambiguous_fixture.jsonl`
@@ -996,14 +974,6 @@ Stub assets (UI fixtures):
 - Mini pilot local-optimum blocking modal required observed: `data/ui_minipilot_local_optimum_blocking_modal_required_observed_ok.jsonl`
 - Mini pilot local-optimum blocking modal required ambiguous fixture: `data/ui_minipilot_local_optimum_blocking_modal_required_ambiguous_fixture.jsonl`
 - Mini pilot local-optimum blocking modal required ambiguous observed: `data/ui_minipilot_local_optimum_blocking_modal_required_ambiguous_observed_ok.jsonl`
-- Mini pilot local-optimum blocking modal permission fixture: `data/ui_minipilot_local_optimum_blocking_modal_permission_fixture.jsonl`
-- Mini pilot local-optimum blocking modal permission observed: `data/ui_minipilot_local_optimum_blocking_modal_permission_observed_ok.jsonl`
-- Mini pilot local-optimum blocking modal permission ambiguous fixture: `data/ui_minipilot_local_optimum_blocking_modal_permission_ambiguous_fixture.jsonl`
-- Mini pilot local-optimum blocking modal permission ambiguous observed: `data/ui_minipilot_local_optimum_blocking_modal_permission_ambiguous_observed_ok.jsonl`
-- Mini pilot local-optimum blocking modal consent fixture: `data/ui_minipilot_local_optimum_blocking_modal_consent_fixture.jsonl`
-- Mini pilot local-optimum blocking modal consent observed: `data/ui_minipilot_local_optimum_blocking_modal_consent_observed_ok.jsonl`
-- Mini pilot local-optimum blocking modal consent ambiguous fixture: `data/ui_minipilot_local_optimum_blocking_modal_consent_ambiguous_fixture.jsonl`
-- Mini pilot local-optimum blocking modal consent ambiguous observed: `data/ui_minipilot_local_optimum_blocking_modal_consent_ambiguous_observed_ok.jsonl`
 - Mini pilot local-optimum delayed fixture: `data/ui_minipilot_local_optimum_delayed_fixture.jsonl`
 - Mini pilot local-optimum delayed observed: `data/ui_minipilot_local_optimum_delayed_observed_ok.jsonl`
 - Mini pilot local-optimum delayed solvable fixture: `data/ui_minipilot_local_optimum_delayed_solvable_fixture.jsonl`
@@ -1050,57 +1020,6 @@ Mini pilot stub:
 ```
 
 This writes `runs/ui_minipilot_gate.json` and `runs/ui_minipilot_summary.json`.
-
-Mini pilot notepad stub:
-
-```powershell
-.\scripts\run_ui_minipilot_notepad_stub.ps1
-```
-
-This writes `runs/ui_minipilot_notepad_gate.json` and `runs/ui_minipilot_notepad_summary.json`.
-
-Mini pilot notepad state-gate baseline (state-dependent Save As):
-
-```powershell
-.\scripts\run_ui_minipilot_notepad_state_gate.ps1
-```
-
-This writes `runs/ui_minipilot_notepad_state_gate_search.json`.
-
-Mini pilot notepad ambiguous baseline (abstain_expected):
-
-```powershell
-.\scripts\run_ui_minipilot_notepad_ambiguous.ps1
-```
-
-This writes `runs/ui_minipilot_notepad_ambiguous_search.json`.
-
-Mini pilot notepad wrong-directory baseline (state-gated folder selection):
-
-```powershell
-.\scripts\run_ui_minipilot_notepad_wrong_directory.ps1
-```
-
-This writes `runs/ui_minipilot_notepad_wrong_directory_search.json`.
-
-Mini pilot notepad wrong-directory detour baseline (Save vs Save As trap):
-
-```powershell
-.\scripts\run_ui_minipilot_notepad_wrong_directory_detour.ps1
-```
-
-This writes `runs/ui_minipilot_notepad_wrong_directory_detour_search.json`.
-
-Mini pilot notepad live demo (drives Notepad with SendKeys):
-
-```powershell
-.\scripts\run_notepad_demo.ps1 -ModelPath "C:\AI\models\qwen2.5-7b-instruct-q5_k_m-00001-of-00002.gguf" `
-  -Text "Hello from GoldEvidenceBench." -FilePath "$env:TEMP\notes.txt"
-```
-
-This writes a plan to `runs/notepad_demo_plan.json` and executes it. Use `-DryRun` to only emit the plan.
-SendKeys types into the active window; keep focus on Notepad while the script runs.
-If the file already exists, Notepad may prompt to overwrite.
 
 Mini pilot form stub:
 
@@ -1248,14 +1167,6 @@ Blocking-modal required ambiguous fixture (abstain_expected):
 python .\scripts\run_ui_search_baseline.py --fixture .\data\ui_minipilot_local_optimum_blocking_modal_required_ambiguous_fixture.jsonl `
   --observed .\data\ui_minipilot_local_optimum_blocking_modal_required_ambiguous_observed_ok.jsonl `
   --out .\runs\ui_minipilot_local_optimum_blocking_modal_required_ambiguous_search.json
-
-python .\scripts\run_ui_search_baseline.py --fixture .\data\ui_minipilot_local_optimum_blocking_modal_permission_ambiguous_fixture.jsonl `
-  --observed .\data\ui_minipilot_local_optimum_blocking_modal_permission_ambiguous_observed_ok.jsonl `
-  --out .\runs\ui_minipilot_local_optimum_blocking_modal_permission_ambiguous_search.json
-
-python .\scripts\run_ui_search_baseline.py --fixture .\data\ui_minipilot_local_optimum_blocking_modal_consent_ambiguous_fixture.jsonl `
-  --observed .\data\ui_minipilot_local_optimum_blocking_modal_consent_ambiguous_observed_ok.jsonl `
-  --out .\runs\ui_minipilot_local_optimum_blocking_modal_consent_ambiguous_search.json
 ```
 
 Tip: for state-gated fixtures, you can explore search improvements by disabling fatal wrong penalties:
@@ -1319,11 +1230,6 @@ Set `GOLDEVIDENCEBENCH_UI_PRESELECT_RULES=1` to apply deterministic pre-selectio
 The deterministic policy rejects non-main candidates unless a modal/popup is requested, prefers
 enabled/visible/clickable candidates, prefers non-overlay candidates, then uses geometry as a last
 tie-breaker. If it resolves to a single candidate, the adapter returns it without invoking the LLM.
-If the instruction specifies a save destination (Desktop/Documents/Downloads), the policy prefers
-Save As candidates that open the save dialog (`next_state.save_dialog_open` or label "Save As") before
-geometry.
-If a candidate explicitly opens a required modal (`next_state.modal_required=true`) and overlays are
-allowed for the row, the policy prefers that candidate even when the instruction doesn't mention a modal.
 The traps minipilot includes a forced-abstain step (identical main-page duplicates) to keep the abstain
 contract exercised in UI gates.
 If it still cannot safely disambiguate, it abstains.
@@ -1540,8 +1446,8 @@ To rotate the holdout variant automatically across runs, add `-RotateHoldout`
 `-RunAdapterGate` runs the UI Llama adapter with overlay filtering + preselect rules and writes:
 `runs/ui_same_label_llm_gate.json`, `runs/ui_popup_overlay_llm_gate.json`, and
 `runs/ui_popup_overlay_policy_llm_gate.json`, `runs/ui_minipilot_llm_gate.json`,
-`runs/ui_minipilot_notepad_llm_gate.json`, `runs/ui_minipilot_form_llm_gate.json`,
-`runs/ui_minipilot_table_llm_gate.json`, and `runs/ui_minipilot_traps_llm_gate.json`
+`runs/ui_minipilot_form_llm_gate.json`, `runs/ui_minipilot_table_llm_gate.json`, and
+`runs/ui_minipilot_traps_llm_gate.json`
 (warn-level gates in
 `configs/usecase_checks.json`).
 Decision traces are written as `runs/ui_*_llm_trace_YYYYMMDD_HHMMSS.jsonl`.

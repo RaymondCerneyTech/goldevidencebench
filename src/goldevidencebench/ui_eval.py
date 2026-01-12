@@ -21,21 +21,35 @@ def score_ui_rows(
         }
 
     gold_present_count = 0
+    gold_present_for_accuracy = 0
     correct_count = 0
     wrong_count = 0
     abstain_count = 0
+    abstain_expected_count = 0
+    abstain_expected_correct = 0
 
     for row, selected in zip(rows_list, selected_ids, strict=True):
         candidates = row.get("candidates", [])
         candidate_ids = {c.get("candidate_id") for c in candidates if isinstance(c, dict)}
         gold = row.get("gold", {})
         gold_id = gold.get("candidate_id") if isinstance(gold, dict) else None
+        abstain_expected = row.get("abstain_expected") is True
 
         if gold_id in candidate_ids:
             gold_present_count += 1
+            if not abstain_expected:
+                gold_present_for_accuracy += 1
 
         if selected is None:
             abstain_count += 1
+            if abstain_expected:
+                abstain_expected_count += 1
+                abstain_expected_correct += 1
+            continue
+
+        if abstain_expected:
+            abstain_expected_count += 1
+            wrong_count += 1
             continue
 
         if selected == gold_id:
@@ -44,7 +58,12 @@ def score_ui_rows(
             wrong_count += 1
 
     accuracy_when_gold_present = (
-        (correct_count / gold_present_count) if gold_present_count else 0.0
+        (correct_count / gold_present_for_accuracy) if gold_present_for_accuracy else 0.0
+    )
+    abstain_expected_rate = (
+        (abstain_expected_correct / abstain_expected_count)
+        if abstain_expected_count
+        else 0.0
     )
 
     return {
@@ -53,6 +72,8 @@ def score_ui_rows(
         "wrong_action_rate": wrong_count / total,
         "abstain_rate": abstain_count / total,
         "accuracy_when_gold_present": accuracy_when_gold_present,
+        "abstain_expected_rate": abstain_expected_rate,
+        "abstain_expected_count": float(abstain_expected_count),
     }
 
 
@@ -70,6 +91,8 @@ def score_post_action_verification(
     verified = 0
 
     for row, observed in zip(rows_list, observed_deltas, strict=True):
+        if row.get("abstain_expected") is True:
+            continue
         expected = row.get("expected_delta")
         if expected is None:
             continue
@@ -132,6 +155,7 @@ def score_ui_sequences(
         for idx in indices:
             row = rows_list[idx]
             selected = selected_ids[idx]
+            abstain_expected = row.get("abstain_expected") is True
             candidates = row.get("candidates", [])
             candidate_ids = {
                 c.get("candidate_id") for c in candidates if isinstance(c, dict)
@@ -139,16 +163,22 @@ def score_ui_sequences(
             gold = row.get("gold", {})
             gold_id = gold.get("candidate_id") if isinstance(gold, dict) else None
 
-            if gold_id not in candidate_ids:
+            if gold_id not in candidate_ids and not abstain_expected:
                 all_selected = False
             if selected is None:
                 abstain_count += 1
+                if not abstain_expected:
+                    all_selected = False
+            elif abstain_expected:
+                wrong_action = True
                 all_selected = False
             elif selected != gold_id:
                 wrong_action = True
                 all_selected = False
 
             if observed_deltas is not None:
+                if abstain_expected:
+                    continue
                 expected = row.get("expected_delta")
                 if isinstance(expected, dict):
                     expected_total += 1
