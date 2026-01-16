@@ -982,12 +982,24 @@ Stub assets (UI fixtures):
 - Mini pilot local-optimum observed: `data/ui_minipilot_local_optimum_observed_ok.jsonl`
 - Mini pilot local-optimum role mismatch fixture: `data/ui_minipilot_local_optimum_role_mismatch_fixture.jsonl`
 - Mini pilot local-optimum role mismatch observed: `data/ui_minipilot_local_optimum_role_mismatch_observed_ok.jsonl`
+- Mini pilot local-optimum role conflict fixture: `data/ui_minipilot_local_optimum_role_conflict_fixture.jsonl`
+- Mini pilot local-optimum role conflict observed: `data/ui_minipilot_local_optimum_role_conflict_observed_ok.jsonl`
 - Mini pilot local-optimum blocking modal fixture: `data/ui_minipilot_local_optimum_blocking_modal_fixture.jsonl`
 - Mini pilot local-optimum blocking modal observed: `data/ui_minipilot_local_optimum_blocking_modal_observed_ok.jsonl`
 - Mini pilot local-optimum blocking modal detour fixture: `data/ui_minipilot_local_optimum_blocking_modal_detour_fixture.jsonl`
 - Mini pilot local-optimum blocking modal detour observed: `data/ui_minipilot_local_optimum_blocking_modal_detour_observed_ok.jsonl`
 - Mini pilot local-optimum tab detour fixture: `data/ui_minipilot_local_optimum_tab_detour_fixture.jsonl`
 - Mini pilot local-optimum tab detour observed: `data/ui_minipilot_local_optimum_tab_detour_observed_ok.jsonl`
+- Mini pilot local-optimum panel toggle fixture: `data/ui_minipilot_local_optimum_panel_toggle_fixture.jsonl`
+- Mini pilot local-optimum panel toggle observed: `data/ui_minipilot_local_optimum_panel_toggle_observed_ok.jsonl`
+- Mini pilot local-optimum accessibility label fixture: `data/ui_minipilot_local_optimum_accessibility_label_fixture.jsonl`
+- Mini pilot local-optimum accessibility label observed: `data/ui_minipilot_local_optimum_accessibility_label_observed_ok.jsonl`
+- Mini pilot local-optimum checkbox gate fixture: `data/ui_minipilot_local_optimum_checkbox_gate_fixture.jsonl`
+- Mini pilot local-optimum checkbox gate observed: `data/ui_minipilot_local_optimum_checkbox_gate_observed_ok.jsonl`
+- Mini pilot local-optimum section path fixture: `data/ui_minipilot_local_optimum_section_path_fixture.jsonl`
+- Mini pilot local-optimum section path observed: `data/ui_minipilot_local_optimum_section_path_observed_ok.jsonl`
+- Mini pilot local-optimum section path conflict fixture: `data/ui_minipilot_local_optimum_section_path_conflict_fixture.jsonl`
+- Mini pilot local-optimum section path conflict observed: `data/ui_minipilot_local_optimum_section_path_conflict_observed_ok.jsonl`
 - Mini pilot local-optimum blocking modal unmentioned fixture: `data/ui_minipilot_local_optimum_blocking_modal_unmentioned_fixture.jsonl`
 - Mini pilot local-optimum blocking modal unmentioned observed: `data/ui_minipilot_local_optimum_blocking_modal_unmentioned_observed_ok.jsonl`
 - Mini pilot local-optimum blocking modal unmentioned ambiguous fixture: `data/ui_minipilot_local_optimum_blocking_modal_unmentioned_ambiguous_fixture.jsonl`
@@ -1004,6 +1016,26 @@ Stub assets (UI fixtures):
 - Mini pilot local-optimum blocking modal consent observed: `data/ui_minipilot_local_optimum_blocking_modal_consent_observed_ok.jsonl`
 - Mini pilot local-optimum blocking modal consent ambiguous fixture: `data/ui_minipilot_local_optimum_blocking_modal_consent_ambiguous_fixture.jsonl`
 - Mini pilot local-optimum blocking modal consent ambiguous observed: `data/ui_minipilot_local_optimum_blocking_modal_consent_ambiguous_observed_ok.jsonl`
+- Mini pilot local-optimum blocking modal unprompted confirm fixture: `data/ui_minipilot_local_optimum_blocking_modal_unprompted_confirm_fixture.jsonl`
+- Mini pilot local-optimum blocking modal unprompted confirm observed: `data/ui_minipilot_local_optimum_blocking_modal_unprompted_confirm_observed_ok.jsonl`
+- Mini pilot local-optimum blocking modal unprompted confirm ambiguous fixture: `data/ui_minipilot_local_optimum_blocking_modal_unprompted_confirm_ambiguous_fixture.jsonl`
+- Mini pilot local-optimum blocking modal unprompted confirm ambiguous observed: `data/ui_minipilot_local_optimum_blocking_modal_unprompted_confirm_ambiguous_observed_ok.jsonl`
+- Mini pilot local-optimum checkbox gate ambiguous fixture: `data/ui_minipilot_local_optimum_checkbox_gate_ambiguous_fixture.jsonl`
+- Mini pilot local-optimum checkbox gate ambiguous observed: `data/ui_minipilot_local_optimum_checkbox_gate_ambiguous_observed_ok.jsonl`
+- Mini pilot local-optimum panel toggle ambiguous fixture: `data/ui_minipilot_local_optimum_panel_toggle_ambiguous_fixture.jsonl`
+- Mini pilot local-optimum panel toggle ambiguous observed: `data/ui_minipilot_local_optimum_panel_toggle_ambiguous_observed_ok.jsonl`
+- Mini pilot local-optimum accessibility label ambiguous fixture: `data/ui_minipilot_local_optimum_accessibility_label_ambiguous_fixture.jsonl`
+- Mini pilot local-optimum accessibility label ambiguous observed: `data/ui_minipilot_local_optimum_accessibility_label_ambiguous_observed_ok.jsonl`
+- Mini pilot local-optimum section path ambiguous fixture: `data/ui_minipilot_local_optimum_section_path_ambiguous_fixture.jsonl`
+- Mini pilot local-optimum section path ambiguous observed: `data/ui_minipilot_local_optimum_section_path_ambiguous_observed_ok.jsonl`
+- Mini pilot local-optimum section path conflict ambiguous fixture: `data/ui_minipilot_local_optimum_section_path_conflict_ambiguous_fixture.jsonl`
+- Mini pilot local-optimum section path conflict ambiguous observed: `data/ui_minipilot_local_optimum_section_path_conflict_ambiguous_observed_ok.jsonl`
+- Mini pilot local-optimum destructive confirm fixture: `data/ui_minipilot_local_optimum_destructive_confirm_fixture.jsonl`
+- Mini pilot local-optimum destructive confirm observed: `data/ui_minipilot_local_optimum_destructive_confirm_observed_ok.jsonl`
+- Mini pilot local-optimum destructive confirm ambiguous fixture: `data/ui_minipilot_local_optimum_destructive_confirm_ambiguous_fixture.jsonl`
+- Mini pilot local-optimum destructive confirm ambiguous observed: `data/ui_minipilot_local_optimum_destructive_confirm_ambiguous_observed_ok.jsonl`
+- Mini pilot local-optimum role conflict ambiguous fixture: `data/ui_minipilot_local_optimum_role_conflict_ambiguous_fixture.jsonl`
+- Mini pilot local-optimum role conflict ambiguous observed: `data/ui_minipilot_local_optimum_role_conflict_ambiguous_observed_ok.jsonl`
 - Mini pilot local-optimum delayed fixture: `data/ui_minipilot_local_optimum_delayed_fixture.jsonl`
 - Mini pilot local-optimum delayed observed: `data/ui_minipilot_local_optimum_delayed_observed_ok.jsonl`
 - Mini pilot local-optimum delayed solvable fixture: `data/ui_minipilot_local_optimum_delayed_solvable_fixture.jsonl`
@@ -1099,8 +1131,12 @@ Mini pilot notepad live demo (drives Notepad with SendKeys):
 ```
 
 This writes a plan to `runs/notepad_demo_plan.json` and executes it. Use `-DryRun` to only emit the plan.
-SendKeys types into the active window; keep focus on Notepad while the script runs.
-If the file already exists, Notepad may prompt to overwrite.
+By default the demo uses the deterministic `greedy` planner; pass `-Planner llm` to use the LLM.
+SendKeys drives the active window; keep focus on Notepad while the script runs.
+The default input mode uses clipboard paste. Use `-InputMode type` (optionally with
+`-TypeChunkSize`/`-TypeDelayMs`) to simulate typing.
+If the file already exists, the script prompts to rename, overwrite, or cancel. Use
+`-OnExistingFile rename|overwrite` to skip the prompt.
 
 Mini pilot form stub:
 
@@ -1164,6 +1200,10 @@ state gate reflects feasible transitions rather than post-hoc scoring.
 The search baseline output includes `abstain_debug` with reason counts and average candidate pool sizes
 after each filtering stage to diagnose why abstains happen.
 
+If fixture rows include `min_steps`, the baseline adds `task_step_overhead_mean` and `task_steps_taken_mean`
+to `sequence_metrics`. When `--out` is set it also writes a `*_summary.csv` and a `*_preferences.jsonl`
+file containing pairwise "shorter & valid" preferences.
+
 Local-optimum baseline (SA discriminator):
 
 ```powershell
@@ -1174,6 +1214,7 @@ python .\scripts\run_ui_search_baseline.py --fixture .\data\ui_minipilot_local_o
 Use `--seeds N` to evaluate whether SA beats greedy across multiple seeds; the output includes
 `seed_summary.sa_beats_greedy_rate` plus the explicit `seed_list`. Each seed run includes SA telemetry
 (accept_rate, best_score, runtime_ms_per_iter) and a `sa_diff` blob when SA beats greedy.
+Tip: tune SA by watching `accept_rate` (near 0 = frozen, near 1 = random walk).
 
 Optional robustness fuzzing (instruction/label mutations) writes a `fuzz_summary` block with mean and
 min metrics across variants:
@@ -1193,6 +1234,21 @@ non-holdouts keep policy/greedy pass rates high. The holdout requires
 `holdout.sa_beats_greedy_rate >= 0.9` until it is distilled; once the holdout is
 fully solved (policy/greedy pass-rate >= 0.9), the SA gap check is skipped and you
 should rotate to a new holdout family.
+
+Trap-mining exit criteria (transition point):
+
+- Auto-curriculum finds no oracle gap across multiple rotations (e.g., 3-5) and the distillation backlog stays empty.
+- Core trap axes are covered (overlay/modal, same_label, role mismatch, state-gate, consent/permission, save-dialog, section/app_path).
+- Fuzzed variants stay green across seeds (no regressions).
+
+When these hold, freeze the trap suite and shift effort to end-to-end demos and external validity checks.
+
+**Completion & Next Phase**
+
+- Freeze the trap suite + holdout list as a versioned contract (e.g., v1); treat "curriculum exhausted" as expected.
+- Pin gate outputs and run the release check in CI (one command to accept/reject changes).
+- Shift work to end-to-end demos (Notepad flow) and external validity checks (map 1–2 real tasks into fixtures).
+- Keep SA as an offline oracle; distill rules/prompts and export preference pairs for training.
 
 Local-optimum variants (role mismatch, delayed penalty, overlay inversion, blocking modal, blocking modal unmentioned, decoy primary) are available; swap the
 fixture/observed paths above to validate additional trap patterns.
@@ -1256,6 +1312,34 @@ python .\scripts\run_ui_search_baseline.py --fixture .\data\ui_minipilot_local_o
 python .\scripts\run_ui_search_baseline.py --fixture .\data\ui_minipilot_local_optimum_blocking_modal_consent_ambiguous_fixture.jsonl `
   --observed .\data\ui_minipilot_local_optimum_blocking_modal_consent_ambiguous_observed_ok.jsonl `
   --out .\runs\ui_minipilot_local_optimum_blocking_modal_consent_ambiguous_search.json
+
+python .\scripts\run_ui_search_baseline.py --fixture .\data\ui_minipilot_local_optimum_checkbox_gate_ambiguous_fixture.jsonl `
+  --observed .\data\ui_minipilot_local_optimum_checkbox_gate_ambiguous_observed_ok.jsonl `
+  --out .\runs\ui_minipilot_local_optimum_checkbox_gate_ambiguous_search.json
+
+python .\scripts\run_ui_search_baseline.py --fixture .\data\ui_minipilot_local_optimum_panel_toggle_ambiguous_fixture.jsonl `
+  --observed .\data\ui_minipilot_local_optimum_panel_toggle_ambiguous_observed_ok.jsonl `
+  --out .\runs\ui_minipilot_local_optimum_panel_toggle_ambiguous_search.json
+
+python .\scripts\run_ui_search_baseline.py --fixture .\data\ui_minipilot_local_optimum_accessibility_label_ambiguous_fixture.jsonl `
+  --observed .\data\ui_minipilot_local_optimum_accessibility_label_ambiguous_observed_ok.jsonl `
+  --out .\runs\ui_minipilot_local_optimum_accessibility_label_ambiguous_search.json
+
+python .\scripts\run_ui_search_baseline.py --fixture .\data\ui_minipilot_local_optimum_section_path_ambiguous_fixture.jsonl `
+  --observed .\data\ui_minipilot_local_optimum_section_path_ambiguous_observed_ok.jsonl `
+  --out .\runs\ui_minipilot_local_optimum_section_path_ambiguous_search.json
+python .\scripts\run_ui_search_baseline.py --fixture .\data\ui_minipilot_local_optimum_section_path_conflict_ambiguous_fixture.jsonl `
+  --observed .\data\ui_minipilot_local_optimum_section_path_conflict_ambiguous_observed_ok.jsonl `
+  --out .\runs\ui_minipilot_local_optimum_section_path_conflict_ambiguous_search.json
+python .\scripts\run_ui_search_baseline.py --fixture .\data\ui_minipilot_local_optimum_blocking_modal_unprompted_confirm_ambiguous_fixture.jsonl `
+  --observed .\data\ui_minipilot_local_optimum_blocking_modal_unprompted_confirm_ambiguous_observed_ok.jsonl `
+  --out .\runs\ui_minipilot_local_optimum_blocking_modal_unprompted_confirm_ambiguous_search.json
+python .\scripts\run_ui_search_baseline.py --fixture .\data\ui_minipilot_local_optimum_destructive_confirm_ambiguous_fixture.jsonl `
+  --observed .\data\ui_minipilot_local_optimum_destructive_confirm_ambiguous_observed_ok.jsonl `
+  --out .\runs\ui_minipilot_local_optimum_destructive_confirm_ambiguous_search.json
+python .\scripts\run_ui_search_baseline.py --fixture .\data\ui_minipilot_local_optimum_role_conflict_ambiguous_fixture.jsonl `
+  --observed .\data\ui_minipilot_local_optimum_role_conflict_ambiguous_observed_ok.jsonl `
+  --out .\runs\ui_minipilot_local_optimum_role_conflict_ambiguous_search.json
 ```
 
 Tip: for state-gated fixtures, you can explore search improvements by disabling fatal wrong penalties:
@@ -1315,7 +1399,7 @@ unless the instruction explicitly calls for a modal/popup/overlay.
 If `allow_overlay` is true and any overlay candidate clears a blocking modal (`next_state.modal_cleared=true`),
 the policy prefers those overlay candidates even when the instruction doesn't mention a modal.
 Set `GOLDEVIDENCEBENCH_UI_PRESELECT_RULES=1` to apply deterministic pre-selection based on instruction cues
-(main page vs modal/dialog, primary/secondary, top/bottom, left/right, label keyword matches from the instruction, e.g. "confirm") before selection.
+(main page vs modal/dialog, primary/secondary, top/bottom, left/right, label keyword matches from the instruction, app_path keyword matches like section/page tokens) before selection.
 The deterministic policy rejects non-main candidates unless a modal/popup is requested, prefers
 enabled/visible/clickable candidates, prefers non-overlay candidates, then uses geometry as a last
 tie-breaker. If it resolves to a single candidate, the adapter returns it without invoking the LLM.
@@ -1336,6 +1420,12 @@ Potential-based shaping (virtual power):
 - `src/goldevidencebench/ui_search.py` exposes `compute_potential(state)` and `delta_phi(current, next)`.
 - The potential gives +1 for overlay dismissed, +1 for `modal_scope="main"`, and +1 when `tab` matches the instruction tab (-1 for the opposite).
 - Use `delta_phi` as a shaping term for offline search baselines (greedy -> SA) without changing the optimal policy.
+
+Annealing intuition (why SA works here):
+
+- Temperature is the exploration noise knob; acceptance rate is the health signal (near 0 = frozen, near 1 = random walk).
+- The SA acceptance rule is the same exponential that shows up in Boltzmann sampling; cooling concentrates on lower "energy" (better scores).
+- Shaping via `delta_phi` is guidance, not truth; it should help search without redefining what "correct" means.
 
 Greedy construction (initial plan):
 
@@ -1521,6 +1611,15 @@ Use `-SkipVariants` to skip the local-optimum variants suite, or tune it with
 `-VariantsSeeds`, `-VariantsHoldoutName`, `-VariantsFuzzVariants`, `-VariantsFuzzSeed`.
 To rotate the holdout variant automatically across runs, add `-RotateHoldout`
 (and optionally customize `-HoldoutList`).
+To choose the holdout automatically from the prior distillation report, add
+`-AutoCurriculum` (writes `runs/release_gates/ui_holdout_autocurriculum.json` and warns when the
+curriculum is exhausted).
+
+To run the local-optimum curriculum end-to-end without the full release checklist, use:
+
+```powershell
+.\scripts\run_ui_autocurriculum.ps1 -MaxRounds 10 -Seeds 10 -FuzzVariants 5
+```
 
 If thresholds fail, `run_release_check.ps1` writes UI baseline traces + SA diffs under
 `runs/ui_gate_artifacts_YYYYMMDD_HHMMSS/` for quick diagnosis.
@@ -1536,6 +1635,8 @@ By default this also runs the local-optimum variants suite and writes a distilla
 `-VariantsSeeds`, `-VariantsHoldoutName`, `-VariantsFuzzVariants`, `-VariantsFuzzSeed`.
 To rotate the holdout variant automatically across runs, add `-RotateHoldout`
 (and optionally customize `-HoldoutList`).
+To choose the holdout automatically from the prior distillation report, add
+`-AutoCurriculum`.
 
 `-RunAdapterGate` runs the UI Llama adapter with overlay filtering + preselect rules and writes:
 `runs/ui_same_label_llm_gate.json`, `runs/ui_popup_overlay_llm_gate.json`, and

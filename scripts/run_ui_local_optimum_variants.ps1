@@ -29,6 +29,11 @@ $variants = @(
         Observed = "data\\ui_minipilot_local_optimum_role_mismatch_observed_ok.jsonl"
     },
     @{
+        Name = "local_optimum_role_conflict"
+        Fixture = "data\\ui_minipilot_local_optimum_role_conflict_fixture.jsonl"
+        Observed = "data\\ui_minipilot_local_optimum_role_conflict_observed_ok.jsonl"
+    },
+    @{
         Name = "local_optimum_blocking_modal"
         Fixture = "data\\ui_minipilot_local_optimum_blocking_modal_fixture.jsonl"
         Observed = "data\\ui_minipilot_local_optimum_blocking_modal_observed_ok.jsonl"
@@ -42,6 +47,31 @@ $variants = @(
         Name = "local_optimum_tab_detour"
         Fixture = "data\\ui_minipilot_local_optimum_tab_detour_fixture.jsonl"
         Observed = "data\\ui_minipilot_local_optimum_tab_detour_observed_ok.jsonl"
+    },
+    @{
+        Name = "local_optimum_panel_toggle"
+        Fixture = "data\\ui_minipilot_local_optimum_panel_toggle_fixture.jsonl"
+        Observed = "data\\ui_minipilot_local_optimum_panel_toggle_observed_ok.jsonl"
+    },
+    @{
+        Name = "local_optimum_accessibility_label"
+        Fixture = "data\\ui_minipilot_local_optimum_accessibility_label_fixture.jsonl"
+        Observed = "data\\ui_minipilot_local_optimum_accessibility_label_observed_ok.jsonl"
+    },
+    @{
+        Name = "local_optimum_checkbox_gate"
+        Fixture = "data\\ui_minipilot_local_optimum_checkbox_gate_fixture.jsonl"
+        Observed = "data\\ui_minipilot_local_optimum_checkbox_gate_observed_ok.jsonl"
+    },
+    @{
+        Name = "local_optimum_section_path"
+        Fixture = "data\\ui_minipilot_local_optimum_section_path_fixture.jsonl"
+        Observed = "data\\ui_minipilot_local_optimum_section_path_observed_ok.jsonl"
+    },
+    @{
+        Name = "local_optimum_section_path_conflict"
+        Fixture = "data\\ui_minipilot_local_optimum_section_path_conflict_fixture.jsonl"
+        Observed = "data\\ui_minipilot_local_optimum_section_path_conflict_observed_ok.jsonl"
     },
     @{
         Name = "local_optimum_blocking_modal_unmentioned"
@@ -62,6 +92,16 @@ $variants = @(
         Name = "local_optimum_blocking_modal_consent"
         Fixture = "data\\ui_minipilot_local_optimum_blocking_modal_consent_fixture.jsonl"
         Observed = "data\\ui_minipilot_local_optimum_blocking_modal_consent_observed_ok.jsonl"
+    },
+    @{
+        Name = "local_optimum_blocking_modal_unprompted_confirm"
+        Fixture = "data\\ui_minipilot_local_optimum_blocking_modal_unprompted_confirm_fixture.jsonl"
+        Observed = "data\\ui_minipilot_local_optimum_blocking_modal_unprompted_confirm_observed_ok.jsonl"
+    },
+    @{
+        Name = "local_optimum_destructive_confirm"
+        Fixture = "data\\ui_minipilot_local_optimum_destructive_confirm_fixture.jsonl"
+        Observed = "data\\ui_minipilot_local_optimum_destructive_confirm_observed_ok.jsonl"
     },
     @{
         Name = "local_optimum_delayed_solvable"

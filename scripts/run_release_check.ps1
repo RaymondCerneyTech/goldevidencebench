@@ -7,7 +7,11 @@ param(
     [int]$VariantsFuzzVariants = 5,
     [int]$VariantsFuzzSeed = 0,
     [switch]$RotateHoldout,
-    [string]$HoldoutList = "local_optimum_blocking_modal_detour,local_optimum_tab_detour,local_optimum_blocking_modal_required,local_optimum_blocking_modal_permission,local_optimum_blocking_modal_consent,local_optimum_blocking_modal_unmentioned,local_optimum_blocking_modal,local_optimum_overlay,local_optimum_primary,local_optimum_delayed_solvable,local_optimum_role_mismatch",
+    [switch]$AutoCurriculum,
+    [double]$AutoCurriculumGapMin = 0.1,
+    [double]$AutoCurriculumSolvedMin = 0.9,
+    [string]$AutoCurriculumStatePath = "runs\\release_gates\\ui_holdout_autocurriculum.json",
+    [string]$HoldoutList = "local_optimum_section_path,local_optimum_section_path_conflict,local_optimum_blocking_modal_detour,local_optimum_tab_detour,local_optimum_panel_toggle,local_optimum_accessibility_label,local_optimum_checkbox_gate,local_optimum_blocking_modal_required,local_optimum_blocking_modal_permission,local_optimum_blocking_modal_consent,local_optimum_blocking_modal_unmentioned,local_optimum_blocking_modal,local_optimum_overlay,local_optimum_primary,local_optimum_delayed_solvable,local_optimum_role_mismatch,local_optimum_role_conflict,local_optimum_destructive_confirm,local_optimum_blocking_modal_unprompted_confirm",
     [switch]$SkipVariants
 )
 
@@ -37,10 +41,107 @@ if ($RunSweeps) {
     Write-Host "Sweeps complete: $stressRoot, $pinRoot"
 }
 
+function Get-NextHoldoutFromReport {
+    param(
+        [object]$Report,
+        [double]$GapMin,
+        [double]$SolvedMin,
+        [string]$FallbackHoldout
+    )
+    $result = [ordered]@{
+        holdout = $FallbackHoldout
+        reason = "fallback"
+        exhausted = $false
+    }
+    if (-not $Report) {
+        return $result
+    }
+    $holdout = $Report.holdout
+    $holdoutName = $holdout.name
+    $holdoutSolved = $false
+    $holdoutGap = 0.0
+    if ($holdout) {
+        $holdoutGap = [double]($holdout.sa_beats_greedy_rate)
+        $holdoutSolved = (
+            [double]($holdout.policy_task_pass_rate_min) -ge $SolvedMin -and
+            [double]($holdout.greedy_task_pass_rate_min) -ge $SolvedMin
+        )
+    }
+    if (-not $holdoutSolved -or $holdoutGap -ge $GapMin) {
+        $result.holdout = $holdoutName
+        $result.reason = "holdout_unsolved"
+        return $result
+    }
+    $candidates = @()
+    $variantBreakdown = $Report.variant_breakdown
+    if ($variantBreakdown) {
+        foreach ($prop in $variantBreakdown.PSObject.Properties) {
+            $name = $prop.Name
+            $data = $prop.Value
+            if ($data.excluded_from_distillation -eq $true) {
+                continue
+            }
+            $gap = [double]($data.sa_beats_greedy_rate)
+            if ($gap -lt $GapMin) {
+                continue
+            }
+            $candidates += [pscustomobject]@{
+                name = $name
+                gap = $gap
+                greedy_min = [double]($data.greedy_task_pass_rate_min)
+                policy_min = [double]($data.policy_task_pass_rate_min)
+            }
+        }
+    }
+    if ($candidates.Count -gt 0) {
+        $pick = $candidates | Sort-Object `
+            @{ Expression = "gap"; Descending = $true }, `
+            @{ Expression = "greedy_min"; Descending = $false }, `
+            @{ Expression = "policy_min"; Descending = $false } | Select-Object -First 1
+        $result.holdout = $pick.name
+        $result.reason = "gap_candidate"
+        return $result
+    }
+    $result.holdout = $holdoutName
+    $result.reason = "curriculum_exhausted"
+    $result.exhausted = $true
+    return $result
+}
+
 if (-not $SkipThresholds) {
     $stamp = Get-Date -Format "yyyyMMdd_HHmmss"
     $resolvedHoldout = $VariantsHoldoutName
-    if ($RotateHoldout) {
+    if ($AutoCurriculum) {
+        $prevReportPath = "runs\\release_gates\\ui_local_optimum_distillation.json"
+        if (Test-Path $prevReportPath) {
+            try {
+                $report = Get-Content $prevReportPath -Raw | ConvertFrom-Json
+                $choice = Get-NextHoldoutFromReport -Report $report -GapMin $AutoCurriculumGapMin -SolvedMin $AutoCurriculumSolvedMin -FallbackHoldout $resolvedHoldout
+                if ($choice.holdout) {
+                    $resolvedHoldout = $choice.holdout
+                    New-Item -ItemType Directory -Path (Split-Path $AutoCurriculumStatePath) -Force | Out-Null
+                    [pscustomobject]@{
+                        used_holdout = $resolvedHoldout
+                        reason = $choice.reason
+                        exhausted = $choice.exhausted
+                        gap_min = $AutoCurriculumGapMin
+                        solved_min = $AutoCurriculumSolvedMin
+                        source_report = $prevReportPath
+                        updated_at = (Get-Date -Format "s")
+                    } | ConvertTo-Json -Depth 4 | Set-Content -Path $AutoCurriculumStatePath -Encoding UTF8
+                    if ($choice.exhausted) {
+                        Write-Host "AutoCurriculum: no oracle gap found in previous report (curriculum exhausted)."
+                    } else {
+                        Write-Host ("AutoCurriculum holdout: {0} ({1})" -f $resolvedHoldout, $choice.reason)
+                    }
+                }
+            } catch {
+                Write-Host "AutoCurriculum: failed to parse prior distillation report."
+            }
+        } else {
+            Write-Host "AutoCurriculum: no prior distillation report found; using configured holdout."
+        }
+    } elseif ($RotateHoldout) {
         $holdoutNames = @(
             $HoldoutList -split "," | ForEach-Object { $_.Trim() } | Where-Object { $_ }
         )
@@ -81,6 +182,18 @@ if (-not $SkipThresholds) {
     .\scripts\run_ui_popup_overlay_stub.ps1
     Write-Host "Running UI minipilot notepad stub..."
     .\scripts\run_ui_minipilot_notepad_stub.ps1
+    Write-Host "Running UI minipilot notepad baseline (step overhead)..."
+    python .\scripts\run_ui_search_baseline.py --fixture .\data\ui_minipilot_notepad_fixture.jsonl `
+        --observed .\data\ui_minipilot_notepad_observed_ok.jsonl `
+        --out .\runs\ui_minipilot_notepad_search.json
+    Write-Host "Running UI minipilot form baseline (step overhead)..."
+    python .\scripts\run_ui_search_baseline.py --fixture .\data\ui_minipilot_form_fixture.jsonl `
+        --observed .\data\ui_minipilot_form_observed_ok.jsonl `
+        --out .\runs\ui_minipilot_form_search.json
+    Write-Host "Running UI minipilot table baseline (step overhead)..."
+    python .\scripts\run_ui_search_baseline.py --fixture .\data\ui_minipilot_table_fixture.jsonl `
+        --observed .\data\ui_minipilot_table_observed_ok.jsonl `
+        --out .\runs\ui_minipilot_table_search.json
     Write-Host "Running UI minipilot notepad ambiguous baseline..."
     python .\scripts\run_ui_search_baseline.py --fixture .\data\ui_minipilot_notepad_ambiguous_fixture.jsonl `
         --observed .\data\ui_minipilot_notepad_ambiguous_observed_ok.jsonl `
@@ -113,6 +226,35 @@ if (-not $SkipThresholds) {
     python .\scripts\run_ui_search_baseline.py --fixture .\data\ui_minipilot_local_optimum_blocking_modal_consent_ambiguous_fixture.jsonl `
         --observed .\data\ui_minipilot_local_optimum_blocking_modal_consent_ambiguous_observed_ok.jsonl `
         --out .\runs\ui_minipilot_local_optimum_blocking_modal_consent_ambiguous_search.json
+    Write-Host "Running UI local-optimum checkbox gate ambiguous baseline..."
+    python .\scripts\run_ui_search_baseline.py --fixture .\data\ui_minipilot_local_optimum_checkbox_gate_ambiguous_fixture.jsonl `
+        --observed .\data\ui_minipilot_local_optimum_checkbox_gate_ambiguous_observed_ok.jsonl `
+        --out .\runs\ui_minipilot_local_optimum_checkbox_gate_ambiguous_search.json
+    Write-Host "Running UI local-optimum panel toggle ambiguous baseline..."
+    python .\scripts\run_ui_search_baseline.py --fixture .\data\ui_minipilot_local_optimum_panel_toggle_ambiguous_fixture.jsonl `
+        --observed .\data\ui_minipilot_local_optimum_panel_toggle_ambiguous_observed_ok.jsonl `
+        --out .\runs\ui_minipilot_local_optimum_panel_toggle_ambiguous_search.json
+    Write-Host "Running UI local-optimum accessibility label ambiguous baseline..."
+    python .\scripts\run_ui_search_baseline.py --fixture .\data\ui_minipilot_local_optimum_accessibility_label_ambiguous_fixture.jsonl `
+        --observed .\data\ui_minipilot_local_optimum_accessibility_label_ambiguous_observed_ok.jsonl `
+        --out .\runs\ui_minipilot_local_optimum_accessibility_label_ambiguous_search.json
+    Write-Host "Running UI local-optimum section path ambiguous baseline..."
+    python .\scripts\run_ui_search_baseline.py --fixture .\data\ui_minipilot_local_optimum_section_path_ambiguous_fixture.jsonl `
+        --observed .\data\ui_minipilot_local_optimum_section_path_ambiguous_observed_ok.jsonl `
+        --out .\runs\ui_minipilot_local_optimum_section_path_ambiguous_search.json
+    Write-Host "Running UI local-optimum section path conflict ambiguous baseline..."
+    python .\scripts\run_ui_search_baseline.py --fixture .\data\ui_minipilot_local_optimum_section_path_conflict_ambiguous_fixture.jsonl `
+        --observed .\data\ui_minipilot_local_optimum_section_path_conflict_ambiguous_observed_ok.jsonl `
+        --out .\runs\ui_minipilot_local_optimum_section_path_conflict_ambiguous_search.json
+    python .\scripts\run_ui_search_baseline.py --fixture .\data\ui_minipilot_local_optimum_blocking_modal_unprompted_confirm_ambiguous_fixture.jsonl `
+        --observed .\data\ui_minipilot_local_optimum_blocking_modal_unprompted_confirm_ambiguous_observed_ok.jsonl `
+        --out .\runs\ui_minipilot_local_optimum_blocking_modal_unprompted_confirm_ambiguous_search.json
+    python .\scripts\run_ui_search_baseline.py --fixture .\data\ui_minipilot_local_optimum_destructive_confirm_ambiguous_fixture.jsonl `
+        --observed .\data\ui_minipilot_local_optimum_destructive_confirm_ambiguous_observed_ok.jsonl `
+        --out .\runs\ui_minipilot_local_optimum_destructive_confirm_ambiguous_search.json
+    python .\scripts\run_ui_search_baseline.py --fixture .\data\ui_minipilot_local_optimum_role_conflict_ambiguous_fixture.jsonl `
+        --observed .\data\ui_minipilot_local_optimum_role_conflict_ambiguous_observed_ok.jsonl `
+        --out .\runs\ui_minipilot_local_optimum_role_conflict_ambiguous_search.json
     if (-not $SkipVariants) {
         $variantsOutRoot = "runs\\ui_local_optimum_variants_$stamp"
         Write-Host "Running UI local-optimum variants + distillation report..."
@@ -127,6 +269,30 @@ if (-not $SkipThresholds) {
             $releaseDir = "runs\\release_gates"
             New-Item -ItemType Directory -Path $releaseDir -Force | Out-Null
             Copy-Item -Path $distillationPath -Destination (Join-Path $releaseDir "ui_local_optimum_distillation.json") -Force
+            if ($AutoCurriculum) {
+                try {
+                    $report = Get-Content $distillationPath -Raw | ConvertFrom-Json
+                    $choice = Get-NextHoldoutFromReport -Report $report -GapMin $AutoCurriculumGapMin -SolvedMin $AutoCurriculumSolvedMin -FallbackHoldout $resolvedHoldout
+                    New-Item -ItemType Directory -Path (Split-Path $AutoCurriculumStatePath) -Force | Out-Null
+                    [pscustomobject]@{
+                        used_holdout = $resolvedHoldout
+                        next_holdout = $choice.holdout
+                        reason = $choice.reason
+                        exhausted = $choice.exhausted
+                        gap_min = $AutoCurriculumGapMin
+                        solved_min = $AutoCurriculumSolvedMin
+                        source_report = $distillationPath
+                        updated_at = (Get-Date -Format "s")
+                    } | ConvertTo-Json -Depth 5 | Set-Content -Path $AutoCurriculumStatePath -Encoding UTF8
+                    if ($choice.exhausted) {
+                        Write-Host "AutoCurriculum: no oracle gap found in current report (curriculum exhausted)."
+                    } else {
+                        Write-Host ("AutoCurriculum next holdout: {0} ({1})" -f $choice.holdout, $choice.reason)
+                    }
+                } catch {
+                    Write-Host "AutoCurriculum: failed to parse distillation report for next holdout."
+                }
+            }
         }
     }
     python .\scripts\check_thresholds.py --config .\configs\usecase_checks.json
@@ -165,6 +331,46 @@ if (-not $SkipThresholds) {
                 Name = "local_optimum_blocking_modal_consent_ambiguous"
                 Fixture = "data\\ui_minipilot_local_optimum_blocking_modal_consent_ambiguous_fixture.jsonl"
                 Baseline = "runs\\ui_minipilot_local_optimum_blocking_modal_consent_ambiguous_search.json"
+            }
+            @{
+                Name = "local_optimum_checkbox_gate_ambiguous"
+                Fixture = "data\\ui_minipilot_local_optimum_checkbox_gate_ambiguous_fixture.jsonl"
+                Baseline = "runs\\ui_minipilot_local_optimum_checkbox_gate_ambiguous_search.json"
+            }
+            @{
+                Name = "local_optimum_panel_toggle_ambiguous"
+                Fixture = "data\\ui_minipilot_local_optimum_panel_toggle_ambiguous_fixture.jsonl"
+                Baseline = "runs\\ui_minipilot_local_optimum_panel_toggle_ambiguous_search.json"
+            }
+            @{
+                Name = "local_optimum_accessibility_label_ambiguous"
+                Fixture = "data\\ui_minipilot_local_optimum_accessibility_label_ambiguous_fixture.jsonl"
+                Baseline = "runs\\ui_minipilot_local_optimum_accessibility_label_ambiguous_search.json"
+            }
+            @{
+                Name = "local_optimum_section_path_ambiguous"
+                Fixture = "data\\ui_minipilot_local_optimum_section_path_ambiguous_fixture.jsonl"
+                Baseline = "runs\\ui_minipilot_local_optimum_section_path_ambiguous_search.json"
+            }
+            @{
+                Name = "local_optimum_section_path_conflict_ambiguous"
+                Fixture = "data\\ui_minipilot_local_optimum_section_path_conflict_ambiguous_fixture.jsonl"
+                Baseline = "runs\\ui_minipilot_local_optimum_section_path_conflict_ambiguous_search.json"
+            }
+            @{
+                Name = "local_optimum_blocking_modal_unprompted_confirm_ambiguous"
+                Fixture = "data\\ui_minipilot_local_optimum_blocking_modal_unprompted_confirm_ambiguous_fixture.jsonl"
+                Baseline = "runs\\ui_minipilot_local_optimum_blocking_modal_unprompted_confirm_ambiguous_search.json"
+            }
+            @{
+                Name = "local_optimum_destructive_confirm_ambiguous"
+                Fixture = "data\\ui_minipilot_local_optimum_destructive_confirm_ambiguous_fixture.jsonl"
+                Baseline = "runs\\ui_minipilot_local_optimum_destructive_confirm_ambiguous_search.json"
+            }
+            @{
+                Name = "local_optimum_role_conflict_ambiguous"
+                Fixture = "data\\ui_minipilot_local_optimum_role_conflict_ambiguous_fixture.jsonl"
+                Baseline = "runs\\ui_minipilot_local_optimum_role_conflict_ambiguous_search.json"
             }
         )
         foreach ($pair in $pairs) {

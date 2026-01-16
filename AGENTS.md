@@ -18,6 +18,11 @@ These rules apply to the entire repository.
 - Update `README.md` whenever behavior, CLI, formats, or defaults change.
 - When README changes, ensure this `AGENTS.md` stays accurate (house rules + current contracts).
 
+## Completion & next phase
+- When auto-curriculum is exhausted and all gates are green, freeze the trap suite + holdout list as a versioned contract.
+- Pin release gate outputs and use the release check as the acceptance signal.
+- After freezing, focus on end-to-end demos and external validity fixtures; keep SA offline as an oracle.
+
 ## Current contracts (keep in sync)
 - Adapter schema version: `1.0` (adapter outputs must include `value`, `support_ids` list; extra fields rejected).
 - Results output: `--results-json` writes JSON (object or array); `--out` writes predictions JSONL.

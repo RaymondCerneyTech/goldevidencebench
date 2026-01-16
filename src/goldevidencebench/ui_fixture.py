@@ -59,6 +59,13 @@ def validate_ui_rows(rows: Iterable[dict[str, Any]]) -> list[str]:
                     f"row {row_index}: step_index must be a positive integer when present"
                 )
 
+        min_steps = row.get("min_steps")
+        if min_steps is not None:
+            if not _is_int(min_steps) or min_steps < 1:
+                errors.append(
+                    f"row {row_index}: min_steps must be a positive integer when present"
+                )
+
         candidates = row.get("candidates")
         if not isinstance(candidates, list) or not candidates:
             errors.append(f"row {row_index}: candidates must be a non-empty list")

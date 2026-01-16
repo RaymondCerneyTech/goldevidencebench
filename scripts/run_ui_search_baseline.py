@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import time
 import random
@@ -12,6 +13,7 @@ from goldevidencebench.ui_eval import (
     score_post_action_verification,
     score_ui_rows,
     score_ui_sequences,
+    task_step_stats,
 )
 from goldevidencebench.ui_fixture import validate_ui_fixture_path
 from goldevidencebench.ui_policy import preselect_candidates, preselect_candidates_with_trace
@@ -377,12 +379,24 @@ def _apply_text_fuzz(rows: list[dict[str, Any]], rng: random.Random) -> list[dic
     return mutated
 
 
-def _mean(values: list[float]) -> float:
-    return sum(values) / len(values) if values else 0.0
+def _mean(values: list[float | None]) -> float | None:
+    cleaned = [value for value in values if isinstance(value, (int, float))]
+    if not cleaned:
+        return None
+    return sum(cleaned) / len(cleaned)
 
 
-def _min(values: list[float]) -> float:
-    return min(values) if values else 0.0
+def _min(values: list[float | None]) -> float | None:
+    cleaned = [value for value in values if isinstance(value, (int, float))]
+    if not cleaned:
+        return None
+    return min(cleaned)
+
+
+def _mean_or_none(values: list[float]) -> float | None:
+    if not values:
+        return None
+    return sum(values) / len(values)
 
 
 def _as_seed_runs(payload: dict[str, Any]) -> list[dict[str, Any]]:
@@ -400,9 +414,33 @@ def _as_seed_runs(payload: dict[str, Any]) -> list[dict[str, Any]]:
 
 def _summarize_seed_runs(seed_runs: list[dict[str, Any]]) -> dict[str, dict[str, float]]:
     metrics = {
-        "policy": {"selection_rate": [], "abstain_rate": [], "wrong_action_rate": [], "task_pass_rate": []},
-        "greedy": {"selection_rate": [], "abstain_rate": [], "wrong_action_rate": [], "task_pass_rate": []},
-        "sa": {"selection_rate": [], "abstain_rate": [], "wrong_action_rate": [], "task_pass_rate": []},
+        "policy": {
+            "selection_rate": [],
+            "abstain_rate": [],
+            "wrong_action_rate": [],
+            "task_pass_rate": [],
+            "task_step_overhead_mean": [],
+            "task_steps_taken_mean": [],
+            "task_min_steps_mean": [],
+        },
+        "greedy": {
+            "selection_rate": [],
+            "abstain_rate": [],
+            "wrong_action_rate": [],
+            "task_pass_rate": [],
+            "task_step_overhead_mean": [],
+            "task_steps_taken_mean": [],
+            "task_min_steps_mean": [],
+        },
+        "sa": {
+            "selection_rate": [],
+            "abstain_rate": [],
+            "wrong_action_rate": [],
+            "task_pass_rate": [],
+            "task_step_overhead_mean": [],
+            "task_steps_taken_mean": [],
+            "task_min_steps_mean": [],
+        },
     }
     for run in seed_runs:
         for strategy in ("policy", "greedy", "sa"):
@@ -420,10 +458,112 @@ def _summarize_seed_runs(seed_runs: list[dict[str, Any]]) -> dict[str, dict[str,
                 task_pass_rate = sequence_metrics.get("task_pass_rate")
                 if isinstance(task_pass_rate, (int, float)):
                     metrics[strategy]["task_pass_rate"].append(float(task_pass_rate))
+                for key in (
+                    "task_step_overhead_mean",
+                    "task_steps_taken_mean",
+                    "task_min_steps_mean",
+                ):
+                    value = sequence_metrics.get(key)
+                    if isinstance(value, (int, float)):
+                        metrics[strategy][key].append(float(value))
     summary: dict[str, dict[str, float]] = {}
     for strategy, values in metrics.items():
-        summary[strategy] = {key: _mean(vals) for key, vals in values.items()}
+        summary[strategy] = {key: _mean_or_none(vals) for key, vals in values.items()}
     return summary
+
+
+def _write_summary_csv(
+    path: Path,
+    *,
+    fixture: str,
+    seeds: int,
+    strategy_summary: dict[str, dict[str, float]],
+) -> None:
+    fieldnames = [
+        "fixture",
+        "seeds",
+        "strategy",
+        "selection_rate_mean",
+        "abstain_rate_mean",
+        "wrong_action_rate_mean",
+        "task_pass_rate_mean",
+        "task_step_overhead_mean",
+        "task_steps_taken_mean",
+        "task_min_steps_mean",
+    ]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        for strategy, metrics in strategy_summary.items():
+            writer.writerow(
+                {
+                    "fixture": fixture,
+                    "seeds": seeds,
+                    "strategy": strategy,
+                    "selection_rate_mean": metrics.get("selection_rate", 0.0),
+                    "abstain_rate_mean": metrics.get("abstain_rate", 0.0),
+                    "wrong_action_rate_mean": metrics.get("wrong_action_rate", 0.0),
+                    "task_pass_rate_mean": metrics.get("task_pass_rate", 0.0),
+                    "task_step_overhead_mean": metrics.get("task_step_overhead_mean", ""),
+                    "task_steps_taken_mean": metrics.get("task_steps_taken_mean", ""),
+                    "task_min_steps_mean": metrics.get("task_min_steps_mean", ""),
+                }
+            )
+
+
+def _stats_by_task(
+    rows: list[dict[str, Any]],
+    selected_ids: list[str | None],
+    observed: list[dict[str, Any] | None] | None,
+) -> dict[str, dict[str, Any]]:
+    stats = task_step_stats(rows, selected_ids, observed)
+    return {stat["task_id"]: stat for stat in stats}
+
+
+def _shorter_valid_prefs(
+    fixture: str,
+    seed: int,
+    stats_by_strategy: dict[str, dict[str, dict[str, Any]]],
+) -> list[dict[str, Any]]:
+    pairs = [("policy", "greedy"), ("policy", "sa"), ("greedy", "sa")]
+    task_ids = set()
+    for stats in stats_by_strategy.values():
+        task_ids.update(stats.keys())
+    preferences: list[dict[str, Any]] = []
+    for task_id in sorted(task_ids):
+        for left, right in pairs:
+            left_stat = stats_by_strategy.get(left, {}).get(task_id)
+            right_stat = stats_by_strategy.get(right, {}).get(task_id)
+            if not left_stat or not right_stat:
+                continue
+            if not (left_stat["pass"] and right_stat["pass"]):
+                continue
+            left_steps = left_stat["steps_taken"]
+            right_steps = right_stat["steps_taken"]
+            if left_steps == right_steps:
+                continue
+            if left_steps < right_steps:
+                preferred, rejected = left, right
+                preferred_stat, rejected_stat = left_stat, right_stat
+            else:
+                preferred, rejected = right, left
+                preferred_stat, rejected_stat = right_stat, left_stat
+            preferences.append(
+                {
+                    "fixture": fixture,
+                    "task_id": task_id,
+                    "seed": seed,
+                    "preferred_strategy": preferred,
+                    "rejected_strategy": rejected,
+                    "preferred_steps": preferred_stat["steps_taken"],
+                    "rejected_steps": rejected_stat["steps_taken"],
+                    "min_steps": preferred_stat["min_steps"],
+                    "preferred_overhead": preferred_stat["step_overhead"],
+                    "rejected_overhead": rejected_stat["step_overhead"],
+                }
+            )
+    return preferences
 
 
 def _state_constrained_candidates(
@@ -597,6 +737,11 @@ def main() -> int:
         help="Optional JSONL with {id, observed_delta} rows for post-action verification.",
     )
     parser.add_argument("--out", help="Optional output JSON path.")
+    parser.add_argument("--out-csv", help="Optional output CSV summary path.")
+    parser.add_argument(
+        "--preferences-out",
+        help="Optional output JSONL path for shorter & valid preferences.",
+    )
     parser.add_argument("--seed", type=int, default=0, help="Random seed for greedy/SA.")
     parser.add_argument(
         "--seeds",
@@ -682,13 +827,12 @@ def main() -> int:
     def run_baseline(
         rows_to_score: list[dict[str, Any]],
         observed: list[dict[str, Any] | None] | None,
-    ) -> dict[str, Any]:
+    ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
         policy_plan = _policy_only_plan(
             rows_to_score,
             apply_overlay_filter=args.overlay_filter,
             apply_rules=args.rules,
         )
-
         def compute_score(plan: list[str | None]) -> float:
             score, _ = score_plan_against_gold(
                 rows_to_score,
@@ -815,6 +959,15 @@ def main() -> int:
                 else None
             )
 
+            stats_by_strategy = {
+                "policy": _stats_by_task(rows_to_score, policy_plan, observed),
+                "greedy": _stats_by_task(rows_to_score, greedy_plan, observed),
+                "sa": _stats_by_task(rows_to_score, sa_plan, observed),
+            }
+            seed_preferences = _shorter_valid_prefs(
+                str(fixture_path), seed, stats_by_strategy
+            )
+
             return {
                 "seed": seed,
                 "policy": _score_strategy(
@@ -832,16 +985,21 @@ def main() -> int:
                 },
                 "sa_beats_greedy": sa_beats_greedy,
                 "sa_diff": sa_diff,
+                "preferences": seed_preferences,
             }
 
         seed_count = max(1, args.seeds)
         seed_list = list(range(seed_count))
         seed_runs = [run_for_seed(seed) for seed in seed_list]
+        run_preferences: list[dict[str, Any]] = []
+        for run in seed_runs:
+            run_preferences.extend(run.pop("preferences", []))
         payload = {
             "rows": len(rows_to_score),
             "fixture": str(fixture_path),
             "seed_list": seed_list,
         }
+        payload["strategy_summary"] = _summarize_seed_runs(seed_runs)
 
         if seed_count == 1:
             single = seed_runs[0]
@@ -863,9 +1021,9 @@ def main() -> int:
                 "seed_list": seed_list,
                 "sa_beats_greedy_rate": beats / seed_count,
             }
-        return payload
+        return payload, run_preferences
 
-    payload = run_baseline(rows, observed_deltas)
+    payload, preferences = run_baseline(rows, observed_deltas)
 
     if args.fuzz_variants > 0:
         fuzz_seed = args.fuzz_seed
@@ -873,7 +1031,7 @@ def main() -> int:
         for variant_index in range(args.fuzz_variants):
             rng = random.Random(fuzz_seed + variant_index)
             mutated_rows = _apply_text_fuzz(rows, rng)
-            variant_payload = run_baseline(mutated_rows, observed_deltas)
+            variant_payload, _ = run_baseline(mutated_rows, observed_deltas)
             seed_runs = _as_seed_runs(variant_payload)
             variant_summaries.append(
                 {
@@ -900,8 +1058,33 @@ def main() -> int:
         fuzz_summary["variant_summaries"] = variant_summaries
         payload["fuzz_summary"] = fuzz_summary
 
-    if args.out:
-        Path(args.out).write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    out_path = Path(args.out) if args.out else None
+    if out_path:
+        out_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+    csv_path: Path | None = None
+    if args.out_csv:
+        csv_path = Path(args.out_csv)
+    elif out_path:
+        csv_path = out_path.with_name(out_path.stem + "_summary.csv")
+    if csv_path:
+        _write_summary_csv(
+            csv_path,
+            fixture=str(fixture_path),
+            seeds=max(1, args.seeds),
+            strategy_summary=payload.get("strategy_summary", {}),
+        )
+
+    pref_path: Path | None = None
+    if args.preferences_out:
+        pref_path = Path(args.preferences_out)
+    elif out_path:
+        pref_path = out_path.with_name(out_path.stem + "_preferences.jsonl")
+    if pref_path:
+        pref_path.parent.mkdir(parents=True, exist_ok=True)
+        with pref_path.open("w", encoding="utf-8") as handle:
+            for entry in preferences:
+                handle.write(json.dumps(entry) + "\n")
     print(json.dumps(payload, indent=2))
     return 0
 

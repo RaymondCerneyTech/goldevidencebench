@@ -266,6 +266,61 @@ def test_preselect_candidates_prefers_overlay_when_advances_state() -> None:
     assert [c["candidate_id"] for c in filtered] == ["btn_overlay"]
 
 
+def test_preselect_candidates_prefers_state_advances_without_label_hint() -> None:
+    row = {"instruction": "Continue setup."}
+    candidates = [
+        {
+            "candidate_id": "btn_continue",
+            "label": "Continue",
+            "modal_scope": None,
+            "next_state": {"consent_granted": False},
+        },
+        {
+            "candidate_id": "chk_consent",
+            "label": "Continue with consent",
+            "modal_scope": None,
+            "next_state": {"consent_granted": True},
+        },
+    ]
+    filtered = preselect_candidates(
+        row,
+        candidates,
+        apply_overlay_filter=False,
+        apply_rules=True,
+    )
+    assert [c["candidate_id"] for c in filtered] == ["chk_consent"]
+
+
+def test_preselect_candidates_prefers_state_signal_when_generic_instruction() -> None:
+    row = {"instruction": "Select the option."}
+    candidates = [
+        {
+            "candidate_id": "btn_basic",
+            "label": "Open details",
+            "modal_scope": "main",
+            "next_state": {"panel": "main", "modal_scope": "main", "overlay_present": False},
+        },
+        {
+            "candidate_id": "btn_details",
+            "label": "Details link",
+            "modal_scope": "main",
+            "next_state": {
+                "panel": "details",
+                "modal_scope": "main",
+                "overlay_present": True,
+                "details_open": True,
+            },
+        },
+    ]
+    filtered = preselect_candidates(
+        row,
+        candidates,
+        apply_overlay_filter=False,
+        apply_rules=True,
+    )
+    assert [c["candidate_id"] for c in filtered] == ["btn_details"]
+
+
 def test_preselect_candidates_does_not_treat_desktop_as_top() -> None:
     row = {"instruction": "Save the file to Desktop."}
     candidates = [
@@ -416,8 +471,46 @@ def test_preselect_candidates_prefers_label_keyword_synonym() -> None:
     assert [c["candidate_id"] for c in filtered] == ["btn_confirm"]
 
 
+def test_preselect_candidates_prefers_app_path_keyword() -> None:
+    row = {"instruction": "Open the Billing section."}
+    candidates = [
+        {
+            "candidate_id": "btn_profile",
+            "label": "Open profile",
+            "app_path": "Settings > Profile",
+        },
+        {
+            "candidate_id": "btn_billing",
+            "label": "Open account",
+            "app_path": "Settings > Billing",
+        },
+    ]
+    filtered = preselect_candidates(
+        row,
+        candidates,
+        apply_overlay_filter=False,
+        apply_rules=True,
+    )
+    assert [c["candidate_id"] for c in filtered] == ["btn_billing"]
+
+
 def test_preselect_candidates_abstains_on_ambiguous_duplicates() -> None:
     row = {"instruction": "Click Save."}
+    candidates = [
+        {"candidate_id": "btn_save_a", "label": "Save"},
+        {"candidate_id": "btn_save_b", "label": "Save"},
+    ]
+    filtered = preselect_candidates(
+        row,
+        candidates,
+        apply_overlay_filter=False,
+        apply_rules=True,
+    )
+    assert filtered == []
+
+
+def test_preselect_candidates_abstains_when_expected() -> None:
+    row = {"instruction": "Click Save.", "abstain_expected": True}
     candidates = [
         {"candidate_id": "btn_save_a", "label": "Save"},
         {"candidate_id": "btn_save_b", "label": "Save"},

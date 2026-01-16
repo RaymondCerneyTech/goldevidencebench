@@ -23,7 +23,7 @@ param(
     [int]$VariantsFuzzVariants = 5,
     [int]$VariantsFuzzSeed = 0,
     [switch]$RotateHoldout,
-    [string]$HoldoutList = "local_optimum_blocking_modal_detour,local_optimum_tab_detour,local_optimum_blocking_modal_required,local_optimum_blocking_modal_permission,local_optimum_blocking_modal_consent,local_optimum_blocking_modal_unmentioned,local_optimum_blocking_modal,local_optimum_overlay,local_optimum_primary,local_optimum_delayed_solvable,local_optimum_role_mismatch",
+    [string]$HoldoutList = "local_optimum_section_path,local_optimum_section_path_conflict,local_optimum_blocking_modal_detour,local_optimum_tab_detour,local_optimum_panel_toggle,local_optimum_accessibility_label,local_optimum_blocking_modal_required,local_optimum_blocking_modal_permission,local_optimum_blocking_modal_consent,local_optimum_blocking_modal_unmentioned,local_optimum_blocking_modal,local_optimum_overlay,local_optimum_primary,local_optimum_delayed_solvable,local_optimum_role_mismatch,local_optimum_role_conflict,local_optimum_destructive_confirm,local_optimum_blocking_modal_unprompted_confirm",
     [switch]$SkipVariants,
     [switch]$CheckThresholds,
     [switch]$DumpGateArtifactsOnFail
@@ -130,6 +130,27 @@ Write-Host "Running UI local-optimum blocking modal consent ambiguous baseline..
 python .\scripts\run_ui_search_baseline.py --fixture .\data\ui_minipilot_local_optimum_blocking_modal_consent_ambiguous_fixture.jsonl `
     --observed .\data\ui_minipilot_local_optimum_blocking_modal_consent_ambiguous_observed_ok.jsonl `
     --out .\runs\ui_minipilot_local_optimum_blocking_modal_consent_ambiguous_search.json
+python .\scripts\run_ui_search_baseline.py --fixture .\data\ui_minipilot_local_optimum_panel_toggle_ambiguous_fixture.jsonl `
+    --observed .\data\ui_minipilot_local_optimum_panel_toggle_ambiguous_observed_ok.jsonl `
+    --out .\runs\ui_minipilot_local_optimum_panel_toggle_ambiguous_search.json
+python .\scripts\run_ui_search_baseline.py --fixture .\data\ui_minipilot_local_optimum_accessibility_label_ambiguous_fixture.jsonl `
+    --observed .\data\ui_minipilot_local_optimum_accessibility_label_ambiguous_observed_ok.jsonl `
+    --out .\runs\ui_minipilot_local_optimum_accessibility_label_ambiguous_search.json
+python .\scripts\run_ui_search_baseline.py --fixture .\data\ui_minipilot_local_optimum_section_path_ambiguous_fixture.jsonl `
+    --observed .\data\ui_minipilot_local_optimum_section_path_ambiguous_observed_ok.jsonl `
+    --out .\runs\ui_minipilot_local_optimum_section_path_ambiguous_search.json
+python .\scripts\run_ui_search_baseline.py --fixture .\data\ui_minipilot_local_optimum_section_path_conflict_ambiguous_fixture.jsonl `
+    --observed .\data\ui_minipilot_local_optimum_section_path_conflict_ambiguous_observed_ok.jsonl `
+    --out .\runs\ui_minipilot_local_optimum_section_path_conflict_ambiguous_search.json
+python .\scripts\run_ui_search_baseline.py --fixture .\data\ui_minipilot_local_optimum_blocking_modal_unprompted_confirm_ambiguous_fixture.jsonl `
+    --observed .\data\ui_minipilot_local_optimum_blocking_modal_unprompted_confirm_ambiguous_observed_ok.jsonl `
+    --out .\runs\ui_minipilot_local_optimum_blocking_modal_unprompted_confirm_ambiguous_search.json
+python .\scripts\run_ui_search_baseline.py --fixture .\data\ui_minipilot_local_optimum_destructive_confirm_ambiguous_fixture.jsonl `
+    --observed .\data\ui_minipilot_local_optimum_destructive_confirm_ambiguous_observed_ok.jsonl `
+    --out .\runs\ui_minipilot_local_optimum_destructive_confirm_ambiguous_search.json
+python .\scripts\run_ui_search_baseline.py --fixture .\data\ui_minipilot_local_optimum_role_conflict_ambiguous_fixture.jsonl `
+    --observed .\data\ui_minipilot_local_optimum_role_conflict_ambiguous_observed_ok.jsonl `
+    --out .\runs\ui_minipilot_local_optimum_role_conflict_ambiguous_search.json
 
 if (-not $SkipVariants) {
     $variantsOutRoot = "runs\\ui_local_optimum_variants_$stamp"
@@ -256,6 +277,41 @@ if ($CheckThresholds) {
                 Name = "local_optimum_blocking_modal_consent_ambiguous"
                 Fixture = "data\\ui_minipilot_local_optimum_blocking_modal_consent_ambiguous_fixture.jsonl"
                 Baseline = "runs\\ui_minipilot_local_optimum_blocking_modal_consent_ambiguous_search.json"
+            }
+            @{
+                Name = "local_optimum_panel_toggle_ambiguous"
+                Fixture = "data\\ui_minipilot_local_optimum_panel_toggle_ambiguous_fixture.jsonl"
+                Baseline = "runs\\ui_minipilot_local_optimum_panel_toggle_ambiguous_search.json"
+            }
+            @{
+                Name = "local_optimum_accessibility_label_ambiguous"
+                Fixture = "data\\ui_minipilot_local_optimum_accessibility_label_ambiguous_fixture.jsonl"
+                Baseline = "runs\\ui_minipilot_local_optimum_accessibility_label_ambiguous_search.json"
+            }
+            @{
+                Name = "local_optimum_section_path_ambiguous"
+                Fixture = "data\\ui_minipilot_local_optimum_section_path_ambiguous_fixture.jsonl"
+                Baseline = "runs\\ui_minipilot_local_optimum_section_path_ambiguous_search.json"
+            }
+            @{
+                Name = "local_optimum_section_path_conflict_ambiguous"
+                Fixture = "data\\ui_minipilot_local_optimum_section_path_conflict_ambiguous_fixture.jsonl"
+                Baseline = "runs\\ui_minipilot_local_optimum_section_path_conflict_ambiguous_search.json"
+            }
+            @{
+                Name = "local_optimum_blocking_modal_unprompted_confirm_ambiguous"
+                Fixture = "data\\ui_minipilot_local_optimum_blocking_modal_unprompted_confirm_ambiguous_fixture.jsonl"
+                Baseline = "runs\\ui_minipilot_local_optimum_blocking_modal_unprompted_confirm_ambiguous_search.json"
+            }
+            @{
+                Name = "local_optimum_destructive_confirm_ambiguous"
+                Fixture = "data\\ui_minipilot_local_optimum_destructive_confirm_ambiguous_fixture.jsonl"
+                Baseline = "runs\\ui_minipilot_local_optimum_destructive_confirm_ambiguous_search.json"
+            }
+            @{
+                Name = "local_optimum_role_conflict_ambiguous"
+                Fixture = "data\\ui_minipilot_local_optimum_role_conflict_ambiguous_fixture.jsonl"
+                Baseline = "runs\\ui_minipilot_local_optimum_role_conflict_ambiguous_search.json"
             }
         )
         foreach ($pair in $pairs) {

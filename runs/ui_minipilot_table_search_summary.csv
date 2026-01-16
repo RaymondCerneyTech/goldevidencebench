@@ -1,0 +1,4 @@
+fixture,seeds,strategy,selection_rate_mean,abstain_rate_mean,wrong_action_rate_mean,task_pass_rate_mean,task_step_overhead_mean,task_steps_taken_mean,task_min_steps_mean
+data\ui_minipilot_table_fixture.jsonl,1,policy,0.75,0.25,0.0,0.0,,,
+data\ui_minipilot_table_fixture.jsonl,1,greedy,1.0,0.0,0.0,1.0,1.0,4.0,4.0
+data\ui_minipilot_table_fixture.jsonl,1,sa,1.0,0.0,0.0,1.0,1.0,4.0,4.0

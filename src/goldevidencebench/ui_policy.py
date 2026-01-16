@@ -38,6 +38,7 @@ LABEL_KEYWORD_STOPWORDS = {
     "screen",
     "secondary",
     "select",
+    "section",
     "tab",
     "tabs",
     "tap",
@@ -94,6 +95,7 @@ OVERLAY_CONFIRM_TOKENS = {
 }
 
 STATE_ADVANCE_KEYS = {"permission_granted", "consent_granted"}
+STATE_SIGNAL_EXCLUDE_KEYS = {"modal_scope", "panel", "overlay_present"}
 
 
 def _candidate_clears_modal(candidate: dict[str, Any]) -> bool:
@@ -282,6 +284,14 @@ def _tokenize_text(text: str) -> list[str]:
     return tokens
 
 
+def _instruction_keyword_tokens(instruction: str) -> list[str]:
+    return [
+        token
+        for token in _tokenize_text(instruction)
+        if token and token not in LABEL_KEYWORD_STOPWORDS
+    ]
+
+
 def _label_tokens(label: str) -> set[str]:
     return {token for token in _tokenize_text(label) if token}
 
@@ -334,9 +344,7 @@ def _filter_by_label_keywords(
 ) -> tuple[list[dict[str, Any]], str | None]:
     if not instruction:
         return candidates, None
-    instruction_tokens = [
-        token for token in _tokenize_text(instruction) if token not in LABEL_KEYWORD_STOPWORDS
-    ]
+    instruction_tokens = _instruction_keyword_tokens(instruction)
     if not instruction_tokens:
         return candidates, None
     instruction_tokens = _expand_keyword_tokens(instruction_tokens)
@@ -367,6 +375,55 @@ def _filter_by_label_keywords(
             candidate
             for candidate, tokens in candidate_tokens
             if any(_token_matches(token, label_token) for label_token in tokens)
+        ]
+        if not matches or len(matches) == len(candidates):
+            continue
+        size = len(matches)
+        if best_size is None or size < best_size:
+            best_size = size
+            best_token = token
+            best_matches = matches
+    if best_matches is None:
+        return candidates, None
+    return best_matches, best_token
+
+
+def _filter_by_app_path_keywords(
+    candidates: list[dict[str, Any]], instruction: str
+) -> tuple[list[dict[str, Any]], str | None]:
+    if not instruction:
+        return candidates, None
+    instruction_tokens = _instruction_keyword_tokens(instruction)
+    if not instruction_tokens:
+        return candidates, None
+    instruction_tokens = _expand_keyword_tokens(instruction_tokens)
+
+    candidate_tokens: list[tuple[dict[str, Any], set[str]]] = []
+    path_token_set: set[str] = set()
+    for candidate in candidates:
+        app_path = candidate.get("app_path")
+        tokens: set[str] = set()
+        if isinstance(app_path, str) and app_path.strip():
+            tokens = {token for token in _tokenize_text(app_path) if token}
+        candidate_tokens.append((candidate, tokens))
+        path_token_set.update(tokens)
+
+    if not path_token_set:
+        return candidates, None
+
+    match_tokens: list[str] = []
+    for token in instruction_tokens:
+        if any(_token_matches(token, path_token) for path_token in path_token_set) and token not in match_tokens:
+            match_tokens.append(token)
+
+    best_matches: list[dict[str, Any]] | None = None
+    best_token: str | None = None
+    best_size: int | None = None
+    for token in match_tokens:
+        matches = [
+            candidate
+            for candidate, tokens in candidate_tokens
+            if any(_token_matches(token, path_token) for path_token in tokens)
         ]
         if not matches or len(matches) == len(candidates):
             continue
@@ -567,13 +624,65 @@ def _candidate_opens_required_modal(candidate: dict[str, Any]) -> bool:
 
 
 def _candidate_advances_state(candidate: dict[str, Any]) -> bool:
-    next_state = candidate.get("next_state")
-    if not isinstance(next_state, dict):
-        return False
-    for key in STATE_ADVANCE_KEYS:
-        if next_state.get(key) is True:
-            return True
+    for field in ("next_state", "state"):
+        state = candidate.get(field)
+        if not isinstance(state, dict):
+            continue
+        for key in STATE_ADVANCE_KEYS:
+            if state.get(key) is True:
+                return True
     return False
+
+
+def _filter_state_advances(
+    candidates: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    matches = [candidate for candidate in candidates if _candidate_advances_state(candidate)]
+    return matches or candidates
+
+
+def _state_signal_keys(candidate: dict[str, Any]) -> set[str]:
+    signals: set[str] = set()
+    for field in ("next_state", "state"):
+        state = candidate.get(field)
+        if not isinstance(state, dict):
+            continue
+        for key, value in state.items():
+            if key in STATE_SIGNAL_EXCLUDE_KEYS:
+                continue
+            if isinstance(value, bool):
+                if value:
+                    signals.add(key)
+                continue
+            if value:
+                signals.add(key)
+    return signals
+
+
+def _filter_by_state_signal(
+    candidates: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    if not candidates:
+        return candidates
+    scored: list[tuple[dict[str, Any], set[str]]] = []
+    for candidate in candidates:
+        scored.append((candidate, _state_signal_keys(candidate)))
+    if not any(signals for _, signals in scored):
+        return candidates
+    shared: set[str] | None = None
+    for _, signals in scored:
+        shared = signals if shared is None else shared & signals
+    shared = shared or set()
+    scored_counts: list[tuple[dict[str, Any], int]] = []
+    for candidate, signals in scored:
+        scored_counts.append((candidate, len(signals - shared)))
+    max_score = max(score for _, score in scored_counts)
+    if max_score <= 0:
+        return candidates
+    filtered = [candidate for candidate, score in scored_counts if score == max_score]
+    if len(filtered) != 1:
+        return candidates
+    return filtered
 
 
 def _filter_overlay_advances_state(
@@ -600,8 +709,11 @@ def preselect_candidates(
     apply_overlay_filter: bool,
     apply_rules: bool,
 ) -> list[dict[str, Any]]:
+    if row.get("abstain_expected") is True:
+        return []
     instruction = extract_ui_instruction(row)
     text = instruction.lower()
+    generic_instruction = not _instruction_keyword_tokens(instruction)
 
     neg_overlay = _has_negated(text, "popup") or _has_negated(text, "overlay")
     wants_overlay = _has_any(text, ("popup", "overlay")) and not neg_overlay
@@ -641,6 +753,9 @@ def preselect_candidates(
         role_hint = _desired_role_from_instruction(instruction)
         if role_hint:
             candidates = _filter_by_role(candidates, role_hint)
+        if not label_hint:
+            candidates, path_token = _filter_by_app_path_keywords(candidates, instruction)
+            label_hint = label_hint or (path_token is not None)
         if not label_hint and _instruction_needs_save_dialog(instruction):
             save_filtered = _filter_save_dialog_openers(candidates)
             if len(save_filtered) != len(candidates):
@@ -650,6 +765,16 @@ def preselect_candidates(
             modal_required_filtered = _filter_required_modal_openers(candidates)
             if len(modal_required_filtered) != len(candidates):
                 candidates = modal_required_filtered
+                label_hint = True
+        if not label_hint:
+            state_filtered = _filter_state_advances(candidates)
+            if len(state_filtered) != len(candidates):
+                candidates = state_filtered
+                label_hint = True
+        if not label_hint and generic_instruction:
+            state_signal_filtered = _filter_by_state_signal(candidates)
+            if len(state_signal_filtered) != len(candidates):
+                candidates = state_signal_filtered
                 label_hint = True
     if apply_rules and not label_hint and wants_primary:
         candidates = _filter_by_candidate_id(candidates, token="primary")
@@ -720,8 +845,25 @@ def preselect_candidates_with_trace(
     apply_overlay_filter: bool,
     apply_rules: bool,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    if row.get("abstain_expected") is True:
+        trace: dict[str, Any] = {
+            "row_id": row.get("id"),
+            "task_id": row.get("task_id"),
+            "instruction": extract_ui_instruction(row),
+            "candidates_in": _candidate_ids(candidates),
+            "after_overlay_filter": _candidate_ids(candidates),
+            "after_rules": [],
+            "final_choice": None,
+            "reasons": {},
+        }
+        for candidate in candidates:
+            candidate_id = candidate.get("candidate_id")
+            if isinstance(candidate_id, str):
+                trace["reasons"].setdefault(candidate_id, []).append("abstain_expected")
+        return [], trace
     instruction = extract_ui_instruction(row)
     text = instruction.lower()
+    generic_instruction = not _instruction_keyword_tokens(instruction)
 
     neg_overlay = _has_negated(text, "popup") or _has_negated(text, "overlay")
     wants_overlay = _has_any(text, ("popup", "overlay")) and not neg_overlay
@@ -786,6 +928,12 @@ def preselect_candidates_with_trace(
             filtered = _filter_by_role(current, role_hint)
             _record_removed(current, filtered, f"role_mismatch:{role_hint}", reasons)
             current = filtered
+        if not label_hint:
+            filtered, path_token = _filter_by_app_path_keywords(current, instruction)
+            if path_token:
+                _record_removed(current, filtered, f"app_path_keyword_mismatch:{path_token}", reasons)
+                label_hint = True
+            current = filtered
         if not label_hint and _instruction_needs_save_dialog(instruction):
             filtered = _filter_save_dialog_openers(current)
             if len(filtered) != len(current):
@@ -796,6 +944,18 @@ def preselect_candidates_with_trace(
             filtered = _filter_required_modal_openers(current)
             if len(filtered) != len(current):
                 _record_removed(current, filtered, "modal_required", reasons)
+                label_hint = True
+            current = filtered
+        if not label_hint:
+            filtered = _filter_state_advances(current)
+            if len(filtered) != len(current):
+                _record_removed(current, filtered, "state_advances", reasons)
+                label_hint = True
+            current = filtered
+        if not label_hint and generic_instruction:
+            filtered = _filter_by_state_signal(current)
+            if len(filtered) != len(current):
+                _record_removed(current, filtered, "state_signal_prefer", reasons)
                 label_hint = True
             current = filtered
     if apply_rules and not label_hint and wants_primary:

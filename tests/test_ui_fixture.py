@@ -63,6 +63,32 @@ def test_ui_fixture_invalid_task_fields() -> None:
     assert any("step_index" in error for error in errors)
 
 
+def test_ui_fixture_invalid_min_steps() -> None:
+    rows = [
+        {
+            "id": "step_0001",
+            "min_steps": 0,
+            "candidates": [
+                {
+                    "candidate_id": "btn_next",
+                    "action_type": "click",
+                    "label": "Next",
+                    "role": "button",
+                    "app_path": "Checkout > Cart",
+                    "bbox": [0, 0, 10, 10],
+                    "visible": True,
+                    "enabled": True,
+                    "modal_scope": None,
+                }
+            ],
+            "gold": {"candidate_id": "btn_next"},
+            "expected_delta": {"page": "checkout_shipping"},
+        }
+    ]
+    errors = validate_ui_rows(rows)
+    assert any("min_steps" in error for error in errors)
+
+
 def test_ui_fixture_bom_is_accepted(tmp_path: Path) -> None:
     row = {
         "id": "step_0001",

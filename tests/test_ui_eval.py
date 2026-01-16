@@ -59,12 +59,14 @@ def test_score_ui_sequences_single_task_passes() -> None:
         {
             "id": "step_0001",
             "task_id": "task_a",
+            "min_steps": 2,
             "candidates": [{"candidate_id": "btn_a"}, {"candidate_id": "btn_b"}],
             "gold": {"candidate_id": "btn_b"},
         },
         {
             "id": "step_0002",
             "task_id": "task_a",
+            "min_steps": 2,
             "candidates": [{"candidate_id": "btn_c"}],
             "gold": {"candidate_id": "btn_c"},
         },
@@ -74,6 +76,9 @@ def test_score_ui_sequences_single_task_passes() -> None:
     assert metrics["tasks_total"] == 1
     assert metrics["task_pass_rate"] == 1.0
     assert metrics["task_wrong_action_rate"] == 0.0
+    assert metrics["task_step_overhead_mean"] == 1.0
+    assert metrics["task_steps_taken_mean"] == 2.0
+    assert metrics["task_min_steps_mean"] == 2.0
 
 
 def test_score_ui_sequences_wrong_action_fails_task() -> None:
