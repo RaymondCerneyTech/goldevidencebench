@@ -49,6 +49,36 @@ $variants = @(
         Observed = "data\\ui_minipilot_local_optimum_tab_detour_observed_ok.jsonl"
     },
     @{
+        Name = "local_optimum_disabled_primary"
+        Fixture = "data\\ui_minipilot_local_optimum_disabled_primary_fixture.jsonl"
+        Observed = "data\\ui_minipilot_local_optimum_disabled_primary_observed_ok.jsonl"
+    },
+    @{
+        Name = "local_optimum_toolbar_vs_menu"
+        Fixture = "data\\ui_minipilot_local_optimum_toolbar_vs_menu_fixture.jsonl"
+        Observed = "data\\ui_minipilot_local_optimum_toolbar_vs_menu_observed_ok.jsonl"
+    },
+    @{
+        Name = "local_optimum_confirm_then_apply"
+        Fixture = "data\\ui_minipilot_local_optimum_confirm_then_apply_fixture.jsonl"
+        Observed = "data\\ui_minipilot_local_optimum_confirm_then_apply_observed_ok.jsonl"
+    },
+    @{
+        Name = "local_optimum_tab_state_reset"
+        Fixture = "data\\ui_minipilot_local_optimum_tab_state_reset_fixture.jsonl"
+        Observed = "data\\ui_minipilot_local_optimum_tab_state_reset_observed_ok.jsonl"
+    },
+    @{
+        Name = "local_optimum_form_validation"
+        Fixture = "data\\ui_minipilot_local_optimum_form_validation_fixture.jsonl"
+        Observed = "data\\ui_minipilot_local_optimum_form_validation_observed_ok.jsonl"
+    },
+    @{
+        Name = "local_optimum_window_focus"
+        Fixture = "data\\ui_minipilot_local_optimum_window_focus_fixture.jsonl"
+        Observed = "data\\ui_minipilot_local_optimum_window_focus_observed_ok.jsonl"
+    },
+    @{
         Name = "local_optimum_panel_toggle"
         Fixture = "data\\ui_minipilot_local_optimum_panel_toggle_fixture.jsonl"
         Observed = "data\\ui_minipilot_local_optimum_panel_toggle_observed_ok.jsonl"

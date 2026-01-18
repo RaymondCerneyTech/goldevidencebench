@@ -471,6 +471,36 @@ def test_preselect_candidates_prefers_label_keyword_synonym() -> None:
     assert [c["candidate_id"] for c in filtered] == ["btn_confirm"]
 
 
+def test_preselect_candidates_prefers_label_keyword_synonym_commit() -> None:
+    row = {"instruction": "Commit the changes."}
+    candidates = [
+        {"candidate_id": "btn_apply", "label": "Apply"},
+        {"candidate_id": "btn_ok", "label": "OK"},
+    ]
+    filtered = preselect_candidates(
+        row,
+        candidates,
+        apply_overlay_filter=False,
+        apply_rules=True,
+    )
+    assert [c["candidate_id"] for c in filtered] == ["btn_apply"]
+
+
+def test_preselect_candidates_prefers_label_keyword_synonym_finalize() -> None:
+    row = {"instruction": "Finalize the update."}
+    candidates = [
+        {"candidate_id": "btn_apply", "label": "Apply"},
+        {"candidate_id": "btn_cancel", "label": "Cancel"},
+    ]
+    filtered = preselect_candidates(
+        row,
+        candidates,
+        apply_overlay_filter=False,
+        apply_rules=True,
+    )
+    assert [c["candidate_id"] for c in filtered] == ["btn_apply"]
+
+
 def test_preselect_candidates_prefers_app_path_keyword() -> None:
     row = {"instruction": "Open the Billing section."}
     candidates = [
@@ -522,3 +552,56 @@ def test_preselect_candidates_abstains_when_expected() -> None:
         apply_rules=True,
     )
     assert filtered == []
+
+
+def test_preselect_candidates_prefers_accessible_name_keyword() -> None:
+    row = {"instruction": "Select the reader option."}
+    candidates = [
+        {
+            "candidate_id": "btn_access",
+            "label": "Accessibility",
+            "accessible_name": "Reader option",
+            "modal_scope": "panel",
+        },
+        {
+            "candidate_id": "btn_settings",
+            "label": "Settings",
+            "modal_scope": "main",
+        },
+    ]
+    filtered = preselect_candidates(
+        row,
+        candidates,
+        apply_overlay_filter=False,
+        apply_rules=True,
+    )
+    assert [c["candidate_id"] for c in filtered] == ["btn_access"]
+
+
+def test_preselect_candidates_skips_aria_disabled() -> None:
+    row = {"instruction": "Select the option."}
+    candidates = [
+        {
+            "candidate_id": "btn_primary",
+            "label": "Continue",
+            "modal_scope": "main",
+            "aria_disabled": True,
+            "enabled": True,
+            "clickable": True,
+        },
+        {
+            "candidate_id": "btn_secondary",
+            "label": "Proceed",
+            "modal_scope": "panel",
+            "aria_disabled": False,
+            "enabled": True,
+            "clickable": True,
+        },
+    ]
+    filtered = preselect_candidates(
+        row,
+        candidates,
+        apply_overlay_filter=False,
+        apply_rules=True,
+    )
+    assert [c["candidate_id"] for c in filtered] == ["btn_secondary"]

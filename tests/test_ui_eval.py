@@ -122,6 +122,9 @@ def test_score_ui_sequences_abstain_expected_allows_pass() -> None:
     metrics = score_ui_sequences(rows, selected)
     assert metrics["task_pass_rate"] == 1.0
     assert metrics["task_wrong_action_rate"] == 0.0
+    assert metrics["task_step_overhead_mean"] == 1.0
+    assert metrics["task_steps_taken_mean"] == 1.0
+    assert metrics["task_min_steps_mean"] == 1.0
 
 
 def test_ui_fixture_adapter_selects_gold(monkeypatch) -> None:

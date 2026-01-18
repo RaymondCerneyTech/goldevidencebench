@@ -1,4 +1,5 @@
 param(
+    [string]$ModelPath = "",
     [string]$FixturePath = "data\\ui_minipilot_form_fixture.jsonl",
     [string]$ConfigPath = "configs\\ui_minipilot_form.json"
 )

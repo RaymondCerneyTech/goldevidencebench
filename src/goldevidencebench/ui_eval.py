@@ -120,7 +120,12 @@ def _task_min_steps(rows: list[dict[str, Any]], indices: list[int]) -> int | Non
         if _is_int(row.get("min_steps"))
     }
     if not values:
-        return None
+        fallback = sum(
+            1
+            for idx in indices
+            if rows[idx].get("abstain_expected") is not True
+        )
+        return fallback if fallback > 0 else None
     if len(values) > 1:
         return None
     return int(next(iter(values)))

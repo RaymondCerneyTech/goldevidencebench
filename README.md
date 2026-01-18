@@ -623,6 +623,67 @@ Interpretation: copy-clamp fixes extraction, but NOTE authority errors remain wi
 
 Proof run uses `linear` to match the reference tables; the default for general use is `prefer_update_latest`.
 
+## Cited memory (read-time verification)
+
+Lightweight memory uses the same authority/selection/abstain discipline: every memory must cite a source,
+and every retrieved memory must be re-verified against the current source of truth before use.
+If verification fails, the agent must abstain or refresh instead of acting on stale memory.
+
+Memory format (JSONL):
+
+- `id`, `claim_text`, `citations[]`, `confidence`, `created_at`, `tags` (optional `used`).
+- `citations[]` currently supports repo-backed citations: `file_path`, `line_start`, `line_end`, `snippet`.
+- `claim_text` must be an exact substring of `snippet` (keeps verification deterministic).
+
+Verify memories (writes a summary gate + optional details):
+
+```powershell
+python .\scripts\verify_memories.py --in .\data\memories\memory_demo.jsonl `
+  --out .\runs\release_gates\memory_verify.json `
+  --out-details .\runs\release_gates\memory_verify_details.json
+```
+
+Gate metrics:
+
+- `memory_verified_rate` should be 1.0 (all used memories verify).
+- `memory_invalid_rate` should be 0.0 (no stale/invalid citations).
+- `actions_blocked_by_memory_gate` should be 0.0 for the demo set.
+
+Notes-backed memory (optional):
+
+```powershell
+python .\scripts\add_note_memory.py --note "Project status: all trap families green."
+python .\scripts\verify_memories.py --in .\data\memories\user_notes_memory.jsonl `
+  --out .\runs\release_gates\memory_verify.json `
+  --out-details .\runs\release_gates\memory_verify_details.json
+```
+
+Notes are tagged `notes,project` by default (override with `--tags`).
+
+Retrieve verified notes:
+
+```powershell
+python .\scripts\get_verified_notes.py --limit 5
+```
+
+Filter verified notes by query:
+
+```powershell
+python .\scripts\get_verified_notes.py --query "trap families" --limit 5
+```
+
+Filter verified notes by tag:
+
+```powershell
+python .\scripts\get_verified_notes.py --tag project --limit 5
+```
+
+Newest-first view:
+
+```powershell
+python .\scripts\get_verified_notes.py --latest --limit 5
+```
+
 
 ## V3-A NOTE-aware selector (filter OFF) results
 
@@ -884,6 +945,37 @@ Staged plan (planner baseline; future work):
 - Stage 3: add an optional search baseline (constructive heuristic -> simulated annealing) with seeded, time-budgeted runs; inspired by Sakana's AHC-style writeup.
 - North stars: MiniWoB++ and WebArena for reproducible UI task benchmarks (not integrated here).
 
+Weak-machine architecture (intended):
+
+- 7B = planner + candidate generator. It proposes steps, candidates, and postconditions. It does not execute directly.
+- Tiny gates = execution/reflex layer (rules, linear/logistic, tiny MLP). They choose among candidates, block unsafe actions, and trigger abstain.
+- Tools execute; verifiers confirm. Failures are tagged with trap family + root cause for training.
+
+What each trap family should yield:
+
+- Candidate set (what actions could be taken).
+- Oracle/verification (what "correct" means).
+- Features for a tiny gate (enough to learn a cheap reflex).
+- Training pairs: valid > invalid; among valid, fewer steps > more steps.
+
+Immediate build plan (gate training loop):
+
+1) extract_gate_features(trace/obs) -> dataset (start with one family).
+2) train_gate_model(family, dataset) -> weights (logistic regression or tiny MLP).
+3) gate_score_candidates(candidates, x) -> ranked choice / abstain.
+4) Integrate into runs: 7B proposes candidates; gate picks/blocks; verifier checks.
+
+Starter commands (confirm_then_apply gate):
+
+```powershell
+python .\scripts\train_ui_gate.py --fixture .\data\ui_minipilot_local_optimum_confirm_then_apply_fixture.jsonl `
+  --out-model .\models\ui_gate_confirm_then_apply.json --out-prefs .\data\gate_prefs_confirm_then_apply.jsonl
+
+python .\scripts\run_ui_gate_baseline.py --fixture .\data\ui_minipilot_local_optimum_confirm_then_apply_fixture.jsonl `
+  --observed .\data\ui_minipilot_local_optimum_confirm_then_apply_observed_ok.jsonl `
+  --model .\models\ui_gate_confirm_then_apply.json --out .\runs\ui_gate_confirm_then_apply.json
+```
+
 Adoption hook (CI gates):
 
 - `selection_rate` floor under `same_label`.
@@ -990,6 +1082,16 @@ Stub assets (UI fixtures):
 - Mini pilot local-optimum blocking modal detour observed: `data/ui_minipilot_local_optimum_blocking_modal_detour_observed_ok.jsonl`
 - Mini pilot local-optimum tab detour fixture: `data/ui_minipilot_local_optimum_tab_detour_fixture.jsonl`
 - Mini pilot local-optimum tab detour observed: `data/ui_minipilot_local_optimum_tab_detour_observed_ok.jsonl`
+- Mini pilot local-optimum disabled primary fixture: `data/ui_minipilot_local_optimum_disabled_primary_fixture.jsonl`
+- Mini pilot local-optimum disabled primary observed: `data/ui_minipilot_local_optimum_disabled_primary_observed_ok.jsonl`
+- Mini pilot local-optimum toolbar vs menu fixture: `data/ui_minipilot_local_optimum_toolbar_vs_menu_fixture.jsonl`
+- Mini pilot local-optimum toolbar vs menu observed: `data/ui_minipilot_local_optimum_toolbar_vs_menu_observed_ok.jsonl`
+- Mini pilot local-optimum confirm then apply fixture: `data/ui_minipilot_local_optimum_confirm_then_apply_fixture.jsonl`
+- Mini pilot local-optimum confirm then apply observed: `data/ui_minipilot_local_optimum_confirm_then_apply_observed_ok.jsonl`
+- Mini pilot local-optimum tab state reset fixture: `data/ui_minipilot_local_optimum_tab_state_reset_fixture.jsonl`
+- Mini pilot local-optimum tab state reset observed: `data/ui_minipilot_local_optimum_tab_state_reset_observed_ok.jsonl`
+- Mini pilot local-optimum form validation fixture: `data/ui_minipilot_local_optimum_form_validation_fixture.jsonl`
+- Mini pilot local-optimum form validation observed: `data/ui_minipilot_local_optimum_form_validation_observed_ok.jsonl`
 - Mini pilot local-optimum panel toggle fixture: `data/ui_minipilot_local_optimum_panel_toggle_fixture.jsonl`
 - Mini pilot local-optimum panel toggle observed: `data/ui_minipilot_local_optimum_panel_toggle_observed_ok.jsonl`
 - Mini pilot local-optimum accessibility label fixture: `data/ui_minipilot_local_optimum_accessibility_label_fixture.jsonl`
@@ -1020,6 +1122,16 @@ Stub assets (UI fixtures):
 - Mini pilot local-optimum blocking modal unprompted confirm observed: `data/ui_minipilot_local_optimum_blocking_modal_unprompted_confirm_observed_ok.jsonl`
 - Mini pilot local-optimum blocking modal unprompted confirm ambiguous fixture: `data/ui_minipilot_local_optimum_blocking_modal_unprompted_confirm_ambiguous_fixture.jsonl`
 - Mini pilot local-optimum blocking modal unprompted confirm ambiguous observed: `data/ui_minipilot_local_optimum_blocking_modal_unprompted_confirm_ambiguous_observed_ok.jsonl`
+- Mini pilot local-optimum disabled primary ambiguous fixture: `data/ui_minipilot_local_optimum_disabled_primary_ambiguous_fixture.jsonl`
+- Mini pilot local-optimum disabled primary ambiguous observed: `data/ui_minipilot_local_optimum_disabled_primary_ambiguous_observed_ok.jsonl`
+- Mini pilot local-optimum toolbar vs menu ambiguous fixture: `data/ui_minipilot_local_optimum_toolbar_vs_menu_ambiguous_fixture.jsonl`
+- Mini pilot local-optimum toolbar vs menu ambiguous observed: `data/ui_minipilot_local_optimum_toolbar_vs_menu_ambiguous_observed_ok.jsonl`
+- Mini pilot local-optimum confirm then apply ambiguous fixture: `data/ui_minipilot_local_optimum_confirm_then_apply_ambiguous_fixture.jsonl`
+- Mini pilot local-optimum confirm then apply ambiguous observed: `data/ui_minipilot_local_optimum_confirm_then_apply_ambiguous_observed_ok.jsonl`
+- Mini pilot local-optimum tab state reset ambiguous fixture: `data/ui_minipilot_local_optimum_tab_state_reset_ambiguous_fixture.jsonl`
+- Mini pilot local-optimum tab state reset ambiguous observed: `data/ui_minipilot_local_optimum_tab_state_reset_ambiguous_observed_ok.jsonl`
+- Mini pilot local-optimum form validation ambiguous fixture: `data/ui_minipilot_local_optimum_form_validation_ambiguous_fixture.jsonl`
+- Mini pilot local-optimum form validation ambiguous observed: `data/ui_minipilot_local_optimum_form_validation_ambiguous_observed_ok.jsonl`
 - Mini pilot local-optimum checkbox gate ambiguous fixture: `data/ui_minipilot_local_optimum_checkbox_gate_ambiguous_fixture.jsonl`
 - Mini pilot local-optimum checkbox gate ambiguous observed: `data/ui_minipilot_local_optimum_checkbox_gate_ambiguous_observed_ok.jsonl`
 - Mini pilot local-optimum panel toggle ambiguous fixture: `data/ui_minipilot_local_optimum_panel_toggle_ambiguous_fixture.jsonl`
@@ -1127,10 +1239,68 @@ Mini pilot notepad live demo (drives Notepad with SendKeys):
 
 ```powershell
 .\scripts\run_notepad_demo.ps1 -ModelPath "C:\AI\models\qwen2.5-7b-instruct-q5_k_m-00001-of-00002.gguf" `
-  -Text "Hello from GoldEvidenceBench." -FilePath "$env:TEMP\notes.txt"
-```
+    -Text "Hello from GoldEvidenceBench." -FilePath "$env:TEMP\notes.txt"
+  ```
 
-This writes a plan to `runs/notepad_demo_plan.json` and executes it. Use `-DryRun` to only emit the plan.
+  This writes a plan to `runs/notepad_demo_plan.json` and executes it. Use `-DryRun` to only emit the plan, `-VerifySaved` to validate the output file, and `-CloseAfterSave` to close Notepad after saving.
+  The keystroke gate runs by default to block unsafe text (length/ASCII). Use `-DisableKeystrokeGate` to bypass, or tune with `-MaxTextLength`, `-AllowNonAscii`, or `-AllowEmptyText`.
+
+  End-to-end demo (7B planner + gate map + preselect rules, auto-rename, closes after save):
+
+  ```powershell
+  $env:GOLDEVIDENCEBENCH_UI_GATE_MODELS=".\configs\ui_gate_models.json"
+  $env:GOLDEVIDENCEBENCH_UI_PRESELECT_RULES="1"
+  .\scripts\run_notepad_demo.ps1 -ModelPath "C:\AI\models\qwen2.5-7b-instruct-q5_k_m-00001-of-00002.gguf" `
+      -Text "Hello from GoldEvidenceBench." -FilePath "$env:USERPROFILE\Desktop\notes.txt" `
+      -OnExistingFile rename -InputMode type -VerifySaved -CloseAfterSave
+  ```
+
+  Prompt runner (routes a natural-language task to a preset in `configs/demo_presets.json`):
+
+  ```powershell
+  .\scripts\run_demo.ps1 -ModelPath "C:\AI\models\qwen2.5-7b-instruct-q5_k_m-00001-of-00002.gguf" `
+      -Task "Open Notepad and write a note"
+  ```
+
+  Multi-app demo (Notepad then Calculator):
+
+  ```powershell
+  .\scripts\run_demo.ps1 -ModelPath "C:\AI\models\qwen2.5-7b-instruct-q5_k_m-00001-of-00002.gguf" `
+      -Task "Write a note and compute 12+34"
+  ```
+
+  Use `-PromptForText` to enter custom text, or `-GenerateText` to let the 7B generate text
+  for the Notepad demo (ASCII-only by default). `-List` shows available presets (live vs fixture). See `docs/WORKFLOWS.md` for the workflow index.
+
+  Live practice form demo (fills fields, saves, verifies):
+
+  ```powershell
+  .\scripts\run_demo.ps1 -ModelPath "C:\AI\models\qwen2.5-7b-instruct-q5_k_m-00001-of-00002.gguf" `
+      -Task "Fill the login form"
+  ```
+  If the form window doesn't activate automatically, click the form once and the script will proceed.
+
+  Fixture-only form stub:
+
+  ```powershell
+  .\scripts\run_demo.ps1 -ModelPath "C:\AI\models\qwen2.5-7b-instruct-q5_k_m-00001-of-00002.gguf" `
+      -Preset form_stub
+  ```
+
+  Fixture-only table demo (gate + stub, no real UI):
+
+  ```powershell
+  .\scripts\run_demo.ps1 -ModelPath "C:\AI\models\qwen2.5-7b-instruct-q5_k_m-00001-of-00002.gguf" `
+      -Task "Export the table"
+  ```
+
+  Live Calculator demo (copy/verify result):
+
+  ```powershell
+  .\scripts\run_demo.ps1 -ModelPath "C:\AI\models\qwen2.5-7b-instruct-q5_k_m-00001-of-00002.gguf" `
+      -Task "Compute 12+34"
+  ```
+  The keystroke gate runs by default to validate the expression. Use `-DisableKeystrokeGate` or adjust `-MaxExpressionLength`.
 By default the demo uses the deterministic `greedy` planner; pass `-Planner llm` to use the LLM.
 SendKeys drives the active window; keep focus on Notepad while the script runs.
 The default input mode uses clipboard paste. Use `-InputMode type` (optionally with
@@ -1201,8 +1371,9 @@ The search baseline output includes `abstain_debug` with reason counts and avera
 after each filtering stage to diagnose why abstains happen.
 
 If fixture rows include `min_steps`, the baseline adds `task_step_overhead_mean` and `task_steps_taken_mean`
-to `sequence_metrics`. When `--out` is set it also writes a `*_summary.csv` and a `*_preferences.jsonl`
-file containing pairwise "shorter & valid" preferences.
+to `sequence_metrics`. If `min_steps` is missing, it falls back to the number of non-abstain steps per task.
+When `--out` is set it also writes a `*_summary.csv` and a `*_preferences.jsonl` file containing pairwise
+"shorter & valid" preferences.
 
 Local-optimum baseline (SA discriminator):
 
@@ -1313,6 +1484,26 @@ python .\scripts\run_ui_search_baseline.py --fixture .\data\ui_minipilot_local_o
   --observed .\data\ui_minipilot_local_optimum_blocking_modal_consent_ambiguous_observed_ok.jsonl `
   --out .\runs\ui_minipilot_local_optimum_blocking_modal_consent_ambiguous_search.json
 
+python .\scripts\run_ui_search_baseline.py --fixture .\data\ui_minipilot_local_optimum_disabled_primary_ambiguous_fixture.jsonl `
+  --observed .\data\ui_minipilot_local_optimum_disabled_primary_ambiguous_observed_ok.jsonl `
+  --out .\runs\ui_minipilot_local_optimum_disabled_primary_ambiguous_search.json
+
+python .\scripts\run_ui_search_baseline.py --fixture .\data\ui_minipilot_local_optimum_toolbar_vs_menu_ambiguous_fixture.jsonl `
+  --observed .\data\ui_minipilot_local_optimum_toolbar_vs_menu_ambiguous_observed_ok.jsonl `
+  --out .\runs\ui_minipilot_local_optimum_toolbar_vs_menu_ambiguous_search.json
+
+python .\scripts\run_ui_search_baseline.py --fixture .\data\ui_minipilot_local_optimum_confirm_then_apply_ambiguous_fixture.jsonl `
+  --observed .\data\ui_minipilot_local_optimum_confirm_then_apply_ambiguous_observed_ok.jsonl `
+  --out .\runs\ui_minipilot_local_optimum_confirm_then_apply_ambiguous_search.json
+
+python .\scripts\run_ui_search_baseline.py --fixture .\data\ui_minipilot_local_optimum_tab_state_reset_ambiguous_fixture.jsonl `
+  --observed .\data\ui_minipilot_local_optimum_tab_state_reset_ambiguous_observed_ok.jsonl `
+  --out .\runs\ui_minipilot_local_optimum_tab_state_reset_ambiguous_search.json
+
+python .\scripts\run_ui_search_baseline.py --fixture .\data\ui_minipilot_local_optimum_form_validation_ambiguous_fixture.jsonl `
+  --observed .\data\ui_minipilot_local_optimum_form_validation_ambiguous_observed_ok.jsonl `
+  --out .\runs\ui_minipilot_local_optimum_form_validation_ambiguous_search.json
+
 python .\scripts\run_ui_search_baseline.py --fixture .\data\ui_minipilot_local_optimum_checkbox_gate_ambiguous_fixture.jsonl `
   --observed .\data\ui_minipilot_local_optimum_checkbox_gate_ambiguous_observed_ok.jsonl `
   --out .\runs\ui_minipilot_local_optimum_checkbox_gate_ambiguous_search.json
@@ -1414,6 +1605,12 @@ If it still cannot safely disambiguate, it abstains.
 Set `GOLDEVIDENCEBENCH_UI_TRACE_PATH` to emit a JSONL trace for each row showing candidates in, post-filter sets,
 final choice, and reason codes.
 By default the trace file is overwritten each run; set `GOLDEVIDENCEBENCH_UI_TRACE_APPEND=1` to append instead.
+You can optionally route selection through tiny gate models before the LLM:
+set `GOLDEVIDENCEBENCH_UI_GATE_MODEL` to a single gate model JSON, or set
+`GOLDEVIDENCEBENCH_UI_GATE_MODELS` to a JSON map of `substring -> model_path`
+to pick a gate based on row text/app_path. If a gate selects a candidate, the
+adapter returns it without invoking the LLM. Set `GOLDEVIDENCEBENCH_UI_GATE_ONLY=1`
+to abstain instead of falling back to the LLM when the gate is unsure.
 
 Potential-based shaping (virtual power):
 
@@ -1599,6 +1796,14 @@ Threshold check (after running the presets above and `scripts/run_instruction_ov
 
 ```powershell
 python .\scripts\check_thresholds.py --config .\configs\usecase_checks.json
+```
+
+Memory verification gate (repo-backed demo):
+
+```powershell
+python .\scripts\verify_memories.py --in .\data\memories\memory_demo.jsonl `
+  --out .\runs\release_gates\memory_verify.json `
+  --out-details .\runs\release_gates\memory_verify_details.json
 ```
 
 Release checklist (optional; runs UI stubs, local-optimum SA discriminator + variants, canonical update_burst sweeps + thresholds):

@@ -7,6 +7,7 @@ from goldevidencebench.ui_prompt import extract_ui_instruction
 OVERLAY_MODAL_SCOPES = {"popup", "overlay"}
 LABEL_KEYWORD_STOPWORDS = {
     "a",
+    "activate",
     "an",
     "and",
     "button",
@@ -14,7 +15,7 @@ LABEL_KEYWORD_STOPWORDS = {
     "choose",
     "click",
     "close",
-    "dialog",
+    "focus",
     "left",
     "leftmost",
     "link",
@@ -59,12 +60,15 @@ LABEL_KEYWORD_SYNONYMS = {
     "close": ("cancel", "dismiss"),
     "confirm": ("ok", "okay", "yes", "apply", "save", "continue"),
     "continue": ("next", "proceed"),
+    "commit": ("apply", "save", "confirm"),
     "deactivate": ("disable", "turnoff"),
     "disable": ("deactivate", "turnoff"),
+    "dialog": ("panel", "drawer", "modal"),
     "dismiss": ("cancel", "close"),
     "done": ("finish", "complete"),
     "enable": ("activate", "turnon"),
     "finish": ("done", "complete"),
+    "finalize": ("apply", "finish", "confirm"),
     "launch": ("open", "start"),
     "next": ("continue", "proceed"),
     "ok": ("confirm", "okay", "yes"),
@@ -238,6 +242,8 @@ def _filter_actionable(candidates: list[dict[str, Any]]) -> list[dict[str, Any]]
             continue
         if candidate.get("clickable") is False:
             continue
+        if candidate.get("aria_disabled") is True:
+            continue
         filtered.append(candidate)
     return filtered or candidates
 
@@ -296,6 +302,17 @@ def _label_tokens(label: str) -> set[str]:
     return {token for token in _tokenize_text(label) if token}
 
 
+def _candidate_label_tokens(candidate: dict[str, Any]) -> set[str]:
+    tokens: set[str] = set()
+    label = candidate.get("label")
+    if isinstance(label, str) and label.strip():
+        tokens.update(_label_tokens(label))
+    accessible_name = candidate.get("accessible_name")
+    if isinstance(accessible_name, str) and accessible_name.strip():
+        tokens.update(_label_tokens(accessible_name))
+    return tokens
+
+
 def _token_matches(instruction_token: str, label_token: str) -> bool:
     if instruction_token == label_token:
         return True
@@ -352,10 +369,7 @@ def _filter_by_label_keywords(
     candidate_tokens: list[tuple[dict[str, Any], set[str]]] = []
     label_token_set: set[str] = set()
     for candidate in candidates:
-        label = candidate.get("label")
-        tokens: set[str] = set()
-        if isinstance(label, str) and label.strip():
-            tokens = _label_tokens(label)
+        tokens = _candidate_label_tokens(candidate)
         candidate_tokens.append((candidate, tokens))
         label_token_set.update(tokens)
 
@@ -732,14 +746,11 @@ def preselect_candidates(
     allow_modal = wants_modal or wants_overlay
     overlay_allowed = allow_overlay or wants_overlay or wants_modal
 
-    if apply_rules and not allow_modal:
-        candidates = _filter_main_scope(candidates)
+    if apply_rules:
+        candidates = _filter_actionable(candidates)
 
     if apply_rules and wants_modal:
         candidates = _filter_modal_scope(candidates, require_modal=True)
-
-    if apply_rules:
-        candidates = _filter_actionable(candidates)
 
     label_hint = False
     if apply_rules and allow_overlay and not wants_overlay:
@@ -776,6 +787,8 @@ def preselect_candidates(
             if len(state_signal_filtered) != len(candidates):
                 candidates = state_signal_filtered
                 label_hint = True
+    if apply_rules and not allow_modal and not label_hint:
+        candidates = _filter_main_scope(candidates)
     if apply_rules and not label_hint and wants_primary:
         candidates = _filter_by_candidate_id(candidates, token="primary")
     if apply_rules and not label_hint and wants_secondary:
@@ -895,19 +908,14 @@ def preselect_candidates_with_trace(
     reasons: dict[str, list[str]] = {}
     current = list(candidates)
 
-    if apply_rules and not allow_modal:
-        filtered = _filter_main_scope(current)
-        _record_removed(current, filtered, "modal_scope_not_main", reasons)
+    if apply_rules:
+        filtered = _filter_actionable(current)
+        _record_removed(current, filtered, "not_actionable", reasons)
         current = filtered
 
     if apply_rules and wants_modal:
         filtered = _filter_modal_scope(current, require_modal=True)
         _record_removed(current, filtered, "modal_scope_required", reasons)
-        current = filtered
-
-    if apply_rules:
-        filtered = _filter_actionable(current)
-        _record_removed(current, filtered, "not_actionable", reasons)
         current = filtered
 
     label_hint = False
@@ -958,6 +966,10 @@ def preselect_candidates_with_trace(
                 _record_removed(current, filtered, "state_signal_prefer", reasons)
                 label_hint = True
             current = filtered
+    if apply_rules and not allow_modal and not label_hint:
+        filtered = _filter_main_scope(current)
+        _record_removed(current, filtered, "modal_scope_not_main", reasons)
+        current = filtered
     if apply_rules and not label_hint and wants_primary:
         filtered = _filter_by_candidate_id(current, token="primary")
         _record_removed(current, filtered, "not_primary", reasons)

@@ -11,10 +11,20 @@ param(
     [ValidateRange(1,200)]
     [int]$TypeChunkSize = 40,
     [int]$TypeDelayMs = 15,
+    [int]$MaxTextLength = 2000,
+    [switch]$AllowNonAscii,
+    [switch]$AllowEmptyText,
+    [switch]$DisableKeystrokeGate,
     [string]$FixturePath = "data\\ui_minipilot_notepad_fixture.jsonl",
     [string]$TaskId = "task_ui_notepad_save",
     [string]$OutPlan = "runs\\notepad_demo_plan.json",
     [int]$DelayMs = 500,
+    [switch]$CloseAfterSave,
+    [switch]$VerifySaved,
+    [ValidateRange(500,30000)]
+    [int]$VerifyTimeoutMs = 5000,
+    [ValidateRange(50,5000)]
+    [int]$VerifyPollMs = 200,
     [switch]$DryRun
 )
 
@@ -65,6 +75,24 @@ function New-UniqueFilePath([string]$path) {
         $counter += 1
     }
     return $candidate
+}
+
+function Normalize-Text([string]$value) {
+    if ($null -eq $value) {
+        return ""
+    }
+    return ($value -replace "`r`n", "`n" -replace "`r", "`n")
+}
+
+function Wait-ForFile([string]$path, [int]$timeoutMs, [int]$pollMs) {
+    $deadline = (Get-Date).AddMilliseconds($timeoutMs)
+    while ((Get-Date) -lt $deadline) {
+        if (Test-Path $path) {
+            return $true
+        }
+        Start-Sleep -Milliseconds $pollMs
+    }
+    return (Test-Path $path)
 }
 
 $scriptPath = "scripts\\select_ui_plan.py"
@@ -160,6 +188,31 @@ if ($DryRun) {
     exit 0
 }
 
+if (-not $DisableKeystrokeGate) {
+    $gateScript = Join-Path $PSScriptRoot "keystroke_gate.py"
+    if (-not (Test-Path $gateScript)) {
+        Write-Error "Missing keystroke gate script: $gateScript"
+        exit 1
+    }
+    $gateArgs = @("--mode", "text", "--text", $Text, "--max-len", $MaxTextLength)
+    if ($AllowNonAscii) {
+        $gateArgs += "--allow-non-ascii"
+    }
+    if ($AllowEmptyText) {
+        $gateArgs += "--allow-empty"
+    }
+    $gateJson = & python $gateScript @gateArgs
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "Keystroke gate failed to run."
+        exit 1
+    }
+    $gate = ($gateJson | Out-String).Trim() | ConvertFrom-Json
+    if (-not $gate.ok) {
+        Write-Warning ("Keystroke gate blocked: {0}" -f $gate.reason)
+        exit 1
+    }
+}
+
 Add-Type -AssemblyName System.Windows.Forms
 
 Write-Host "Launching Notepad..."
@@ -249,3 +302,47 @@ if ($sawInput -and -not $sawSave) {
 }
 
 Write-Host "Done. Saved to $FilePath"
+
+if ($VerifySaved) {
+    if (-not $sawSave) {
+        Write-Warning "VerifySaved requested but no save action was taken."
+    } else {
+        if (-not (Wait-ForFile $FilePath $VerifyTimeoutMs $VerifyPollMs)) {
+            Write-Warning "VerifySaved failed: file not found after ${VerifyTimeoutMs}ms."
+        } else {
+            try {
+                $actual = Normalize-Text (Get-Content -Path $FilePath -Raw)
+                $expected = Normalize-Text $Text
+                if (-not $actual.Contains($expected)) {
+                    Write-Warning "VerifySaved failed: file content does not include expected text."
+                } else {
+                    Write-Host "VerifySaved OK: file exists and contains expected text."
+                }
+            } catch {
+                Write-Warning "VerifySaved failed: unable to read file content."
+            }
+        }
+    }
+}
+
+if ($CloseAfterSave) {
+    if (-not $sawSave) {
+        Write-Warning "CloseAfterSave requested but no save action was taken; leaving Notepad open."
+        exit 0
+    }
+    try {
+        [Microsoft.VisualBasic.Interaction]::AppActivate($process.Id) | Out-Null
+    } catch {
+        Write-Warning "Unable to re-activate Notepad window before closing."
+    }
+    Write-Host "Closing Notepad..."
+    $process.CloseMainWindow() | Out-Null
+    Start-Sleep -Milliseconds $DelayMs
+    if (-not $process.HasExited) {
+        [System.Windows.Forms.SendKeys]::SendWait("%{F4}")
+        Start-Sleep -Milliseconds $DelayMs
+    }
+    if (-not $process.HasExited) {
+        Write-Warning "Notepad is still open; check for a save prompt."
+    }
+}

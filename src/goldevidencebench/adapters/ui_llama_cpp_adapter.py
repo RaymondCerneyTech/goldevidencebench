@@ -10,6 +10,13 @@ try:
 except ImportError as exc:  # pragma: no cover - optional dependency
     raise ImportError("llama_cpp not installed; install via `pip install llama-cpp-python`") from exc
 
+from goldevidencebench.ui_gate import select_candidate
+from goldevidencebench.ui_gate_registry import (
+    GateModelEntry,
+    load_gate_model,
+    load_gate_model_map,
+    match_gate_model,
+)
 from goldevidencebench.ui_policy import (
     preselect_candidates,
     preselect_candidates_with_trace,
@@ -55,6 +62,15 @@ class UILlamaCppAdapter:
         self.grammar = _load_grammar(UI_JSON_GRAMMAR)
         self.filter_overlay = _env_flag("UI_OVERLAY_FILTER", default="0")
         self.preselect_rules = _env_flag("UI_PRESELECT_RULES", default="0")
+        self.gate_only = _env_flag("UI_GATE_ONLY", default="0")
+        self.gate_model_path = get_env("UI_GATE_MODEL")
+        self.gate_models_path = get_env("UI_GATE_MODELS")
+        self.gate_model = None
+        self.gate_models: list[GateModelEntry] = []
+        if self.gate_model_path:
+            self.gate_model = load_gate_model(Path(self.gate_model_path))
+        if self.gate_models_path:
+            self.gate_models = load_gate_model_map(Path(self.gate_models_path))
         self.trace_path = get_env("UI_TRACE_PATH")
         self.trace_append = _env_flag("UI_TRACE_APPEND", default="0")
         if self.trace_path and not self.trace_append:
@@ -102,6 +118,31 @@ class UILlamaCppAdapter:
                 trace["final_choice"] = candidate_ids[0]
                 _append_trace(self.trace_path, trace)
             return {"value": candidate_ids[0], "support_ids": []}
+        gate_selected = None
+        gate_label = None
+        gate_entry = None
+        if self.gate_models:
+            gate_entry = match_gate_model(row, candidates, self.gate_models)
+            if gate_entry is not None:
+                gate_label = str(gate_entry.path)
+                gate_selected = select_candidate(row, candidates, gate_entry.model)
+        if gate_selected is None and self.gate_model is not None:
+            gate_label = str(self.gate_model_path)
+            gate_selected = select_candidate(row, candidates, self.gate_model)
+        if trace is not None and (gate_entry is not None or self.gate_model is not None):
+            trace["gate_model"] = gate_label
+            trace["gate_choice"] = gate_selected
+            trace["gate_used"] = gate_selected in candidate_ids if gate_selected else False
+        if gate_selected in candidate_ids:
+            if trace is not None:
+                trace["final_choice"] = gate_selected
+                _append_trace(self.trace_path, trace)
+            return {"value": gate_selected, "support_ids": []}
+        if self.gate_only:
+            if trace is not None:
+                trace["final_choice"] = None
+                _append_trace(self.trace_path, trace)
+            return {"value": None, "support_ids": []}
         prompt = build_ui_prompt(row, candidates)
         text = _generate_text(self, prompt=prompt)
         parsed = _parse_json(text)

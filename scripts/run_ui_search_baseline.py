@@ -16,6 +16,7 @@ from goldevidencebench.ui_eval import (
     task_step_stats,
 )
 from goldevidencebench.ui_fixture import validate_ui_fixture_path
+from goldevidencebench.ui_gate import GateModel, select_candidate
 from goldevidencebench.ui_policy import preselect_candidates, preselect_candidates_with_trace
 from goldevidencebench.ui_prompt import extract_ui_instruction
 from goldevidencebench.ui_search import (
@@ -66,6 +67,19 @@ def _load_observed_deltas(path: Path, rows: list[dict[str, Any]]) -> list[dict[s
         row_id = row.get("id")
         observed_deltas.append(observed_by_id.get(row_id))
     return observed_deltas
+
+
+def _load_gate_model(path: Path | None) -> GateModel | None:
+    if path is None:
+        return None
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    return GateModel(
+        feature_names=payload["feature_names"],
+        weights=payload["weights"],
+        bias=payload.get("bias", 0.0),
+        min_score=payload.get("min_score", 0.5),
+        min_margin=payload.get("min_margin", 0.0),
+    )
 
 
 def _candidate_by_id(row: dict[str, Any], candidate_id: str | None) -> dict[str, Any] | None:
@@ -248,6 +262,30 @@ def _policy_only_plan(
     return selected_ids
 
 
+def _gate_plan(
+    rows: list[dict[str, Any]],
+    model: GateModel,
+    *,
+    apply_overlay_filter: bool,
+    apply_rules: bool,
+) -> list[str | None]:
+    selected_ids: list[str | None] = []
+    current_state: dict[str, Any] = {}
+    for row in rows:
+        candidates = _state_constrained_candidates(
+            row,
+            current_state,
+            apply_overlay_filter=apply_overlay_filter,
+            apply_rules=apply_rules,
+        )
+        candidate_id = select_candidate(row, candidates, model) if candidates else None
+        selected_ids.append(candidate_id if isinstance(candidate_id, str) else None)
+        next_state = _candidate_state_from_row(row, selected_ids[-1])
+        if next_state:
+            current_state = next_state
+    return selected_ids
+
+
 def _candidate_state_from_row(row: dict[str, Any], selected_id: str | None) -> dict[str, Any]:
     if selected_id is None:
         return {}
@@ -403,47 +441,37 @@ def _as_seed_runs(payload: dict[str, Any]) -> list[dict[str, Any]]:
     seed_runs = payload.get("seed_runs")
     if isinstance(seed_runs, list):
         return seed_runs
-    return [
-        {
-            "policy": payload.get("policy", {}),
-            "greedy": payload.get("greedy", {}),
-            "sa": payload.get("sa", {}),
-        }
-    ]
+    strategies = ["policy", "greedy", "sa"]
+    if "gate" in payload:
+        strategies.append("gate")
+    return [{name: payload.get(name, {}) for name in strategies}]
 
 
 def _summarize_seed_runs(seed_runs: list[dict[str, Any]]) -> dict[str, dict[str, float]]:
-    metrics = {
-        "policy": {
-            "selection_rate": [],
-            "abstain_rate": [],
-            "wrong_action_rate": [],
-            "task_pass_rate": [],
-            "task_step_overhead_mean": [],
-            "task_steps_taken_mean": [],
-            "task_min_steps_mean": [],
-        },
-        "greedy": {
-            "selection_rate": [],
-            "abstain_rate": [],
-            "wrong_action_rate": [],
-            "task_pass_rate": [],
-            "task_step_overhead_mean": [],
-            "task_steps_taken_mean": [],
-            "task_min_steps_mean": [],
-        },
-        "sa": {
-            "selection_rate": [],
-            "abstain_rate": [],
-            "wrong_action_rate": [],
-            "task_pass_rate": [],
-            "task_step_overhead_mean": [],
-            "task_steps_taken_mean": [],
-            "task_min_steps_mean": [],
-        },
+    metric_template = {
+        "selection_rate": [],
+        "abstain_rate": [],
+        "wrong_action_rate": [],
+        "task_pass_rate": [],
+        "task_step_overhead_mean": [],
+        "task_steps_taken_mean": [],
+        "task_min_steps_mean": [],
     }
+    preferred = ["policy", "greedy", "sa", "gate"]
+    discovered: set[str] = set()
     for run in seed_runs:
-        for strategy in ("policy", "greedy", "sa"):
+        if not isinstance(run, dict):
+            continue
+        for key, value in run.items():
+            if isinstance(value, dict) and isinstance(value.get("metrics"), dict):
+                discovered.add(key)
+    strategies = [name for name in preferred if name in discovered]
+    for name in sorted(discovered):
+        if name not in strategies:
+            strategies.append(name)
+    metrics = {name: deepcopy(metric_template) for name in strategies}
+    for run in seed_runs:
+        for strategy in metrics:
             block = run.get(strategy, {})
             if not isinstance(block, dict):
                 continue
@@ -736,6 +764,7 @@ def main() -> int:
         "--observed",
         help="Optional JSONL with {id, observed_delta} rows for post-action verification.",
     )
+    parser.add_argument("--gate-model", help="Optional gate model JSON path.")
     parser.add_argument("--out", help="Optional output JSON path.")
     parser.add_argument("--out-csv", help="Optional output CSV summary path.")
     parser.add_argument(
@@ -824,6 +853,14 @@ def main() -> int:
             return 1
         observed_deltas = _load_observed_deltas(observed_path, rows)
 
+    gate_model = None
+    if args.gate_model:
+        gate_path = Path(args.gate_model)
+        if not gate_path.exists():
+            print(f"Gate model not found: {gate_path}")
+            return 1
+        gate_model = _load_gate_model(gate_path)
+
     def run_baseline(
         rows_to_score: list[dict[str, Any]],
         observed: list[dict[str, Any] | None] | None,
@@ -833,6 +870,14 @@ def main() -> int:
             apply_overlay_filter=args.overlay_filter,
             apply_rules=args.rules,
         )
+        gate_plan = None
+        if gate_model is not None:
+            gate_plan = _gate_plan(
+                rows_to_score,
+                gate_model,
+                apply_overlay_filter=args.overlay_filter,
+                apply_rules=args.rules,
+            )
         def compute_score(plan: list[str | None]) -> float:
             score, _ = score_plan_against_gold(
                 rows_to_score,
@@ -949,6 +994,15 @@ def main() -> int:
                 apply_overlay_filter=args.overlay_filter,
                 apply_rules=args.rules,
             )
+            gate_result = None
+            if gate_plan is not None:
+                gate_result = _score_strategy(
+                    rows_to_score,
+                    gate_plan,
+                    observed,
+                    apply_overlay_filter=args.overlay_filter,
+                    apply_rules=args.rules,
+                )
             sa_beats_greedy = (
                 sa_result["sequence_metrics"]["task_pass_rate"]
                 > greedy_result["sequence_metrics"]["task_pass_rate"]
@@ -964,6 +1018,10 @@ def main() -> int:
                 "greedy": _stats_by_task(rows_to_score, greedy_plan, observed),
                 "sa": _stats_by_task(rows_to_score, sa_plan, observed),
             }
+            if gate_plan is not None and gate_result is not None:
+                stats_by_strategy["gate"] = _stats_by_task(
+                    rows_to_score, gate_plan, observed
+                )
             seed_preferences = _shorter_valid_prefs(
                 str(fixture_path), seed, stats_by_strategy
             )
@@ -983,6 +1041,7 @@ def main() -> int:
                     "score": sa_score,
                     "telemetry": sa_telemetry,
                 },
+                "gate": gate_result,
                 "sa_beats_greedy": sa_beats_greedy,
                 "sa_diff": sa_diff,
                 "preferences": seed_preferences,
@@ -1010,6 +1069,8 @@ def main() -> int:
                     "sa": single["sa"],
                 }
             )
+            if single.get("gate") is not None:
+                payload["gate"] = single["gate"]
         else:
             beats = 0
             for run in seed_runs:

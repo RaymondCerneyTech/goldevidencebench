@@ -1,0 +1,4 @@
+fixture,seeds,strategy,selection_rate_mean,abstain_rate_mean,wrong_action_rate_mean,task_pass_rate_mean,task_step_overhead_mean,task_steps_taken_mean,task_min_steps_mean
+data\ui_minipilot_local_optimum_checkbox_gate_fixture.jsonl,10,policy,1.0,0.0,0.0,1.0,1.0,2.0,2.0
+data\ui_minipilot_local_optimum_checkbox_gate_fixture.jsonl,10,greedy,1.0,0.0,0.0,1.0,1.0,2.0,2.0
+data\ui_minipilot_local_optimum_checkbox_gate_fixture.jsonl,10,sa,1.0,0.0,0.0,1.0,1.0,2.0,2.0
