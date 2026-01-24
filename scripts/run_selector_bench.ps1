@@ -3,6 +3,8 @@ param(
     [string]$Preset = "quick",
     [string]$ModelPath = $env:GOLDEVIDENCEBENCH_MODEL,
     [switch]$UseRerank,
+    [ValidateSet("none", "latest_step", "prefer_set_latest")]
+    [string]$RerankMode,
     [float]$NoteRate = 0.12
 )
 
@@ -18,7 +20,9 @@ $env:GOLDEVIDENCEBENCH_RETRIEVAL_WRONG_TYPE = "same_key"
 $env:GOLDEVIDENCEBENCH_RETRIEVAL_ORDER = "shuffle"
 $env:GOLDEVIDENCEBENCH_RETRIEVAL_ORDER_SEED = "0"
 
-if ($UseRerank) {
+if ($RerankMode) {
+    $env:GOLDEVIDENCEBENCH_RETRIEVAL_RERANK = $RerankMode
+} elseif ($UseRerank) {
     $env:GOLDEVIDENCEBENCH_RETRIEVAL_RERANK = "latest_step"
 } else {
     $env:GOLDEVIDENCEBENCH_RETRIEVAL_RERANK = "none"

@@ -15,3 +15,8 @@ venv/
 *.json
 *.txt
 !.gitignore
+runs/
+runs_wall_latest/
+runs_wall_linear/
+runs_wall_*/
+README - Copy*.md

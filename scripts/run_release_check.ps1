@@ -1,9 +1,26 @@
+<#
+.SYNOPSIS
+Runs GoldEvidenceBench release checks and gates.
+
+.DESCRIPTION
+Executes a suite of checks (retrieval, UI stubs, local-optimum variants) and
+optionally the drift holdout gate. The UI local-optimum distillation holdout
+defaults to local_optimum_blocking_modal_unmentioned_blocked.
+
+.PARAMETER VariantsHoldoutName
+Holdout for UI local-optimum distillation (default:
+local_optimum_blocking_modal_unmentioned_blocked).
+
+.PARAMETER RunDriftHoldoutGate
+Runs the drift holdout canary + fixes gate and fails the release on FAIL.
+#>
 param(
     [string]$ModelPath = $env:GOLDEVIDENCEBENCH_MODEL,
     [switch]$RunSweeps,
     [switch]$SkipThresholds,
+    [switch]$RunDriftHoldoutGate,
     [int]$VariantsSeeds = 10,
-    [string]$VariantsHoldoutName = "local_optimum_blocking_modal_required",
+    [string]$VariantsHoldoutName = "local_optimum_blocking_modal_unmentioned_blocked",
     [int]$VariantsFuzzVariants = 5,
     [int]$VariantsFuzzSeed = 0,
     [switch]$RotateHoldout,
@@ -11,9 +28,11 @@ param(
     [double]$AutoCurriculumGapMin = 0.1,
     [double]$AutoCurriculumSolvedMin = 0.9,
     [string]$AutoCurriculumStatePath = "runs\\release_gates\\ui_holdout_autocurriculum.json",
-    [string]$HoldoutList = "local_optimum_section_path,local_optimum_section_path_conflict,local_optimum_blocking_modal_detour,local_optimum_tab_detour,local_optimum_disabled_primary,local_optimum_toolbar_vs_menu,local_optimum_confirm_then_apply,local_optimum_tab_state_reset,local_optimum_form_validation,local_optimum_window_focus,local_optimum_panel_toggle,local_optimum_accessibility_label,local_optimum_checkbox_gate,local_optimum_blocking_modal_required,local_optimum_blocking_modal_permission,local_optimum_blocking_modal_consent,local_optimum_blocking_modal_unmentioned,local_optimum_blocking_modal,local_optimum_overlay,local_optimum_primary,local_optimum_delayed_solvable,local_optimum_role_mismatch,local_optimum_role_conflict,local_optimum_destructive_confirm,local_optimum_blocking_modal_unprompted_confirm",
+    [string]$HoldoutList = "local_optimum_section_path,local_optimum_section_path_conflict,local_optimum_blocking_modal_detour,local_optimum_tab_detour,local_optimum_disabled_primary,local_optimum_toolbar_vs_menu,local_optimum_confirm_then_apply,local_optimum_tab_state_reset,local_optimum_context_switch,local_optimum_stale_tab_state,local_optimum_form_validation,local_optimum_window_focus,local_optimum_panel_toggle,local_optimum_accessibility_label,local_optimum_checkbox_gate,local_optimum_blocking_modal_required,local_optimum_blocking_modal_permission,local_optimum_blocking_modal_consent,local_optimum_blocking_modal_unmentioned,local_optimum_blocking_modal_unmentioned_blocked,local_optimum_blocking_modal,local_optimum_overlay,local_optimum_primary,local_optimum_delayed_solvable,local_optimum_role_mismatch,local_optimum_role_conflict,local_optimum_destructive_confirm,local_optimum_blocking_modal_unprompted_confirm",
     [switch]$SkipVariants
 )
+
+$RequiredVariantsHoldout = "local_optimum_blocking_modal_unmentioned_blocked"
 
 if ($RunSweeps -and -not $ModelPath) {
     Write-Error "Set -ModelPath or GOLDEVIDENCEBENCH_MODEL before running sweeps."
@@ -272,6 +291,10 @@ if (-not $SkipThresholds) {
     python .\scripts\run_ui_search_baseline.py --fixture .\data\ui_minipilot_local_optimum_blocking_modal_unmentioned_ambiguous_fixture.jsonl `
         --observed .\data\ui_minipilot_local_optimum_blocking_modal_unmentioned_ambiguous_observed_ok.jsonl `
         --out .\runs\ui_minipilot_local_optimum_blocking_modal_unmentioned_ambiguous_search.json
+    Write-Host "Running UI local-optimum blocking modal unmentioned blocked ambiguous baseline..."
+    python .\scripts\run_ui_search_baseline.py --fixture .\data\ui_minipilot_local_optimum_blocking_modal_unmentioned_blocked_ambiguous_fixture.jsonl `
+        --observed .\data\ui_minipilot_local_optimum_blocking_modal_unmentioned_blocked_ambiguous_observed_ok.jsonl `
+        --out .\runs\ui_minipilot_local_optimum_blocking_modal_unmentioned_blocked_ambiguous_search.json
     Write-Host "Running UI local-optimum blocking modal required ambiguous baseline..."
     python .\scripts\run_ui_search_baseline.py --fixture .\data\ui_minipilot_local_optimum_blocking_modal_required_ambiguous_fixture.jsonl `
         --observed .\data\ui_minipilot_local_optimum_blocking_modal_required_ambiguous_observed_ok.jsonl `
@@ -300,6 +323,14 @@ if (-not $SkipThresholds) {
     python .\scripts\run_ui_search_baseline.py --fixture .\data\ui_minipilot_local_optimum_tab_state_reset_ambiguous_fixture.jsonl `
         --observed .\data\ui_minipilot_local_optimum_tab_state_reset_ambiguous_observed_ok.jsonl `
         --out .\runs\ui_minipilot_local_optimum_tab_state_reset_ambiguous_search.json
+    Write-Host "Running UI local-optimum context switch ambiguous baseline..."
+    python .\scripts\run_ui_search_baseline.py --fixture .\data\ui_minipilot_local_optimum_context_switch_ambiguous_fixture.jsonl `
+        --observed .\data\ui_minipilot_local_optimum_context_switch_ambiguous_observed_ok.jsonl `
+        --out .\runs\ui_minipilot_local_optimum_context_switch_ambiguous_search.json
+    Write-Host "Running UI local-optimum stale tab state ambiguous baseline..."
+    python .\scripts\run_ui_search_baseline.py --fixture .\data\ui_minipilot_local_optimum_stale_tab_state_ambiguous_fixture.jsonl `
+        --observed .\data\ui_minipilot_local_optimum_stale_tab_state_ambiguous_observed_ok.jsonl `
+        --out .\runs\ui_minipilot_local_optimum_stale_tab_state_ambiguous_search.json
     Write-Host "Running UI local-optimum form validation ambiguous baseline..."
     python .\scripts\run_ui_search_baseline.py --fixture .\data\ui_minipilot_local_optimum_form_validation_ambiguous_fixture.jsonl `
         --observed .\data\ui_minipilot_local_optimum_form_validation_ambiguous_observed_ok.jsonl `
@@ -349,11 +380,26 @@ if (-not $SkipThresholds) {
         $distillationPath = Join-Path $variantsOutRoot "distillation_report.json"
         if (Test-Path $distillationPath) {
             $releaseDir = "runs\\release_gates"
+            $releaseDistillation = Join-Path $releaseDir "ui_local_optimum_distillation.json"
             New-Item -ItemType Directory -Path $releaseDir -Force | Out-Null
-            Copy-Item -Path $distillationPath -Destination (Join-Path $releaseDir "ui_local_optimum_distillation.json") -Force
+            Copy-Item -Path $distillationPath -Destination $releaseDistillation -Force
+            $report = $null
+            try {
+                $report = Get-Content $releaseDistillation -Raw | ConvertFrom-Json
+            } catch {
+                Write-Error "Failed to parse ui_local_optimum_distillation.json after copy."
+                exit 1
+            }
+            if (-not $report -or -not $report.holdout_name) {
+                Write-Error "ui_local_optimum_distillation.json missing holdout_name."
+                exit 1
+            }
+            if ($report.holdout_name -ne $RequiredVariantsHoldout) {
+                Write-Error ("ui_local_optimum_distillation.json holdout_name '{0}' does not match required '{1}'." -f $report.holdout_name, $RequiredVariantsHoldout)
+                exit 1
+            }
             if ($AutoCurriculum) {
                 try {
-                    $report = Get-Content $distillationPath -Raw | ConvertFrom-Json
                     $choice = Get-NextHoldoutFromReport -Report $report -GapMin $AutoCurriculumGapMin -SolvedMin $AutoCurriculumSolvedMin -FallbackHoldout $resolvedHoldout
                     New-Item -ItemType Directory -Path (Split-Path $AutoCurriculumStatePath) -Force | Out-Null
                     [pscustomobject]@{
@@ -377,6 +423,18 @@ if (-not $SkipThresholds) {
             }
         }
     }
+    if ($RunDriftHoldoutGate) {
+        if (-not $ModelPath) {
+            Write-Error "Set -ModelPath or GOLDEVIDENCEBENCH_MODEL before running the drift holdout gate."
+            exit 1
+        }
+        Write-Host "Running drift holdout gate..."
+        .\scripts\run_drift_holdout_gate.ps1 -ModelPath $ModelPath
+        if ($LASTEXITCODE -ne 0) {
+            Write-Error "Drift holdout gate failed."
+            exit 1
+        }
+    }
     python .\scripts\check_thresholds.py --config .\configs\usecase_checks.json
     $exitCode = $LASTEXITCODE
     if ($exitCode -ne 0) {
@@ -398,6 +456,11 @@ if (-not $SkipThresholds) {
                 Name = "local_optimum_blocking_modal_unmentioned_ambiguous"
                 Fixture = "data\\ui_minipilot_local_optimum_blocking_modal_unmentioned_ambiguous_fixture.jsonl"
                 Baseline = "runs\\ui_minipilot_local_optimum_blocking_modal_unmentioned_ambiguous_search.json"
+            }
+            @{
+                Name = "local_optimum_blocking_modal_unmentioned_blocked_ambiguous"
+                Fixture = "data\\ui_minipilot_local_optimum_blocking_modal_unmentioned_blocked_ambiguous_fixture.jsonl"
+                Baseline = "runs\\ui_minipilot_local_optimum_blocking_modal_unmentioned_blocked_ambiguous_search.json"
             }
             @{
                 Name = "local_optimum_blocking_modal_required_ambiguous"
@@ -433,6 +496,16 @@ if (-not $SkipThresholds) {
                 Name = "local_optimum_tab_state_reset_ambiguous"
                 Fixture = "data\\ui_minipilot_local_optimum_tab_state_reset_ambiguous_fixture.jsonl"
                 Baseline = "runs\\ui_minipilot_local_optimum_tab_state_reset_ambiguous_search.json"
+            }
+            @{
+                Name = "local_optimum_context_switch_ambiguous"
+                Fixture = "data\\ui_minipilot_local_optimum_context_switch_ambiguous_fixture.jsonl"
+                Baseline = "runs\\ui_minipilot_local_optimum_context_switch_ambiguous_search.json"
+            }
+            @{
+                Name = "local_optimum_stale_tab_state_ambiguous"
+                Fixture = "data\\ui_minipilot_local_optimum_stale_tab_state_ambiguous_fixture.jsonl"
+                Baseline = "runs\\ui_minipilot_local_optimum_stale_tab_state_ambiguous_search.json"
             }
             @{
                 Name = "local_optimum_form_validation_ambiguous"

@@ -24,6 +24,7 @@ def _load_summary(path: Path) -> dict[str, Any] | None:
 def _row_from_summary(path: Path, data: dict[str, Any]) -> dict[str, Any]:
     overall = data.get("overall", {})
     retrieval = data.get("retrieval", {})
+    drift = data.get("drift", {})
     return {
         "run_dir": str(path.parent),
         "run_name": path.parent.name,
@@ -53,6 +54,10 @@ def _row_from_summary(path: Path, data: dict[str, Any]) -> dict[str, Any]:
         "drop_rate": retrieval.get("drop_rate"),
         "decomposition_line": retrieval.get("decomposition_line"),
         "state_integrity_rate": overall.get("state_integrity_rate_mean"),
+        "drift_step_rate": drift.get("step_rate"),
+        "drift_persistence_rate": drift.get("persistence_rate"),
+        "drift_wrong_commit_rate": drift.get("wrong_commit_rate"),
+        "drift_run_rate": drift.get("run_rate"),
     }
 
 

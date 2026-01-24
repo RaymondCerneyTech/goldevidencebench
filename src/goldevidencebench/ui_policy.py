@@ -105,11 +105,17 @@ STATE_SIGNAL_EXCLUDE_KEYS = {"modal_scope", "panel", "overlay_present"}
 def _candidate_clears_modal(candidate: dict[str, Any]) -> bool:
     if candidate.get("modal_cleared") is True:
         return True
+    if candidate.get("modal_unblocked") is True:
+        return True
     next_state = candidate.get("next_state")
     if isinstance(next_state, dict) and next_state.get("modal_cleared") is True:
         return True
+    if isinstance(next_state, dict) and next_state.get("modal_unblocked") is True:
+        return True
     state = candidate.get("state")
     if isinstance(state, dict) and state.get("modal_cleared") is True:
+        return True
+    if isinstance(state, dict) and state.get("modal_unblocked") is True:
         return True
     return False
 

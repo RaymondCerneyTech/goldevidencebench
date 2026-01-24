@@ -176,6 +176,28 @@ def test_preselect_candidates_prefers_overlay_when_modal_clears() -> None:
     assert [c["candidate_id"] for c in filtered] == ["btn_dismiss"]
 
 
+def test_preselect_candidates_prefers_overlay_when_modal_unblocked() -> None:
+    row = {"instruction": "Select the option.", "allow_overlay": True}
+    candidates = [
+        {"candidate_id": "btn_main", "label": "Continue", "modal_scope": None},
+        {
+            "candidate_id": "btn_unblock",
+            "label": "Dismiss",
+            "overlay": True,
+            "overlay_present": True,
+            "modal_scope": None,
+            "next_state": {"modal_unblocked": True},
+        },
+    ]
+    filtered = preselect_candidates(
+        row,
+        candidates,
+        apply_overlay_filter=True,
+        apply_rules=True,
+    )
+    assert [c["candidate_id"] for c in filtered] == ["btn_unblock"]
+
+
 def test_preselect_candidates_prefers_overlay_when_opens_modal() -> None:
     row = {"instruction": "Select the option.", "allow_overlay": True}
     candidates = [

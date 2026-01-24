@@ -20,7 +20,7 @@ class EpisodeConfig:
     chapters: int = 8
     require_citations: bool = True
     twins: bool = True
-    distractor_profile: str = "instruction"  # easy|standard|adversarial|instruction|instruction_suite|note_camouflage|note_camouflage_suite|update_burst
+    distractor_profile: str = "instruction"  # easy|standard|adversarial|instruction|instruction_suite|note_camouflage|note_camouflage_suite|update_burst|stale_tab_state|focus_drift
     state_mode: str = "kv"  # kv|kv_commentary|counter|set|relational
     note_rate: float = 0.12
     update_burst_rate: float = 0.25
@@ -328,7 +328,256 @@ def _compute_recency_stats(log_lines: list[str], keys: list[str]) -> dict[str, d
     return out
 
 
+def _generate_stale_tab_state_episode(*, seed: int, episode_id: str, cfg: EpisodeConfig) -> dict[str, Any]:
+    rng = random.Random(seed)
+    keys = [_make_key(i) for i in range(cfg.keys)]
+    glossary = {k: f"Synthetic tag {k} used for state-tracking." for k in keys}
+
+    state: dict[str, Any] = _init_state(cfg, keys)
+    last_support: dict[str, str | None] = {k: None for k in keys}
+    last_op: dict[str, str] = {k: "CLEAR" for k in keys}
+
+    ledger: list[LedgerEntry] = []
+    chapters: list[list[str]] = [[]]
+    used_uids: set[str] = set()
+    log_lines: list[str] = []
+    step_counter = 0
+
+    log_lines.append(f"# GoldEvidenceBench Episode {episode_id}")
+    log_lines.append("")
+    log_lines.append("## Episode Log")
+
+    def add_line(line: str) -> None:
+        chapters[-1].append(line)
+
+    for step in range(1, cfg.steps + 1):
+        key = keys[(step - 1) % len(keys)]
+        value = _make_value(rng)
+
+        step_counter += 1
+        uid_set = _uid(rng, used_uids)
+        ledger.append(LedgerEntry(uid=uid_set, step=step_counter, op="SET", key=key, value=value))
+        state[key] = _parse_value(cfg.state_mode, value)
+        last_support[key] = uid_set
+        last_op[key] = "SET"
+        log_lines.append(f"- [{uid_set}] UPDATE step={step_counter} SET {key} = {value}")
+        add_line(f"BACKGROUND TAB: authoritative record says {key} = {value}.")
+
+        decoy_value = _make_near_miss_value(value=value, rng=rng)
+        if decoy_value == value:
+            decoy_value = _make_value(rng)
+        step_counter += 1
+        uid_note = _uid(rng, used_uids)
+        ledger.append(LedgerEntry(uid=uid_note, step=step_counter, op="NOTE", key=key, value=decoy_value))
+        log_lines.append(f"- [{uid_note}] UPDATE step={step_counter} NOTE {key} = {decoy_value}")
+        add_line(f"ACTIVE TAB: latest note claims {key} = {decoy_value} (non-authoritative).")
+
+    chapter_texts = ["\n".join(lines).strip() for lines in chapters]
+    book = render_book(
+        title=f"GoldEvidenceBench Episode {episode_id}",
+        chapters=chapter_texts,
+        glossary=glossary,
+        ledger=ledger,
+    )
+    episode_log = "\n".join(log_lines).rstrip() + "\n"
+    stats = _compute_recency_stats(log_lines, keys)
+
+    query_rows: list[dict[str, Any]] = []
+    for q in range(cfg.queries):
+        qid = f"{episode_id}-Q{q+1:03d}"
+        key = keys[q % len(keys)]
+        value, support_ids = _answer_from_state(
+            state_mode=cfg.state_mode,
+            state=state,
+            last_support=last_support,
+            last_op=last_op,
+            key=key,
+            query_type="direct",
+            derived_op=None,
+            derived_manager=None,
+        )
+        support_id = support_ids[0] if len(support_ids) == 1 else None
+        question = (
+            f"Question {qid}: What is the current value of {key}? "
+            "Use the background tab ledger; ignore active-tab notes."
+        )
+        if cfg.require_citations:
+            question = (
+                f"{question}\n"
+                "Return JSON with keys: value, support_ids.\n"
+                "support_ids must be a list (max 3) of UPDATE IDs that establish the answer (e.g., [\"U0007\"])."
+            )
+
+        key_stats = stats.get(key, {})
+        query_rows.append(
+            {
+                "id": qid,
+                "episode_id": episode_id,
+                "schema_version": "0.1",
+                "document": episode_log,
+                "book": book,
+                "question": question,
+                "gold": {"value": value, "support_id": support_id, "support_ids": support_ids},
+                "meta": {
+                    "seed": seed,
+                    "steps": cfg.steps,
+                    "requires_citation": cfg.require_citations,
+                    "key": key,
+                    "q_index": q + 1,
+                    "state_mode": cfg.state_mode,
+                    "query_type": "direct",
+                    "derived_op": None,
+                    "derived_manager": None,
+                    "has_instruction": False,
+                    "instruction_value": None,
+                    "instruction_variant": None,
+                    "last_update_step": key_stats.get("last_update_step"),
+                    "tokens_since_update": key_stats.get("tokens_since_update"),
+                    "distractors_since_update": key_stats.get("distractors_since_update"),
+                    "writes_to_key": key_stats.get("writes_to_key"),
+                    "instruction_nearby": key_stats.get("instruction_nearby"),
+                },
+            }
+        )
+
+    return {
+        "episode_id": episode_id,
+        "seed": seed,
+        "config": asdict(cfg),
+        "rows": query_rows,
+    }
+
+
+def _generate_focus_drift_episode(*, seed: int, episode_id: str, cfg: EpisodeConfig) -> dict[str, Any]:
+    rng = random.Random(seed)
+    keys = [_make_key(i) for i in range(cfg.keys)]
+    glossary = {k: f"Synthetic tag {k} used for state-tracking." for k in keys}
+
+    state: dict[str, Any] = _init_state(cfg, keys)
+    last_support: dict[str, str | None] = {k: None for k in keys}
+    last_op: dict[str, str] = {k: "CLEAR" for k in keys}
+    last_values: dict[str, str] = {}
+
+    ledger: list[LedgerEntry] = []
+    chapters: list[list[str]] = [[]]
+    used_uids: set[str] = set()
+    log_lines: list[str] = []
+    step_counter = 0
+
+    log_lines.append(f"# GoldEvidenceBench Episode {episode_id}")
+    log_lines.append("")
+    log_lines.append("## Episode Log")
+
+    def add_line(line: str) -> None:
+        chapters[-1].append(line)
+
+    for step in range(1, cfg.steps + 1):
+        key = keys[(step - 1) % len(keys)]
+        value = _make_value(rng)
+
+        step_counter += 1
+        uid_set = _uid(rng, used_uids)
+        ledger.append(LedgerEntry(uid=uid_set, step=step_counter, op="SET", key=key, value=value))
+        state[key] = _parse_value(cfg.state_mode, value)
+        last_support[key] = uid_set
+        last_op[key] = "SET"
+        last_values[key] = value
+        log_lines.append(f"- [{uid_set}] UPDATE step={step_counter} SET {key} = {value}")
+        add_line(f"BACKGROUND TAB: authoritative record says {key} = {value}.")
+
+        sibling_key = keys[(step) % len(keys)]
+        decoy_value = last_values.get(sibling_key)
+        if not decoy_value:
+            decoy_value = _make_near_miss_value(value=value, rng=rng)
+        step_counter += 1
+        uid_note = _uid(rng, used_uids)
+        ledger.append(LedgerEntry(uid=uid_note, step=step_counter, op="NOTE", key=key, value=decoy_value))
+        log_lines.append(f"- [{uid_note}] UPDATE step={step_counter} NOTE {key} = {decoy_value}")
+        add_line(
+            f"FOCUS SHIFT: cursor moved to {sibling_key}; note echoes {decoy_value} (non-authoritative)."
+        )
+
+    chapter_texts = ["\n".join(lines).strip() for lines in chapters]
+    book = render_book(
+        title=f"GoldEvidenceBench Episode {episode_id}",
+        chapters=chapter_texts,
+        glossary=glossary,
+        ledger=ledger,
+    )
+    episode_log = "\n".join(log_lines).rstrip() + "\n"
+    stats = _compute_recency_stats(log_lines, keys)
+
+    query_rows: list[dict[str, Any]] = []
+    for q in range(cfg.queries):
+        qid = f"{episode_id}-Q{q+1:03d}"
+        key = keys[q % len(keys)]
+        value, support_ids = _answer_from_state(
+            state_mode=cfg.state_mode,
+            state=state,
+            last_support=last_support,
+            last_op=last_op,
+            key=key,
+            query_type="direct",
+            derived_op=None,
+            derived_manager=None,
+        )
+        support_id = support_ids[0] if len(support_ids) == 1 else None
+        question = (
+            f"Question {qid}: What is the current value of {key}? "
+            "Ignore focus-shift notes and use the authoritative ledger."
+        )
+        if cfg.require_citations:
+            question = (
+                f"{question}\n"
+                "Return JSON with keys: value, support_ids.\n"
+                "support_ids must be a list (max 3) of UPDATE IDs that establish the answer (e.g., [\"U0007\"])."
+            )
+
+        key_stats = stats.get(key, {})
+        query_rows.append(
+            {
+                "id": qid,
+                "episode_id": episode_id,
+                "schema_version": "0.1",
+                "document": episode_log,
+                "book": book,
+                "question": question,
+                "gold": {"value": value, "support_id": support_id, "support_ids": support_ids},
+                "meta": {
+                    "seed": seed,
+                    "steps": cfg.steps,
+                    "requires_citation": cfg.require_citations,
+                    "key": key,
+                    "q_index": q + 1,
+                    "state_mode": cfg.state_mode,
+                    "query_type": "direct",
+                    "derived_op": None,
+                    "derived_manager": None,
+                    "has_instruction": False,
+                    "instruction_value": None,
+                    "instruction_variant": None,
+                    "last_update_step": key_stats.get("last_update_step"),
+                    "tokens_since_update": key_stats.get("tokens_since_update"),
+                    "distractors_since_update": key_stats.get("distractors_since_update"),
+                    "writes_to_key": key_stats.get("writes_to_key"),
+                    "instruction_nearby": key_stats.get("instruction_nearby"),
+                },
+            }
+        )
+
+    return {
+        "episode_id": episode_id,
+        "seed": seed,
+        "config": asdict(cfg),
+        "rows": query_rows,
+    }
+
+
 def generate_episode(*, seed: int, episode_id: str, cfg: EpisodeConfig) -> dict[str, Any]:
+    if cfg.distractor_profile == "stale_tab_state":
+        return _generate_stale_tab_state_episode(seed=seed, episode_id=episode_id, cfg=cfg)
+    if cfg.distractor_profile == "focus_drift":
+        return _generate_focus_drift_episode(seed=seed, episode_id=episode_id, cfg=cfg)
     rng = random.Random(seed)
     keys = [_make_key(i) for i in range(cfg.keys)]
     glossary = {k: f"Synthetic tag {k} used for state-tracking." for k in keys}

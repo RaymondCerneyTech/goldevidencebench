@@ -1,7 +1,7 @@
 param(
     [string]$OutRoot = "",
     [int]$Seeds = 10,
-    [string]$HoldoutName = "local_optimum_blocking_modal_required",
+    [string]$HoldoutName = "local_optimum_blocking_modal_unmentioned_blocked",
     [int]$FuzzVariants = 0,
     [int]$FuzzSeed = 0
 )
@@ -69,6 +69,21 @@ $variants = @(
         Observed = "data\\ui_minipilot_local_optimum_tab_state_reset_observed_ok.jsonl"
     },
     @{
+        Name = "local_optimum_delayed"
+        Fixture = "data\\ui_minipilot_local_optimum_delayed_fixture.jsonl"
+        Observed = "data\\ui_minipilot_local_optimum_delayed_observed_ok.jsonl"
+    },
+    @{
+        Name = "local_optimum_stale_tab_state"
+        Fixture = "data\\ui_minipilot_local_optimum_stale_tab_state_fixture.jsonl"
+        Observed = "data\\ui_minipilot_local_optimum_stale_tab_state_observed_ok.jsonl"
+    },
+    @{
+        Name = "local_optimum_context_switch"
+        Fixture = "data\\ui_minipilot_local_optimum_context_switch_fixture.jsonl"
+        Observed = "data\\ui_minipilot_local_optimum_context_switch_observed_ok.jsonl"
+    },
+    @{
         Name = "local_optimum_form_validation"
         Fixture = "data\\ui_minipilot_local_optimum_form_validation_fixture.jsonl"
         Observed = "data\\ui_minipilot_local_optimum_form_validation_observed_ok.jsonl"
@@ -107,6 +122,11 @@ $variants = @(
         Name = "local_optimum_blocking_modal_unmentioned"
         Fixture = "data\\ui_minipilot_local_optimum_blocking_modal_unmentioned_fixture.jsonl"
         Observed = "data\\ui_minipilot_local_optimum_blocking_modal_unmentioned_observed_ok.jsonl"
+    },
+    @{
+        Name = "local_optimum_blocking_modal_unmentioned_blocked"
+        Fixture = "data\\ui_minipilot_local_optimum_blocking_modal_unmentioned_blocked_fixture.jsonl"
+        Observed = "data\\ui_minipilot_local_optimum_blocking_modal_unmentioned_blocked_observed_ok.jsonl"
     },
     @{
         Name = "local_optimum_blocking_modal_required"

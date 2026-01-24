@@ -7,7 +7,9 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
+from goldevidencebench import drift as drift_mod
 from goldevidencebench import grade as grade_mod
+from goldevidencebench import diagnosis as diagnosis_mod
 from goldevidencebench.baselines import parse_book_ledger, parse_model_json_answer, parse_updates
 from goldevidencebench.util import read_jsonl
 
@@ -341,6 +343,23 @@ def _pred_index(pred_rows: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
     return out
 
 
+def _infer_run_holdout(row: dict[str, Any]) -> str | None:
+    profile = row.get("distractor_profile")
+    if isinstance(profile, str) and profile in diagnosis_mod.HOLDOUT_NAMES:
+        return profile
+    cfg = row.get("config", {})
+    if isinstance(cfg, dict):
+        profile = cfg.get("distractor_profile")
+        if isinstance(profile, str) and profile in diagnosis_mod.HOLDOUT_NAMES:
+            return profile
+        profiles = cfg.get("distractor_profiles")
+        if isinstance(profiles, list) and len(profiles) == 1:
+            only = profiles[0]
+            if isinstance(only, str) and only in diagnosis_mod.HOLDOUT_NAMES:
+                return only
+    return None
+
+
 def _score_rows(
     *,
     data_rows: list[dict[str, Any]],
@@ -617,10 +636,16 @@ def main() -> int:
     abstain_total = 0
     abstain_on_missing = 0
     gold_missing_total = 0
+    drift_counts = drift_mod.DriftCounts()
     decomp_rows: list[dict[str, Any]] = []
+    drift_examples: list[dict[str, Any]] = []
+    holdout_names: set[str] = set()
 
     recency_rows = []
     for row in rows:
+        run_holdout = _infer_run_holdout(row)
+        if run_holdout:
+            holdout_names.add(run_holdout)
         data_path = row.get("data", {}).get("path")
         if not data_path:
             continue
@@ -685,6 +710,16 @@ def main() -> int:
                 if not rid:
                     continue
                 retrieval_by_id[rid] = stat
+        if run_holdout and len(drift_examples) < 3 and data_rows and pred_by_id and retrieval_by_id:
+            drift_examples.extend(
+                diagnosis_mod.build_drift_examples(
+                    data_rows=data_rows,
+                    pred_by_id=pred_by_id,
+                    retrieval_by_id=retrieval_by_id,
+                    holdout_name=run_holdout,
+                    max_examples=3 - len(drift_examples),
+                )
+            )
         cfg = row.get("config", {})
         require_citations = cfg.get("require_citations", True)
         citations = "auto" if require_citations else "off"
@@ -757,6 +792,14 @@ def main() -> int:
                     selected_spoof_total += 1
                     if diag.get("selected_spoofed") is True:
                         selected_spoof_ok += 1
+        if data_rows and pred_by_id and retrieval_by_id:
+            drift_counts.add(
+                drift_mod.compute_drift_counts(
+                    data_rows=data_rows,
+                    pred_by_id=pred_by_id,
+                    retrieval_by_id=retrieval_by_id,
+                )
+            )
         recency_rows.extend(
             _score_rows(
                 data_rows=data_rows,
@@ -840,6 +883,8 @@ def main() -> int:
             ),
             "writes_to_key": _summarize_bucket(recency_rows, field="writes_to_key", edges=writes_edges),
         }
+    if drift_counts.steps_total:
+        summary["drift"] = drift_counts.as_metrics()
 
     if flat:
         with args.out_csv.open("w", newline="", encoding="utf-8") as f:
@@ -852,7 +897,22 @@ def main() -> int:
             writer.writeheader()
             writer.writerows(decomp_rows)
     args.out_json.write_text(json.dumps(summary, indent=2), encoding="utf-8")
+    thresholds_path = Path("configs") / "diagnosis_thresholds.json"
+    thresholds = diagnosis_mod.load_thresholds(thresholds_path)
+    holdout_name = holdout_names.pop() if len(holdout_names) == 1 else None
+    diagnosis = diagnosis_mod.build_diagnosis(
+        summary=summary,
+        thresholds=thresholds,
+        thresholds_path=thresholds_path,
+        run_dir=args.out_json.parent,
+        holdout_name=holdout_name,
+        evidence_examples=drift_examples,
+    )
+    diagnosis_path = args.out_json.with_name("diagnosis.json")
+    diagnosis_mod.write_diagnosis(diagnosis_path, diagnosis)
     print(f"Wrote {args.out_csv} and {args.out_json}")
+    for line in diagnosis_mod.format_diagnosis_summary(diagnosis):
+        print(line)
     return 0
 
 

@@ -342,13 +342,13 @@ Quick preset takeaway: even a small reranker makes selection near-perfect in fas
 
 ## One command reproduces the headline
 
-Run one script, get one CSV, and compare the table below:
+Run one script, get one CSV, and compare the table below (latest_step only by default):
 
 ```powershell
 .\scripts\run_reference.ps1 -Preset standard -ModelPath "C:\AI\models\your-model.gguf"
 ```
 
-This writes `runs\summary_all.csv`. The "Report preset (s5q24)" table below is a direct copy of those rows.
+This writes `runs\summary_all.csv`. Add `-ComparePreferSetLatest` if you want prefer_set_latest rows in the same CSV. The "Report preset (s5q24)" table below is a direct copy of those rows.
 
 Headline takeaways:
 

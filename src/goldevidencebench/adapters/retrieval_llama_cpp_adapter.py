@@ -34,6 +34,7 @@ class RetrievalConfig:
     abstain_on_missing: bool = False
     rerank_mode: str = "none"  # none|latest_step|last_occurrence|prefer_set_latest|prefer_update_latest|linear
     selection_only: bool = False
+    selection_value: bool = False
     authority_filter: bool = False
     step_bucket: int = 1
     linear_tie_break: str = "none"
@@ -636,6 +637,7 @@ class RetrievalLlamaCppAdapter:
         copy_clamp_env = get_env("RETRIEVAL_COPY_CLAMP", "0").strip().lower()
         rerank_env = get_env("RETRIEVAL_RERANK", "none").strip().lower()
         selection_only_env = get_env("RETRIEVAL_SELECTOR_ONLY", "0").strip().lower()
+        selection_value_env = get_env("RETRIEVAL_SELECTOR_VALUE", "0").strip().lower()
         authority_filter_env = get_env("RETRIEVAL_AUTHORITY_FILTER", "0").strip().lower()
         abstain_env = get_env("RETRIEVAL_ABSTAIN_ON_MISSING", "0").strip().lower()
         linear_model_env = get_env("RETRIEVAL_LINEAR_MODEL", "").strip()
@@ -704,6 +706,7 @@ class RetrievalLlamaCppAdapter:
                 else "none"
             ),
             selection_only=selection_only_env in {"1", "true", "yes"},
+            selection_value=selection_value_env in {"1", "true", "yes"},
             authority_filter=authority_filter_env in {"1", "true", "yes"},
             step_bucket=step_bucket,
             linear_tie_break=linear_tie_break_env,
@@ -728,6 +731,7 @@ class RetrievalLlamaCppAdapter:
                 abstain_on_missing=self.cfg.abstain_on_missing,
                 rerank_mode=self.cfg.rerank_mode,
                 selection_only=True,
+                selection_value=self.cfg.selection_value,
                 authority_filter=self.cfg.authority_filter,
                 step_bucket=self.cfg.step_bucket,
                 linear_tie_break=self.cfg.linear_tie_break,
@@ -895,7 +899,14 @@ class RetrievalLlamaCppAdapter:
                 "selected_spoofed": selected_spoofed,
             }
         support_ids = [chosen["uid"]] if chosen else []
-        return {"value": "", "support_ids": support_ids}
+        if not self.cfg.selection_value:
+            return {"value": "", "support_ids": support_ids}
+        selected_value = None
+        if chosen is not None:
+            op = str(chosen.get("op", "")).upper()
+            if op != "CLEAR":
+                selected_value = chosen.get("value")
+        return {"value": selected_value, "support_ids": support_ids}
 
     def predict(self, row: dict[str, Any], *, protocol: str = "open_book") -> dict[str, Any]:
         if protocol != "closed_book":

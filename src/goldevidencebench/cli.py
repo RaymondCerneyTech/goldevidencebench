@@ -657,7 +657,18 @@ def build_parser() -> argparse.ArgumentParser:
     )
     g.add_argument(
         "--distractor-profile",
-        choices=["easy", "standard", "adversarial", "instruction", "instruction_suite", "note_camouflage", "note_camouflage_suite", "update_burst"],
+        choices=[
+            "easy",
+            "standard",
+            "adversarial",
+            "instruction",
+            "instruction_suite",
+            "note_camouflage",
+            "note_camouflage_suite",
+            "update_burst",
+            "stale_tab_state",
+            "focus_drift",
+        ],
         default="instruction",
         help="Adversarial adds stale-echo distractors; instruction injects spec-violating lines.",
     )

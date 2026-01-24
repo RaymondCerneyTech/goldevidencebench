@@ -23,7 +23,7 @@ param(
     [int]$VariantsFuzzVariants = 5,
     [int]$VariantsFuzzSeed = 0,
     [switch]$RotateHoldout,
-    [string]$HoldoutList = "local_optimum_section_path,local_optimum_section_path_conflict,local_optimum_blocking_modal_detour,local_optimum_tab_detour,local_optimum_disabled_primary,local_optimum_toolbar_vs_menu,local_optimum_confirm_then_apply,local_optimum_tab_state_reset,local_optimum_form_validation,local_optimum_window_focus,local_optimum_panel_toggle,local_optimum_accessibility_label,local_optimum_blocking_modal_required,local_optimum_blocking_modal_permission,local_optimum_blocking_modal_consent,local_optimum_blocking_modal_unmentioned,local_optimum_blocking_modal,local_optimum_overlay,local_optimum_primary,local_optimum_delayed_solvable,local_optimum_role_mismatch,local_optimum_role_conflict,local_optimum_destructive_confirm,local_optimum_blocking_modal_unprompted_confirm",
+    [string]$HoldoutList = "local_optimum_section_path,local_optimum_section_path_conflict,local_optimum_blocking_modal_detour,local_optimum_tab_detour,local_optimum_disabled_primary,local_optimum_toolbar_vs_menu,local_optimum_confirm_then_apply,local_optimum_tab_state_reset,local_optimum_context_switch,local_optimum_stale_tab_state,local_optimum_form_validation,local_optimum_window_focus,local_optimum_panel_toggle,local_optimum_accessibility_label,local_optimum_blocking_modal_required,local_optimum_blocking_modal_permission,local_optimum_blocking_modal_consent,local_optimum_blocking_modal_unmentioned,local_optimum_blocking_modal_unmentioned_blocked,local_optimum_blocking_modal,local_optimum_overlay,local_optimum_primary,local_optimum_delayed_solvable,local_optimum_role_mismatch,local_optimum_role_conflict,local_optimum_destructive_confirm,local_optimum_blocking_modal_unprompted_confirm",
     [switch]$SkipVariants,
     [switch]$CheckThresholds,
     [switch]$DumpGateArtifactsOnFail
@@ -115,6 +115,10 @@ Write-Host "Running UI local-optimum blocking modal unmentioned ambiguous baseli
 python .\scripts\run_ui_search_baseline.py --fixture .\data\ui_minipilot_local_optimum_blocking_modal_unmentioned_ambiguous_fixture.jsonl `
     --observed .\data\ui_minipilot_local_optimum_blocking_modal_unmentioned_ambiguous_observed_ok.jsonl `
     --out .\runs\ui_minipilot_local_optimum_blocking_modal_unmentioned_ambiguous_search.json
+Write-Host "Running UI local-optimum blocking modal unmentioned blocked ambiguous baseline..."
+python .\scripts\run_ui_search_baseline.py --fixture .\data\ui_minipilot_local_optimum_blocking_modal_unmentioned_blocked_ambiguous_fixture.jsonl `
+    --observed .\data\ui_minipilot_local_optimum_blocking_modal_unmentioned_blocked_ambiguous_observed_ok.jsonl `
+    --out .\runs\ui_minipilot_local_optimum_blocking_modal_unmentioned_blocked_ambiguous_search.json
 
 Write-Host "Running UI local-optimum blocking modal required ambiguous baseline..."
 python .\scripts\run_ui_search_baseline.py --fixture .\data\ui_minipilot_local_optimum_blocking_modal_required_ambiguous_fixture.jsonl `
@@ -146,6 +150,14 @@ Write-Host "Running UI local-optimum tab state reset ambiguous baseline..."
 python .\scripts\run_ui_search_baseline.py --fixture .\data\ui_minipilot_local_optimum_tab_state_reset_ambiguous_fixture.jsonl `
     --observed .\data\ui_minipilot_local_optimum_tab_state_reset_ambiguous_observed_ok.jsonl `
     --out .\runs\ui_minipilot_local_optimum_tab_state_reset_ambiguous_search.json
+Write-Host "Running UI local-optimum context switch ambiguous baseline..."
+python .\scripts\run_ui_search_baseline.py --fixture .\data\ui_minipilot_local_optimum_context_switch_ambiguous_fixture.jsonl `
+    --observed .\data\ui_minipilot_local_optimum_context_switch_ambiguous_observed_ok.jsonl `
+    --out .\runs\ui_minipilot_local_optimum_context_switch_ambiguous_search.json
+Write-Host "Running UI local-optimum stale tab state ambiguous baseline..."
+python .\scripts\run_ui_search_baseline.py --fixture .\data\ui_minipilot_local_optimum_stale_tab_state_ambiguous_fixture.jsonl `
+    --observed .\data\ui_minipilot_local_optimum_stale_tab_state_ambiguous_observed_ok.jsonl `
+    --out .\runs\ui_minipilot_local_optimum_stale_tab_state_ambiguous_search.json
 Write-Host "Running UI local-optimum form validation ambiguous baseline..."
 python .\scripts\run_ui_search_baseline.py --fixture .\data\ui_minipilot_local_optimum_form_validation_ambiguous_fixture.jsonl `
     --observed .\data\ui_minipilot_local_optimum_form_validation_ambiguous_observed_ok.jsonl `
@@ -287,6 +299,11 @@ if ($CheckThresholds) {
                 Baseline = "runs\\ui_minipilot_local_optimum_blocking_modal_unmentioned_ambiguous_search.json"
             }
             @{
+                Name = "local_optimum_blocking_modal_unmentioned_blocked_ambiguous"
+                Fixture = "data\\ui_minipilot_local_optimum_blocking_modal_unmentioned_blocked_ambiguous_fixture.jsonl"
+                Baseline = "runs\\ui_minipilot_local_optimum_blocking_modal_unmentioned_blocked_ambiguous_search.json"
+            }
+            @{
                 Name = "local_optimum_blocking_modal_required_ambiguous"
                 Fixture = "data\\ui_minipilot_local_optimum_blocking_modal_required_ambiguous_fixture.jsonl"
                 Baseline = "runs\\ui_minipilot_local_optimum_blocking_modal_required_ambiguous_search.json"
@@ -320,6 +337,16 @@ if ($CheckThresholds) {
                 Name = "local_optimum_tab_state_reset_ambiguous"
                 Fixture = "data\\ui_minipilot_local_optimum_tab_state_reset_ambiguous_fixture.jsonl"
                 Baseline = "runs\\ui_minipilot_local_optimum_tab_state_reset_ambiguous_search.json"
+            }
+            @{
+                Name = "local_optimum_context_switch_ambiguous"
+                Fixture = "data\\ui_minipilot_local_optimum_context_switch_ambiguous_fixture.jsonl"
+                Baseline = "runs\\ui_minipilot_local_optimum_context_switch_ambiguous_search.json"
+            }
+            @{
+                Name = "local_optimum_stale_tab_state_ambiguous"
+                Fixture = "data\\ui_minipilot_local_optimum_stale_tab_state_ambiguous_fixture.jsonl"
+                Baseline = "runs\\ui_minipilot_local_optimum_stale_tab_state_ambiguous_search.json"
             }
             @{
                 Name = "local_optimum_form_validation_ambiguous"

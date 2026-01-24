@@ -10,6 +10,7 @@ Use `scripts/next_trap_family.ps1` to pick the next backlog item to implement.
 - local_optimum_blocking_modal
 - local_optimum_blocking_modal_detour
 - local_optimum_blocking_modal_unmentioned
+- local_optimum_blocking_modal_unmentioned_blocked
 - local_optimum_blocking_modal_required
 - local_optimum_blocking_modal_permission
 - local_optimum_blocking_modal_consent
@@ -29,6 +30,8 @@ Use `scripts/next_trap_family.ps1` to pick the next backlog item to implement.
 - local_optimum_toolbar_vs_menu
 - local_optimum_confirm_then_apply
 - local_optimum_tab_state_reset
+- local_optimum_stale_tab_state
+- local_optimum_context_switch
 - local_optimum_form_validation
 - local_optimum_window_focus
 
@@ -36,6 +39,7 @@ Ambiguity-only companions (abstain_expected):
 
 - local_optimum_delayed_ambiguous
 - local_optimum_blocking_modal_unmentioned_ambiguous
+- local_optimum_blocking_modal_unmentioned_blocked_ambiguous
 - local_optimum_blocking_modal_required_ambiguous
 - local_optimum_blocking_modal_permission_ambiguous
 - local_optimum_blocking_modal_consent_ambiguous
@@ -51,6 +55,8 @@ Ambiguity-only companions (abstain_expected):
 - local_optimum_toolbar_vs_menu_ambiguous
 - local_optimum_confirm_then_apply_ambiguous
 - local_optimum_tab_state_reset_ambiguous
+- local_optimum_stale_tab_state_ambiguous
+- local_optimum_context_switch_ambiguous
 - local_optimum_form_validation_ambiguous
 - local_optimum_window_focus_ambiguous
 

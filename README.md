@@ -50,6 +50,8 @@ Headline metric: closed-book exact_acc with citations on (use value_acc when cit
 
 Preset standard runs with --require-citations.
 
+By default, `run_reference.ps1` runs the `latest_step` reranker only. Add `-ComparePreferSetLatest` if you want the `prefer_set_latest` comparison rows in the same CSV.
+
 2) Read the result table in `runs/summary_all.csv` (it matches the "Reference proof" section below).
 
 3) Takeaways: selection under ambiguity fails for LLM-only; a deterministic selector fixes it; learned selectors reduce but do not remove order bias.
@@ -57,6 +59,62 @@ Preset standard runs with --require-citations.
 Everything else in this README is an extension or deeper dive.
 
 If selection is the bottleneck, run `scripts/run_selector_only.ps1`; if gold_present is low, run the BM25/TF-IDF baselines to confirm retrieval issues.
+
+## Actionable Diagnosis (bottleneck-driven next step)
+
+At the end of a run, GoldEvidenceBench writes a machine-readable diagnosis that recommends the highest-leverage fix based on the bottleneck, not the smallest change.
+
+- Output: `diagnosis.json` is written next to `summary.json` in the run output folder.
+- Contents: `status` (PASS/FAIL/UNSTABLE), `primary_bottleneck`, `supporting_metrics`, and a top prescription.
+
+Example (any run that writes `summary.json` will also write `diagnosis.json`):
+
+```powershell
+.\scripts\run_reference.ps1 -Preset standard -ModelPath "C:\AI\models\your-model.gguf"
+```
+
+Interpretation: `primary_bottleneck` tells which contract is failing (retrieval, selection, authority, answering, instability, action_safety). Follow the prescription first; the second-best item is a fallback.
+Diagnosis is gate-consistent: for drift runs/holdouts, passing `drift.step_rate` (<= DRIFT_MAX) yields `status=PASS` unless a safety/authority violation is present.
+Holdout failures include a few `evidence_examples` with `why_type` (e.g., `commit_state`) plus committed vs expected values so you can see the exact failing decision.
+`diagnosis.json` includes `schema_version`, `run_dir`, `thresholds_version`, and (when applicable) `holdout_name` for traceability.
+
+## Drift gate (state divergence over long sequences)
+
+Drift measures how often the model's committed state lags the oracle across a long sequence even when gold evidence is present. It captures cumulative divergence (wrong belief persisting across steps), not just one-off selection errors.
+
+Quick drift wall sweep:
+
+```powershell
+.\scripts\run_drift_wall.ps1 -ModelPath "C:\AI\models\your-model.gguf"
+```
+
+Outputs are written under `runs\drift_wall_<timestamp>\` with a `summary.json` per step setting and a `drift_wall.json`. A latest snapshot is copied to `runs\drift_wall_latest\`.
+
+## Drift holdout: stale tab state
+
+The `stale_tab_state` holdout forces long sequences where the authoritative update is in a background tab, but a newer non-authoritative NOTE appears in the active tab. A latest-step selector will drift by committing the NOTE value and persisting the wrong belief.
+
+Quick holdout run:
+
+```powershell
+.\scripts\run_drift_holdouts.ps1 -ModelPath "C:\AI\models\your-model.gguf"
+```
+
+Outputs are written under `runs\drift_holdout_<timestamp>\` with `summary.json` and `diagnosis.json`. Inspect `summary.json` for `drift.step_rate` to confirm drift is observed.
+
+Second holdout (focus drift) with the same interface:
+
+```powershell
+.\scripts\run_drift_holdouts.ps1 -ModelPath "C:\AI\models\your-model.gguf" -HoldoutName focus_drift
+```
+
+Quick gate snapshot (for `check_thresholds.py` and regression canary/fix):
+
+```powershell
+.\scripts\run_drift_holdout_gate.ps1 -ModelPath "C:\AI\models\your-model.gguf"
+```
+
+This writes `runs\release_gates\drift_holdout_gate.json` and updates `runs\drift_holdout_latest\summary.json` for the `drift_holdout_gate` check. Use `scripts\run_release_check.ps1 -RunDriftHoldoutGate` to include it in release gating.
 
 ## Goal: a self-teaching gym for evidence selection
 
@@ -765,6 +823,10 @@ Score: rank by selection + robustness subject to cost.
 
 Decision quality here = satisfying gates + selecting the correct state update under confusers.
 
+## Individual "Why" Steps (DecisionPoints)
+
+Long tasks are chains of individual "why" steps. A "why step" is a DecisionPoint where the agent must choose among candidates (evidence, action, or state update) under constraints. GoldEvidenceBench grades between these whys to measure decision correctness, especially commit decisions, which prevents drift across long sequences.
+
 Recommended scoring rule: treat authority + attribution as preconditions when reporting accuracy (especially when citations are required).
 
 ## What counts as an oracle?
@@ -1090,6 +1152,8 @@ Stub assets (UI fixtures):
 - Mini pilot local-optimum confirm then apply observed: `data/ui_minipilot_local_optimum_confirm_then_apply_observed_ok.jsonl`
 - Mini pilot local-optimum tab state reset fixture: `data/ui_minipilot_local_optimum_tab_state_reset_fixture.jsonl`
 - Mini pilot local-optimum tab state reset observed: `data/ui_minipilot_local_optimum_tab_state_reset_observed_ok.jsonl`
+- Mini pilot local-optimum stale tab state fixture: `data/ui_minipilot_local_optimum_stale_tab_state_fixture.jsonl`
+- Mini pilot local-optimum stale tab state observed: `data/ui_minipilot_local_optimum_stale_tab_state_observed_ok.jsonl`
 - Mini pilot local-optimum form validation fixture: `data/ui_minipilot_local_optimum_form_validation_fixture.jsonl`
 - Mini pilot local-optimum form validation observed: `data/ui_minipilot_local_optimum_form_validation_observed_ok.jsonl`
 - Mini pilot local-optimum panel toggle fixture: `data/ui_minipilot_local_optimum_panel_toggle_fixture.jsonl`
@@ -1104,8 +1168,12 @@ Stub assets (UI fixtures):
 - Mini pilot local-optimum section path conflict observed: `data/ui_minipilot_local_optimum_section_path_conflict_observed_ok.jsonl`
 - Mini pilot local-optimum blocking modal unmentioned fixture: `data/ui_minipilot_local_optimum_blocking_modal_unmentioned_fixture.jsonl`
 - Mini pilot local-optimum blocking modal unmentioned observed: `data/ui_minipilot_local_optimum_blocking_modal_unmentioned_observed_ok.jsonl`
+- Mini pilot local-optimum blocking modal unmentioned blocked fixture: `data/ui_minipilot_local_optimum_blocking_modal_unmentioned_blocked_fixture.jsonl`
+- Mini pilot local-optimum blocking modal unmentioned blocked observed: `data/ui_minipilot_local_optimum_blocking_modal_unmentioned_blocked_observed_ok.jsonl`
 - Mini pilot local-optimum blocking modal unmentioned ambiguous fixture: `data/ui_minipilot_local_optimum_blocking_modal_unmentioned_ambiguous_fixture.jsonl`
 - Mini pilot local-optimum blocking modal unmentioned ambiguous observed: `data/ui_minipilot_local_optimum_blocking_modal_unmentioned_ambiguous_observed_ok.jsonl`
+- Mini pilot local-optimum blocking modal unmentioned blocked ambiguous fixture: `data/ui_minipilot_local_optimum_blocking_modal_unmentioned_blocked_ambiguous_fixture.jsonl`
+- Mini pilot local-optimum blocking modal unmentioned blocked ambiguous observed: `data/ui_minipilot_local_optimum_blocking_modal_unmentioned_blocked_ambiguous_observed_ok.jsonl`
 - Mini pilot local-optimum blocking modal required fixture: `data/ui_minipilot_local_optimum_blocking_modal_required_fixture.jsonl`
 - Mini pilot local-optimum blocking modal required observed: `data/ui_minipilot_local_optimum_blocking_modal_required_observed_ok.jsonl`
 - Mini pilot local-optimum blocking modal required ambiguous fixture: `data/ui_minipilot_local_optimum_blocking_modal_required_ambiguous_fixture.jsonl`
@@ -1130,6 +1198,8 @@ Stub assets (UI fixtures):
 - Mini pilot local-optimum confirm then apply ambiguous observed: `data/ui_minipilot_local_optimum_confirm_then_apply_ambiguous_observed_ok.jsonl`
 - Mini pilot local-optimum tab state reset ambiguous fixture: `data/ui_minipilot_local_optimum_tab_state_reset_ambiguous_fixture.jsonl`
 - Mini pilot local-optimum tab state reset ambiguous observed: `data/ui_minipilot_local_optimum_tab_state_reset_ambiguous_observed_ok.jsonl`
+- Mini pilot local-optimum stale tab state ambiguous fixture: `data/ui_minipilot_local_optimum_stale_tab_state_ambiguous_fixture.jsonl`
+- Mini pilot local-optimum stale tab state ambiguous observed: `data/ui_minipilot_local_optimum_stale_tab_state_ambiguous_observed_ok.jsonl`
 - Mini pilot local-optimum form validation ambiguous fixture: `data/ui_minipilot_local_optimum_form_validation_ambiguous_fixture.jsonl`
 - Mini pilot local-optimum form validation ambiguous observed: `data/ui_minipilot_local_optimum_form_validation_ambiguous_observed_ok.jsonl`
 - Mini pilot local-optimum checkbox gate ambiguous fixture: `data/ui_minipilot_local_optimum_checkbox_gate_ambiguous_fixture.jsonl`
@@ -1453,6 +1523,28 @@ python .\scripts\build_ui_sa_distillation_report.py --variants-dir .\runs\ui_loc
 The distillation report includes per-variant breakdowns (top decoy reasons, feature deltas, and SA
 telemetry) so you can see which variant is driving each rule.
 
+Holdout rotation (fixtures ∩ variants) runs every eligible holdout without touching release-gate artifacts:
+
+```powershell
+.\scripts\run_ui_local_optimum_rotations.ps1 -Seeds 10
+```
+
+Outputs are written under `runs\holdout_rotations_<timestamp>\`:
+- `rotation_index.json` / `rotation_index.csv` (per-holdout metrics + counts + warnings)
+- `coverage_report.json` (fixtures/variants mismatches)
+
+To limit the run, use `-IncludeHoldoutNames` (alias for `-HoldoutNames`):
+
+```powershell
+.\scripts\run_ui_local_optimum_rotations.ps1 -IncludeHoldoutNames local_optimum_context_switch,local_optimum_toolbar_vs_menu -Seeds 10
+```
+
+Strict hygiene (fail if any fixture/variant mismatch is detected), with optional planned gaps:
+
+```powershell
+.\scripts\run_ui_local_optimum_rotations.ps1 -Seeds 10 -Strict -AllowMissing local_optimum_delayed
+```
+
 Use the delayed ambiguous fixture for the abstain contract (abstain_expected):
 
 ```powershell
@@ -1467,6 +1559,14 @@ Blocking-modal unmentioned ambiguous fixture (abstain_expected):
 python .\scripts\run_ui_search_baseline.py --fixture .\data\ui_minipilot_local_optimum_blocking_modal_unmentioned_ambiguous_fixture.jsonl `
   --observed .\data\ui_minipilot_local_optimum_blocking_modal_unmentioned_ambiguous_observed_ok.jsonl `
   --out .\runs\ui_minipilot_local_optimum_blocking_modal_unmentioned_ambiguous_search.json
+```
+
+Blocking-modal unmentioned blocked ambiguous fixture (abstain_expected):
+
+```powershell
+python .\scripts\run_ui_search_baseline.py --fixture .\data\ui_minipilot_local_optimum_blocking_modal_unmentioned_blocked_ambiguous_fixture.jsonl `
+  --observed .\data\ui_minipilot_local_optimum_blocking_modal_unmentioned_blocked_ambiguous_observed_ok.jsonl `
+  --out .\runs\ui_minipilot_local_optimum_blocking_modal_unmentioned_blocked_ambiguous_search.json
 ```
 
 Blocking-modal required ambiguous fixture (abstain_expected):
@@ -1499,6 +1599,10 @@ python .\scripts\run_ui_search_baseline.py --fixture .\data\ui_minipilot_local_o
 python .\scripts\run_ui_search_baseline.py --fixture .\data\ui_minipilot_local_optimum_tab_state_reset_ambiguous_fixture.jsonl `
   --observed .\data\ui_minipilot_local_optimum_tab_state_reset_ambiguous_observed_ok.jsonl `
   --out .\runs\ui_minipilot_local_optimum_tab_state_reset_ambiguous_search.json
+
+python .\scripts\run_ui_search_baseline.py --fixture .\data\ui_minipilot_local_optimum_stale_tab_state_ambiguous_fixture.jsonl `
+  --observed .\data\ui_minipilot_local_optimum_stale_tab_state_ambiguous_observed_ok.jsonl `
+  --out .\runs\ui_minipilot_local_optimum_stale_tab_state_ambiguous_search.json
 
 python .\scripts\run_ui_search_baseline.py --fixture .\data\ui_minipilot_local_optimum_form_validation_ambiguous_fixture.jsonl `
   --observed .\data\ui_minipilot_local_optimum_form_validation_ambiguous_observed_ok.jsonl `
@@ -2618,9 +2722,9 @@ Speed: what actually dominates runtime
 
 ## Efficient testing workflow (fast -> slow)
 
-Reference system (baseline vs reranker in one command):
+Reference system (latest_step in one command):
 
-Expected output: `runs\summary_all.csv` with rows for selector_quick_none_k2/4/8 and selector_quick_latest_step_k2/4/8.
+Expected output: `runs\summary_all.csv` with rows for selector_quick_latest_step_k2/4/8. Add `-ComparePreferSetLatest` to include selector_quick_prefer_set_latest_k2/4/8.
 
 ```powershell
 .\scripts\run_reference.ps1 -Preset quick -ModelPath "C:\AI\models\your-model.gguf"
