@@ -2,7 +2,12 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
+import os
+import subprocess
+import sys
+from datetime import datetime, timezone
 from collections import defaultdict
 from pathlib import Path
 from typing import Any
@@ -10,8 +15,116 @@ from typing import Any
 from goldevidencebench import drift as drift_mod
 from goldevidencebench import grade as grade_mod
 from goldevidencebench import diagnosis as diagnosis_mod
+from goldevidencebench import compaction as compaction_mod
+from goldevidencebench import reporting as reporting_mod
+from goldevidencebench import thread_log as thread_log_mod
+from goldevidencebench import schema_validation
 from goldevidencebench.baselines import parse_book_ledger, parse_model_json_answer, parse_updates
 from goldevidencebench.util import read_jsonl
+
+
+def _iso_timestamp(ts: datetime | None = None) -> str:
+    now = ts or datetime.now(timezone.utc)
+    return now.isoformat()
+
+
+REPRO_ARTIFACT_VERSION = "1.0.0"
+
+
+def _model_fingerprint(model_path: str | None) -> dict[str, Any]:
+    if not model_path:
+        return {"path": None, "exists": False}
+    path = Path(model_path)
+    if not path.exists():
+        return {"path": model_path, "exists": False}
+    try:
+        stat = path.stat()
+    except OSError:
+        return {"path": model_path, "exists": False}
+    fingerprint: dict[str, Any] = {
+        "path": str(path),
+        "exists": True,
+        "size_bytes": stat.st_size,
+        "mtime": datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat(),
+    }
+    try:
+        with path.open("rb") as handle:
+            chunk = handle.read(1024 * 1024)
+        fingerprint["sha256_1mb"] = hashlib.sha256(chunk).hexdigest()
+    except OSError:
+        fingerprint["sha256_1mb"] = None
+    return fingerprint
+
+
+def _git_commit(repo_root: Path) -> str | None:
+    try:
+        commit = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"],
+            cwd=repo_root,
+            stderr=subprocess.DEVNULL,
+            text=True,
+        ).strip()
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    return commit or None
+
+
+def _build_repro_metadata(
+    rows: list[dict[str, Any]],
+    *,
+    input_path: Path,
+    out_json: Path,
+) -> dict[str, Any]:
+    first = rows[0] if rows else {}
+    env = first.get("env") or {}
+    config = first.get("config") or {}
+    data = first.get("data") or {}
+    stats = first.get("retrieval_stats") or []
+    first_stat = stats[0] if isinstance(stats, list) and stats else {}
+    rerank_mode = first_stat.get("rerank_mode") or env.get("GOLDEVIDENCEBENCH_RETRIEVAL_RERANK")
+    authority_raw = env.get("GOLDEVIDENCEBENCH_RETRIEVAL_AUTHORITY_FILTER", "0")
+    authority_enabled = str(authority_raw).lower() in {"1", "true", "yes"}
+    command_line = subprocess.list2cmdline([sys.executable, *sys.argv])
+
+    repo_root = Path(__file__).resolve().parents[1]
+    model_path = env.get("GOLDEVIDENCEBENCH_MODEL") or os.environ.get("GOLDEVIDENCEBENCH_MODEL")
+    return {
+        "schema_version": "1",
+        "artifact_version": REPRO_ARTIFACT_VERSION,
+        "generated_at": _iso_timestamp(),
+        "commands": [command_line],
+        "command_line": command_line,
+        "args": sys.argv[1:],
+        "baseline": first.get("baseline") or first.get("adapter"),
+        "adapter": first.get("adapter"),
+        "protocol": first.get("protocol"),
+        "state_mode": first.get("state_mode"),
+        "seed": first.get("seed"),
+        "steps": first.get("steps"),
+        "retrieval": {
+            "k": first_stat.get("k"),
+            "rerank_mode": rerank_mode,
+        },
+        "config": config,
+        "env": env,
+        "key_env": {
+            "GOLDEVIDENCEBENCH_MODEL": env.get("GOLDEVIDENCEBENCH_MODEL"),
+            "GOLDEVIDENCEBENCH_RETRIEVAL_RERANK": env.get("GOLDEVIDENCEBENCH_RETRIEVAL_RERANK"),
+            "GOLDEVIDENCEBENCH_RETRIEVAL_AUTHORITY_FILTER": env.get(
+                "GOLDEVIDENCEBENCH_RETRIEVAL_AUTHORITY_FILTER"
+            ),
+            "GOLDEVIDENCEBENCH_UI_GATE_MODELS": env.get("GOLDEVIDENCEBENCH_UI_GATE_MODELS"),
+            "GOLDEVIDENCEBENCH_UI_PRESELECT_RULES": env.get("GOLDEVIDENCEBENCH_UI_PRESELECT_RULES"),
+        },
+        "model": _model_fingerprint(model_path),
+        "git_commit": _git_commit(repo_root),
+        "config_paths": {
+            "combined_json": str(input_path),
+            "summary_json": str(out_json),
+            "data_path": data.get("path"),
+        },
+        "authority_mode": "filter_on" if authority_enabled else "filter_off",
+    }
 
 
 def _flatten(row: dict[str, Any]) -> dict[str, Any]:
@@ -162,6 +275,13 @@ def _bucket_label(value: int, edges: list[int]) -> str:
 def _parse_edges(raw: str | None, default: str) -> list[int]:
     text = raw if raw is not None else default
     return [int(s) for s in text.split(",") if s.strip()]
+
+
+def _relpath(path: Path, base: Path) -> str:
+    try:
+        return str(path.relative_to(base))
+    except ValueError:
+        return str(path)
 
 
 def _compute_decomposition(
@@ -640,6 +760,7 @@ def main() -> int:
     decomp_rows: list[dict[str, Any]] = []
     drift_examples: list[dict[str, Any]] = []
     holdout_names: set[str] = set()
+    context_keys: set[str] = set()
 
     recency_rows = []
     for row in rows:
@@ -653,6 +774,10 @@ def main() -> int:
         if not preds_path.exists():
             continue
         data_rows = list(read_jsonl(data_path))
+        for data_row in data_rows:
+            key = data_row.get("meta", {}).get("key")
+            if key:
+                context_keys.add(str(key))
         preds = list(read_jsonl(preds_path))
         pred_by_id = _pred_index(preds)
         retrieval_by_id: dict[str, dict[str, Any]] = {}
@@ -910,6 +1035,138 @@ def main() -> int:
     )
     diagnosis_path = args.out_json.with_name("diagnosis.json")
     diagnosis_mod.write_diagnosis(diagnosis_path, diagnosis)
+
+    run_dir = args.out_json.parent
+    if "release_gates" not in run_dir.parts:
+        repro_metadata = _build_repro_metadata(rows, input_path=args.input_path, out_json=args.out_json)
+        repro_path = run_dir / "repro_commands.json"
+        schema_validation.validate_or_raise(
+            repro_metadata,
+            schema_validation.schema_path("repro_commands.schema.json"),
+        )
+        repro_path.write_text(json.dumps(repro_metadata, indent=2, ensure_ascii=True), encoding="utf-8")
+
+        env = repro_metadata.get("env") or {}
+        authority_raw = env.get("GOLDEVIDENCEBENCH_RETRIEVAL_AUTHORITY_FILTER", "0")
+        authority_enabled = str(authority_raw).lower() in {"1", "true", "yes"}
+        rerank_mode = (repro_metadata.get("retrieval") or {}).get("rerank_mode")
+        ui_gate_models_raw = str(env.get("GOLDEVIDENCEBENCH_UI_GATE_MODELS", "")).strip().lower()
+        gates_enabled = {
+            "retrieval_authority_filter": authority_enabled,
+            "ui_gate_models": bool(ui_gate_models_raw) and ui_gate_models_raw not in {"0", "false", "no"},
+            "ui_preselect_rules": str(env.get("GOLDEVIDENCEBENCH_UI_PRESELECT_RULES", "0")).lower()
+            in {"1", "true", "yes"},
+        }
+        run_config = {
+            "baseline": repro_metadata.get("baseline"),
+            "adapter": repro_metadata.get("adapter"),
+            "protocol": repro_metadata.get("protocol"),
+            "state_mode": repro_metadata.get("state_mode"),
+            "seed": repro_metadata.get("seed"),
+            "steps": repro_metadata.get("steps"),
+            "retrieval": repro_metadata.get("retrieval"),
+            "config": repro_metadata.get("config"),
+            "env": repro_metadata.get("env"),
+            "data_path": (repro_metadata.get("config_paths") or {}).get("data_path"),
+        }
+        compact_path = run_dir / "compact_state.json"
+        report_path = run_dir / "report.md"
+        compact_state = compaction_mod.build_compact_state(
+            run_dir=run_dir,
+            summary=summary,
+            diagnosis=diagnosis,
+            context_keys=context_keys,
+            thresholds=thresholds,
+            report_path=report_path,
+            run_config=run_config,
+            gates_enabled=gates_enabled,
+            rerank_mode=rerank_mode,
+            authority_mode="filter_on" if authority_enabled else "filter_off",
+        )
+        compaction_mod.write_compact_state(compact_path, compact_state)
+        reporting_mod.generate_report(
+            summary_path=args.out_json,
+            diagnosis_path=diagnosis_path,
+            compact_state_path=compact_path,
+            out_path=report_path,
+            thresholds_path=thresholds_path,
+        )
+        thread_path = run_dir / "thread.jsonl"
+        input_ref = _relpath(args.input_path, run_dir)
+        thread_log_mod.append_event(
+            thread_path,
+            thread_log_mod.build_event(
+                run_id=run_dir.name or str(run_dir),
+                step=0,
+                event_type="plan",
+                inputs_ref=_relpath(repro_path, run_dir),
+                notes="start_marker",
+            ),
+        )
+        thread_log_mod.append_event(
+            thread_path,
+            thread_log_mod.build_event(
+                run_id=run_dir.name or str(run_dir),
+                step=1,
+                event_type="observation",
+                inputs_ref=input_ref,
+                outputs_ref=_relpath(args.out_json, run_dir),
+                notes="summary written",
+            ),
+        )
+        thread_log_mod.append_event(
+            thread_path,
+            thread_log_mod.build_event(
+                run_id=run_dir.name or str(run_dir),
+                step=2,
+                event_type="tool",
+                inputs_ref=_relpath(args.out_json, run_dir),
+                outputs_ref=_relpath(diagnosis_path, run_dir),
+                notes="diagnosis written",
+            ),
+        )
+        thread_log_mod.append_event(
+            thread_path,
+            thread_log_mod.build_event(
+                run_id=run_dir.name or str(run_dir),
+                step=3,
+                event_type="summary",
+                inputs_ref=_relpath(args.out_json, run_dir),
+                outputs_ref=_relpath(compact_path, run_dir),
+                notes="compact state snapshot",
+            ),
+        )
+        thread_log_mod.append_event(
+            thread_path,
+            thread_log_mod.build_event(
+                run_id=run_dir.name or str(run_dir),
+                step=4,
+                event_type="summary",
+                inputs_ref=_relpath(compact_path, run_dir),
+                outputs_ref=_relpath(report_path, run_dir),
+                notes="report generated",
+            ),
+        )
+        thread_log_mod.append_event(
+            thread_path,
+            thread_log_mod.build_event(
+                run_id=run_dir.name or str(run_dir),
+                step=5,
+                event_type="summary",
+                outputs_ref=_relpath(report_path, run_dir),
+                notes="end_marker",
+            ),
+        )
+        errors = compaction_mod.validate_compaction_artifacts(
+            run_dir=run_dir,
+            compact_state=compact_state,
+            thread_path=thread_path,
+            report_path=report_path,
+        )
+        if errors:
+            for error in errors:
+                print(f"Compaction invariant failed: {error}")
+            return 1
     print(f"Wrote {args.out_csv} and {args.out_json}")
     for line in diagnosis_mod.format_diagnosis_summary(diagnosis):
         print(line)
