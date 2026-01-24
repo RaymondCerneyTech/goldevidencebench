@@ -2,15 +2,23 @@
 
 GoldEvidenceBench (CLI: `goldevidencebench`) is a benchmark + harness for long-context state tracking. It generates synthetic episode logs with evolving state (kv/kv_commentary/counter/set/relational), distractors, and queries that require choosing the correct update under ambiguity. It decomposes failures (retrieval vs selection vs authority vs answering), adds safety gates, and emits reproducible artifacts.
 
+## Project goals
+
+- Make long-horizon state tracking measurable, reproducible, and gateable.
+- Separate retrieval vs selection vs authority vs answering failures for targeted fixes.
+- Provide safety-focused regression gates (drift, holdouts) that block unsafe commits.
+- Enable low-cost, model-agnostic evaluation and repeatable workflows.
+- Produce compact, auditable run artifacts that can resume without chat history.
+
 ## Current capabilities (short version)
 
-- Long-context state tracking benchmark with deterministic oracles.
-- Retrieval/selection decomposition and authority filtering.
-- Drift gate + holdouts for cumulative divergence.
-- Actionable Diagnosis with bottleneck prescriptions.
-- Thread log + compaction artifacts + report generator.
-- Safe UI demos (Notepad/Calculator/Form) and UI fixture gates.
+- Long-context state tracking benchmark with deterministic oracles and trap families.
+- Retrieval/selection decomposition with authority filtering and Actionable Diagnosis.
+- Drift gate + holdouts + rotation/coverage for cumulative divergence.
+- Thread log + compaction snapshots + report generator.
 - Health check, resume, and run-to-run diff.
+- Repro metadata + schema-validated artifacts.
+- Safe UI demos (Notepad/Calculator/Form) and UI fixture gates.
 
 ## Quickstart (recommended)
 
