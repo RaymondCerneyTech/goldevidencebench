@@ -1,0 +1,12 @@
+{
+  "profile": "ui_minipilot_traps",
+  "description": "Mini pilot traps (disabled primary, toast verify, tab switch, popup target, visibility, abstain, primary wording).",
+  "fixture_path": "data/ui_minipilot_traps_fixture.jsonl",
+  "metrics": [
+    "gold_present_rate",
+    "selection_rate",
+    "wrong_action_rate",
+    "post_action_verify_rate",
+    "abstain_rate"
+  ]
+}

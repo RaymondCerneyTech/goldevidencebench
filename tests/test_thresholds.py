@@ -1,4 +1,6 @@
 import json
+import subprocess
+import sys
 from pathlib import Path
 
 from goldevidencebench import thresholds
@@ -100,3 +102,35 @@ def test_evaluate_checks_skip_if(tmp_path: Path) -> None:
     issues, errors = thresholds.evaluate_checks(config, root=Path("."))
     assert errors == 0
     assert any(issue.status == "skipped" for issue in issues)
+
+
+def test_check_thresholds_out(tmp_path: Path) -> None:
+    summary_path = tmp_path / "summary.json"
+    summary_path.write_text(json.dumps({"overall": {"value_acc_mean": 0.9}}), encoding="utf-8")
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        json.dumps(
+            {
+                "checks": [
+                    {
+                        "id": "pass",
+                        "summary_path": str(summary_path),
+                        "metrics": [{"path": "overall.value_acc_mean", "min": 0.5}],
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    out_path = tmp_path / "issues.json"
+    script_path = Path(__file__).resolve().parents[1] / "scripts" / "check_thresholds.py"
+    result = subprocess.run(
+        [sys.executable, str(script_path), "--config", str(config_path), "--out", str(out_path)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(out_path.read_text(encoding="utf-8"))
+    assert isinstance(payload.get("issues"), list)
+    assert payload.get("error_count") == 0

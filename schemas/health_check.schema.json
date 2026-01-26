@@ -1,0 +1,38 @@
+{
+  "title": "HealthCheck",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "artifact_version",
+    "timestamp",
+    "run_dir",
+    "report_path",
+    "overall",
+    "checks_overall",
+    "report_overall",
+    "model"
+  ],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "artifact_version": { "type": "string" },
+    "timestamp": { "type": "string" },
+    "run_dir": { "type": "string" },
+    "report_path": { "type": "string" },
+    "overall": { "type": "string" },
+    "checks_overall": { "type": "string" },
+    "report_overall": { "type": "string" },
+    "model": {
+      "type": "object",
+      "required": ["path", "exists"],
+      "properties": {
+        "path": { "type": ["string", "null"] },
+        "exists": { "type": "boolean" },
+        "size_bytes": { "type": ["number", "null"] },
+        "mtime": { "type": ["string", "null"] },
+        "sha256_1mb": { "type": ["string", "null"] }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

@@ -1,0 +1,8 @@
+cff-version: 1.2.0
+title: GoldEvidenceBench
+message: If you use this software, please cite it as below.
+type: software
+authors:
+  - name: GoldEvidenceBench contributors
+license: MIT
+date-released: 2026-01-26

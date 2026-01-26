@@ -37,6 +37,14 @@ def _compare(value: float, threshold: float, comparator: str) -> bool:
     return False
 
 
+def _format_plain(value: Any) -> str:
+    if value is None:
+        return "n/a"
+    if isinstance(value, float):
+        return f"{value:.4f}"
+    return str(value)
+
+
 def _metric_rows(
     supporting: dict[str, Any],
     thresholds: dict[str, float],

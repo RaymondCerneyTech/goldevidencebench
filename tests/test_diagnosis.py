@@ -164,3 +164,4 @@ def test_drift_examples_populated():
     )
     assert examples
     assert examples[0]["why_type"] == "commit_state"
+

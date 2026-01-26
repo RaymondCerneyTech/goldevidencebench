@@ -48,7 +48,7 @@ Correct evidence is Update 2 (99 Pine Ave). The NOTE is contextual but not autho
 1) Run one command to reproduce the headline:
 
 ```powershell
-.\scripts\run_reference.ps1 -Preset standard -ModelPath "C:\AI\models\your-model.gguf"
+.\scripts\run_reference.ps1 -Preset standard -ModelPath "<MODEL_PATH>"
 ```
 
 Headline metric: closed-book exact_acc with citations on (use value_acc when citations are off for quick iteration).
@@ -75,7 +75,7 @@ At the end of a run, GoldEvidenceBench writes a machine-readable diagnosis that 
 Example (any run that writes `summary.json` will also write `diagnosis.json`):
 
 ```powershell
-.\scripts\run_reference.ps1 -Preset standard -ModelPath "C:\AI\models\your-model.gguf"
+.\scripts\run_reference.ps1 -Preset standard -ModelPath "<MODEL_PATH>"
 ```
 
 Interpretation: `primary_bottleneck` tells which contract is failing (retrieval, selection, authority, answering, instability, action_safety). Follow the prescription first; the second-best item is a fallback.
@@ -105,14 +105,14 @@ Resume from a prior run's compact state (copies summary/diagnosis, regenerates r
 ```powershell
 .\scripts\resume_run.ps1 -RunDir .\runs\your_run_dir
 .\\scripts\\resume_run.ps1 -Latest
-.\scripts\resume_run.ps1 -RunDir .\runs\your_run_dir -RunDriftGate -ModelPath "C:\AI\models\your-model.gguf"
-.\\scripts\\resume_run.ps1 -Latest -RunDriftGate -ModelPath "C:\AI\models\your-model.gguf"
+.\scripts\resume_run.ps1 -RunDir .\runs\your_run_dir -RunDriftGate -ModelPath "<MODEL_PATH>"
+.\\scripts\\resume_run.ps1 -Latest -RunDriftGate -ModelPath "<MODEL_PATH>"
 ```
 
 One-button health check (resume + drift gate):
 
 ```powershell
-.\scripts\run_health_check.ps1 -ModelPath "C:\AI\models\your-model.gguf"
+.\scripts\run_health_check.ps1 -ModelPath "<MODEL_PATH>"
 ```
 
 The health check writes `health_check.json` next to the resumed run and exits non-zero on FAIL/WARN so it can be used in scripts/CI.
@@ -172,7 +172,7 @@ Drift measures how often the model's committed state lags the oracle across a lo
 Quick drift wall sweep:
 
 ```powershell
-.\scripts\run_drift_wall.ps1 -ModelPath "C:\AI\models\your-model.gguf"
+.\scripts\run_drift_wall.ps1 -ModelPath "<MODEL_PATH>"
 ```
 
 Outputs are written under `runs\drift_wall_<timestamp>\` with a `summary.json` per step setting and a `drift_wall.json`. A latest snapshot is copied to `runs\drift_wall_latest\`.
@@ -184,7 +184,7 @@ The `stale_tab_state` holdout forces long sequences where the authoritative upda
 Quick holdout run:
 
 ```powershell
-.\scripts\run_drift_holdouts.ps1 -ModelPath "C:\AI\models\your-model.gguf"
+.\scripts\run_drift_holdouts.ps1 -ModelPath "<MODEL_PATH>"
 ```
 
 Outputs are written under `runs\drift_holdout_<timestamp>\` with `summary.json` and `diagnosis.json`. Inspect `summary.json` for `drift.step_rate` to confirm drift is observed.
@@ -192,13 +192,13 @@ Outputs are written under `runs\drift_holdout_<timestamp>\` with `summary.json` 
 Second holdout (focus drift) with the same interface:
 
 ```powershell
-.\scripts\run_drift_holdouts.ps1 -ModelPath "C:\AI\models\your-model.gguf" -HoldoutName focus_drift
+.\scripts\run_drift_holdouts.ps1 -ModelPath "<MODEL_PATH>" -HoldoutName focus_drift
 ```
 
 Quick gate snapshot (for `check_thresholds.py` and regression canary/fix):
 
 ```powershell
-.\scripts\run_drift_holdout_gate.ps1 -ModelPath "C:\AI\models\your-model.gguf"
+.\scripts\run_drift_holdout_gate.ps1 -ModelPath "<MODEL_PATH>"
 ```
 
 This writes `runs\release_gates\drift_holdout_gate.json` and updates `runs\drift_holdout_latest\summary.json` for the `drift_holdout_gate` check. Use `scripts\run_release_check.ps1 -RunDriftHoldoutGate` to include it in release gating.
@@ -1048,13 +1048,13 @@ Canonical wall sweep commands (frozen):
 ```powershell
 # Stress regime (full pipeline, linear + step_bucket=10 + k=16)
 .\scripts\run_update_burst_full_linear_bucket10.ps1 `
-  -ModelPath "C:\AI\models\your-model.gguf" `
+  -ModelPath "<MODEL_PATH>" `
   -OutRoot "runs\wall_update_burst_full_linear_bucket10_20260104_180252" `
   -Rates 0.205,0.209,0.22,0.24
 
 # Pin sweep (same regime, lower rates)
 .\scripts\run_update_burst_full_linear_bucket10.ps1 `
-  -ModelPath "C:\AI\models\your-model.gguf" `
+  -ModelPath "<MODEL_PATH>" `
   -OutRoot "runs\wall_update_burst_full_linear_bucket10_pin_20260104_180252" `
   -Rates 0.18,0.19,0.195,0.20 `
   -FindWall:$true
@@ -1395,7 +1395,7 @@ This writes `runs/ui_minipilot_notepad_wrong_directory_detour_search.json`.
 Mini pilot notepad live demo (drives Notepad with SendKeys):
 
 ```powershell
-.\scripts\run_notepad_demo.ps1 -ModelPath "C:\AI\models\qwen2.5-7b-instruct-q5_k_m-00001-of-00002.gguf" `
+.\scripts\run_notepad_demo.ps1 -ModelPath "<MODEL_PATH>" `
     -Text "Hello from GoldEvidenceBench." -FilePath "$env:TEMP\notes.txt"
   ```
 
@@ -1407,7 +1407,7 @@ Mini pilot notepad live demo (drives Notepad with SendKeys):
   ```powershell
   $env:GOLDEVIDENCEBENCH_UI_GATE_MODELS=".\configs\ui_gate_models.json"
   $env:GOLDEVIDENCEBENCH_UI_PRESELECT_RULES="1"
-  .\scripts\run_notepad_demo.ps1 -ModelPath "C:\AI\models\qwen2.5-7b-instruct-q5_k_m-00001-of-00002.gguf" `
+  .\scripts\run_notepad_demo.ps1 -ModelPath "<MODEL_PATH>" `
       -Text "Hello from GoldEvidenceBench." -FilePath "$env:USERPROFILE\Desktop\notes.txt" `
       -OnExistingFile rename -InputMode type -VerifySaved -CloseAfterSave
   ```
@@ -1415,14 +1415,14 @@ Mini pilot notepad live demo (drives Notepad with SendKeys):
   Prompt runner (routes a natural-language task to a preset in `configs/demo_presets.json`):
 
   ```powershell
-  .\scripts\run_demo.ps1 -ModelPath "C:\AI\models\qwen2.5-7b-instruct-q5_k_m-00001-of-00002.gguf" `
+  .\scripts\run_demo.ps1 -ModelPath "<MODEL_PATH>" `
       -Task "Open Notepad and write a note"
   ```
 
   Multi-app demo (Notepad then Calculator):
 
   ```powershell
-  .\scripts\run_demo.ps1 -ModelPath "C:\AI\models\qwen2.5-7b-instruct-q5_k_m-00001-of-00002.gguf" `
+  .\scripts\run_demo.ps1 -ModelPath "<MODEL_PATH>" `
       -Task "Write a note and compute 12+34"
   ```
 
@@ -1432,7 +1432,7 @@ Mini pilot notepad live demo (drives Notepad with SendKeys):
   Live practice form demo (fills fields, saves, verifies):
 
   ```powershell
-  .\scripts\run_demo.ps1 -ModelPath "C:\AI\models\qwen2.5-7b-instruct-q5_k_m-00001-of-00002.gguf" `
+  .\scripts\run_demo.ps1 -ModelPath "<MODEL_PATH>" `
       -Task "Fill the login form"
   ```
   If the form window doesn't activate automatically, click the form once and the script will proceed.
@@ -1440,21 +1440,21 @@ Mini pilot notepad live demo (drives Notepad with SendKeys):
   Fixture-only form stub:
 
   ```powershell
-  .\scripts\run_demo.ps1 -ModelPath "C:\AI\models\qwen2.5-7b-instruct-q5_k_m-00001-of-00002.gguf" `
+  .\scripts\run_demo.ps1 -ModelPath "<MODEL_PATH>" `
       -Preset form_stub
   ```
 
   Fixture-only table demo (gate + stub, no real UI):
 
   ```powershell
-  .\scripts\run_demo.ps1 -ModelPath "C:\AI\models\qwen2.5-7b-instruct-q5_k_m-00001-of-00002.gguf" `
+  .\scripts\run_demo.ps1 -ModelPath "<MODEL_PATH>" `
       -Task "Export the table"
   ```
 
   Live Calculator demo (copy/verify result):
 
   ```powershell
-  .\scripts\run_demo.ps1 -ModelPath "C:\AI\models\qwen2.5-7b-instruct-q5_k_m-00001-of-00002.gguf" `
+  .\scripts\run_demo.ps1 -ModelPath "<MODEL_PATH>" `
       -Task "Compute 12+34"
   ```
   The keystroke gate runs by default to validate the expression. Use `-DisableKeystrokeGate` or adjust `-MaxExpressionLength`.
@@ -1766,7 +1766,7 @@ python .\scripts\run_ui_adapter_stub.py --fixture .\data\ui_same_label_fixture.j
 Run the UI Llama adapter (candidate selection from row fields):
 
 ```powershell
-$env:GOLDEVIDENCEBENCH_MODEL = "C:\AI\models\qwen2.5-7b-instruct-q5_k_m-00001-of-00002.gguf"
+$env:GOLDEVIDENCEBENCH_MODEL = "<MODEL_PATH>"
 goldevidencebench ui-score --adapter goldevidencebench.adapters.ui_llama_cpp_adapter:create_adapter `
   --fixture .\data\ui_same_label_fixture.jsonl --out .\runs\ui_same_label_llm.json
 ```
@@ -1928,7 +1928,7 @@ Recommended presets (quick checks; replace `ModelPath` as needed):
 - Authoritative change logs (selection under ambiguity, same_key):
 
 ```powershell
-.\scripts\run_selector_bench.ps1 -Preset quick -ModelPath "C:\AI\models\your-model.gguf" -UseRerank
+.\scripts\run_selector_bench.ps1 -Preset quick -ModelPath "<MODEL_PATH>" -UseRerank
 ```
 
 - Authority gating (NOTE vs UPDATE in kv_commentary):
@@ -1949,7 +1949,7 @@ python .\scripts\summarize_results.py --in "$outDir\combined.json" --out-json "$
 - Instruction injection exposure:
 
 ```powershell
-.\scripts\run_bench.ps1 -Preset standard -ModelPath "C:\AI\models\your-model.gguf" -RequireCitations
+.\scripts\run_bench.ps1 -Preset standard -ModelPath "<MODEL_PATH>" -RequireCitations
 ```
 
 - Retrieval sanity (dense vs lexical):
@@ -2000,7 +2000,7 @@ python .\scripts\verify_memories.py --in .\data\memories\memory_demo.jsonl `
 Release checklist (optional; runs UI stubs, local-optimum SA discriminator + variants, canonical update_burst sweeps + thresholds):
 
 ```powershell
-.\scripts\run_release_check.ps1 -ModelPath "C:\AI\models\your-model.gguf" -RunSweeps
+.\scripts\run_release_check.ps1 -ModelPath "<MODEL_PATH>" -RunSweeps
 ```
 
 Use `-SkipVariants` to skip the local-optimum variants suite, or tune it with
@@ -2023,7 +2023,7 @@ If thresholds fail, `run_release_check.ps1` writes UI baseline traces + SA diffs
 UI release checklist (UI stubs + SA discriminator + variants + wall sweep; optional LLM gate + config update):
 
 ```powershell
-.\scripts\run_ui_release_check.ps1 -RunAdapterGate -UiModelPath "C:\AI\models\your-model.gguf" -UpdateConfig
+.\scripts\run_ui_release_check.ps1 -RunAdapterGate -UiModelPath "<MODEL_PATH>" -UpdateConfig
 ```
 
 By default this also runs the local-optimum variants suite and writes a distillation report under
@@ -2053,7 +2053,7 @@ Optional: run thresholds and dump UI artifacts on failure:
 Instruction override gate (deterministic answer + copy-clamp; updates `runs/release_gates`):
 
 ```powershell
-.\scripts\run_instruction_override_gate.ps1 -ModelPath "C:\AI\models\your-model.gguf"
+.\scripts\run_instruction_override_gate.ps1 -ModelPath "<MODEL_PATH>"
 ```
 
 This gate uses `instruction_suite` with a larger sample (seeds=4, queries=16) so conflicting instruction values are present (tracked by `instr_conflict_present_rate` and `instr_conflict_present_count`).
@@ -2100,7 +2100,7 @@ Suggested v1 reporting convention:
 Quick one-command loop (generate -> train -> evaluate):
 
 ```powershell
-.\scripts\run_selector_training.ps1 -ModelPath "C:\AI\models\your-model.gguf" `
+.\scripts\run_selector_training.ps1 -ModelPath "<MODEL_PATH>" `
   -StateMode kv_commentary -AuthoritativeOnly -UseAuthorityFilter
 ```
 
@@ -2760,13 +2760,13 @@ Use the PowerShell runner to avoid manual sweeps. It writes results to `runs\com
 Smoke check (fast, noisy signal):
 
 ```powershell
-.\scripts\run_bench.ps1 -Preset smoke -ModelPath "C:\AI\models\your-model.gguf"
+.\scripts\run_bench.ps1 -Preset smoke -ModelPath "<MODEL_PATH>"
 ```
 
 Standard check (still small, more stable):
 
 ```powershell
-.\scripts\run_bench.ps1 -Preset standard -ModelPath "C:\AI\models\your-model.gguf"
+.\scripts\run_bench.ps1 -Preset standard -ModelPath "<MODEL_PATH>"
 ```
 
 By default the runner disables citations (value-only). To require citations, add `-RequireCitations`.
@@ -2814,22 +2814,22 @@ Reference system (latest_step in one command):
 Expected output: `runs\summary_all.csv` with rows for selector_quick_latest_step_k2/4/8. Add `-ComparePreferSetLatest` to include selector_quick_prefer_set_latest_k2/4/8.
 
 ```powershell
-.\scripts\run_reference.ps1 -Preset quick -ModelPath "C:\AI\models\your-model.gguf"
+.\scripts\run_reference.ps1 -Preset quick -ModelPath "<MODEL_PATH>"
 ```
 
 Selector+answerer preset (reranker baseline):
 
 ```powershell
 # no rerank
-.\scripts\run_selector_bench.ps1 -Preset quick -ModelPath "C:\AI\models\your-model.gguf"
+.\scripts\run_selector_bench.ps1 -Preset quick -ModelPath "<MODEL_PATH>"
 # with rerank
-.\scripts\run_selector_bench.ps1 -Preset quick -ModelPath "C:\AI\models\your-model.gguf" -UseRerank
+.\scripts\run_selector_bench.ps1 -Preset quick -ModelPath "<MODEL_PATH>" -UseRerank
 ```
 
 Selector bake-off (quick preset, four rerank modes):
 
 ```powershell
-.\scripts\run_selector_bakeoff.ps1 -Preset quick -ModelPath "C:\AI\models\your-model.gguf"
+.\scripts\run_selector_bakeoff.ps1 -Preset quick -ModelPath "<MODEL_PATH>"
 ```
 
 Expected output: updated `runs\summary_all.csv` with selector_quick_<rerank>_k2/4/8 rows for `none`,
@@ -2838,7 +2838,7 @@ Expected output: updated `runs\summary_all.csv` with selector_quick_<rerank>_k2/
 Selector-only (fast selection metrics, skip LLM answers):
 
 ```powershell
-.\scripts\run_selector_only.ps1 -Preset quick -ModelPath "C:\AI\models\your-model.gguf" -Rerank latest_step
+.\scripts\run_selector_only.ps1 -Preset quick -ModelPath "<MODEL_PATH>" -Rerank latest_step
 ```
 
 Use this when tuning selector policies. It skips answer generation and only emits `support_ids`, so the relevant numbers are `gold_present_rate` and `selection_rate` (value accuracy is not meaningful in this mode).
@@ -2880,7 +2880,7 @@ Interpretation: with the same bucketing, longer sequences amplify ambiguity and 
 Automated update_burst wall search (staged sweep + find_wall):
 
 ```powershell
-.\scripts\run_update_burst_wall.ps1 -ModelPath "C:\AI\models\your-model.gguf"
+.\scripts\run_update_burst_wall.ps1 -ModelPath "<MODEL_PATH>"
 ```
 
 Outputs go to a timestamped subfolder under `runs\wall_update_burst_YYYYMMDD_HHMMSS` by default. Optional knobs:
@@ -2891,7 +2891,7 @@ Outputs go to a timestamped subfolder under `runs\wall_update_burst_YYYYMMDD_HHM
 Adaptive update_burst wall search (coarse -> refine -> confirm; fastest way to find the ceiling):
 
 ```powershell
-.\scripts\run_update_burst_wall_adaptive.ps1 -ModelPath "C:\AI\models\your-model.gguf"
+.\scripts\run_update_burst_wall_adaptive.ps1 -ModelPath "<MODEL_PATH>"
 ```
 
 Optional knobs: `-CoarseRates 0.10,0.20,0.30,0.40`, `-CoarseSeeds 1`, `-ConfirmSeeds 3`,

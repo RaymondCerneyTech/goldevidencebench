@@ -1,0 +1,104 @@
+{
+  "defaults": {
+    "gate_models": "configs/ui_gate_models.json",
+    "preselect_rules": "1"
+  },
+  "presets": [
+    {
+      "name": "notepad_calc",
+      "description": "Multi-app demo: Notepad note then Calculator compute",
+      "mode": "live",
+      "keywords": ["note and compute", "notepad and calculator", "write note and compute", "compute and note"],
+      "match_regex": "(note|notepad).*(compute|calc)|(compute|calc).*(note|notepad)",
+      "script": "scripts/run_combo_demo.ps1",
+      "args": [
+        "-Text",
+        "Hello from GoldEvidenceBench.",
+        "-FilePath",
+        "%USERPROFILE%\\Desktop\\notes.txt",
+        "-OnExistingFile",
+        "rename",
+        "-InputMode",
+        "type",
+        "-VerifySaved",
+        "-CloseAfterSave",
+        "-Expression",
+        "12+34",
+        "-Expected",
+        "46",
+        "-VerifyResult",
+        "-CloseAfter"
+      ]
+    },
+    {
+      "name": "notepad",
+      "description": "Open Notepad, write text, save as notes.txt, close",
+      "mode": "live",
+      "keywords": ["notepad", "notes", "text file", "write note"],
+      "script": "scripts/run_notepad_demo.ps1",
+      "args": [
+        "-Text",
+        "Hello from GoldEvidenceBench.",
+        "-FilePath",
+        "%USERPROFILE%\\Desktop\\notes.txt",
+        "-OnExistingFile",
+        "rename",
+        "-InputMode",
+        "type",
+        "-VerifySaved",
+        "-CloseAfterSave"
+      ]
+    },
+    {
+      "name": "form",
+      "description": "Live practice form demo (fill fields, save, verify)",
+      "mode": "live",
+      "keywords": ["form", "login", "sign in", "fill form"],
+      "script": "scripts/run_form_demo.ps1",
+      "args": [
+        "-Username",
+        "demo_user",
+        "-Password",
+        "demo_pass123",
+        "-RememberMe",
+        "-OutputPath",
+        "%TEMP%\\practice_form_saved.txt",
+        "-OnExistingFile",
+        "rename",
+        "-VerifySaved",
+        "-CloseAfterSave"
+      ]
+    },
+    {
+      "name": "form_stub",
+      "description": "Fixture-only form demo (gate + stub; no real UI)",
+      "mode": "fixture",
+      "keywords": ["form stub", "fixture form"],
+      "script": "scripts/run_ui_minipilot_form_stub.ps1",
+      "args": []
+    },
+    {
+      "name": "table",
+      "description": "Fixture-only table demo (gate + stub; no real UI)",
+      "mode": "fixture",
+      "keywords": ["table", "export table", "data table", "spreadsheet"],
+      "script": "scripts/run_ui_minipilot_table_stub.ps1",
+      "args": []
+    },
+    {
+      "name": "calculator",
+      "description": "Live Calculator demo (type expression, copy result, verify, close)",
+      "mode": "live",
+      "keywords": ["calculator", "calc", "compute", "math"],
+      "script": "scripts/run_calculator_demo.ps1",
+      "args": [
+        "-Expression",
+        "12+34",
+        "-Expected",
+        "46",
+        "-VerifyResult",
+        "-CloseAfter"
+      ]
+    }
+  ]
+}

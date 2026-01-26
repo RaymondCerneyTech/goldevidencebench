@@ -18,6 +18,13 @@ These rules apply to the entire repository.
 - Update `README.md` whenever behavior, CLI, formats, or defaults change.
 - When README changes, ensure this `AGENTS.md` stays accurate (house rules + current contracts).
 
+## Scope & platform
+- Windows-first repo; prefer PowerShell entrypoints, with Python entrypoints for portability.
+- Keep changes aligned with the regression harness + gate system; avoid scope creep.
+
+## Hygiene
+- Run outputs can be large; use `scripts/cleanup_runs.ps1` when needed.
+
 ## Architecture (weak-machine intent)
 - 7B is the planner + candidate generator (steps, candidates, postconditions); it does not execute directly.
 - Tiny gates (rules/linear/logistic/small MLP) choose among candidates, block unsafe actions, and trigger abstain.

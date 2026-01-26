@@ -1,0 +1,47 @@
+{
+  "title": "ReproCommands",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "artifact_version",
+    "generated_at",
+    "commands",
+    "command_line",
+    "args",
+    "config",
+    "env",
+    "key_env",
+    "model",
+    "config_paths",
+    "authority_mode"
+  ],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "artifact_version": { "type": "string" },
+    "generated_at": { "type": "string" },
+    "commands": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "command_line": { "type": "string" },
+    "args": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "baseline": { "type": ["string", "null"] },
+    "adapter": { "type": ["string", "null"] },
+    "protocol": { "type": ["string", "null"] },
+    "state_mode": { "type": ["string", "null"] },
+    "seed": { "type": ["number", "null"] },
+    "steps": { "type": ["number", "null"] },
+    "retrieval": { "type": "object" },
+    "config": { "type": "object" },
+    "env": { "type": "object" },
+    "key_env": { "type": "object" },
+    "model": { "type": "object" },
+    "git_commit": { "type": ["string", "null"] },
+    "config_paths": { "type": "object" },
+    "authority_mode": { "type": "string" }
+  },
+  "additionalProperties": true
+}

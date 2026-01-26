@@ -1,0 +1,12 @@
+{
+  "profile": "ui_minipilot_form",
+  "description": "Mini pilot form flow (login tab -> fill -> submit).",
+  "fixture_path": "data/ui_minipilot_form_fixture.jsonl",
+  "metrics": [
+    "gold_present_rate",
+    "selection_rate",
+    "wrong_action_rate",
+    "post_action_verify_rate",
+    "abstain_rate"
+  ]
+}

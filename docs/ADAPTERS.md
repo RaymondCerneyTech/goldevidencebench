@@ -21,22 +21,6 @@ Set `GOLDEVIDENCEBENCH_BUILDER_PER_KEY_LLM=0` to disable per-key LLM calls (dete
 Retrieval-first answerer (use only the latest ledger entry for the key): `goldevidencebench.adapters.retrieval_llama_cpp_adapter:create_adapter`.
 UI fixture stub adapter (fixture-based candidate selection for computer-use scaffolding): `goldevidencebench.adapters.ui_fixture_adapter:create_adapter`.
 UI Llama adapter (UI candidate selection from row fields): `goldevidencebench.adapters.ui_llama_cpp_adapter:create_adapter`.
-Set `GOLDEVIDENCEBENCH_UI_MODEL` (or `GOLDEVIDENCEBENCH_MODEL`) to a GGUF path. It reads
-`instruction`/`goal`/`question` fields on the row (or `meta`) to guide deterministic pre-selection.
-Set `GOLDEVIDENCEBENCH_UI_OVERLAY_FILTER=1` to drop popup/overlay candidates unless the row sets
-`allow_overlay=true` (or `meta.allow_overlay=true`) or the instruction explicitly mentions a modal/popup/overlay.
-When `allow_overlay` is true, overlay candidates are allowed but main-scope candidates are still preferred
-unless the instruction explicitly calls for a modal/popup/overlay.
-Set `GOLDEVIDENCEBENCH_UI_PRESELECT_RULES=1` to apply a deterministic pre-selector that uses
-instruction cues (main page, modal/dialog, primary/secondary, top/bottom, left/right) before selection.
-The deterministic policy rejects non-main candidates unless a modal/popup is requested, prefers
-enabled/visible/clickable candidates, prefers non-overlay candidates, then uses geometry as a last
-tie-breaker. If it resolves to a single candidate, the adapter returns it without invoking the LLM.
-If it still cannot safely disambiguate, it abstains.
-Set `GOLDEVIDENCEBENCH_UI_TRACE_PATH` to emit a JSONL decision trace (candidates in, post-filter sets,
-final choice, and reason codes).
-By default the trace file is overwritten each run; set `GOLDEVIDENCEBENCH_UI_TRACE_APPEND=1` to append instead.
-Env var names use the `GOLDEVIDENCEBENCH_` prefix.
 Set `GOLDEVIDENCEBENCH_RETRIEVAL_K` to include top-k latest entries for the key (default 1). Set
 `GOLDEVIDENCEBENCH_RETRIEVAL_WRONG_TYPE` to `none`, `same_key`, or `other_key` to inject a wrong line for robustness
 testing. Use `GOLDEVIDENCEBENCH_RETRIEVAL_INCLUDE_CLEAR=0` to skip CLEAR entries.
@@ -345,7 +329,7 @@ Quick preset takeaway: even a small reranker makes selection near-perfect in fas
 Run one script, get one CSV, and compare the table below (latest_step only by default):
 
 ```powershell
-.\scripts\run_reference.ps1 -Preset standard -ModelPath "C:\AI\models\your-model.gguf"
+.\scripts\run_reference.ps1 -Preset standard -ModelPath "<MODEL_PATH>"
 ```
 
 This writes `runs\summary_all.csv`. Add `-ComparePreferSetLatest` if you want prefer_set_latest rows in the same CSV. The "Report preset (s5q24)" table below is a direct copy of those rows.
@@ -390,8 +374,8 @@ Report preset (s5q24) run (same table, larger sample):
 Interpretation: selection under ambiguity is the bottleneck. The LLM-only selector degrades as k grows, while simple deterministic reranking (latest_step or prefer_set_latest) restores near-perfect selection when gold is present. last_occurrence underperforms because shuffled candidates break recency-by-position.
 
 ```powershell
-.\scripts\run_selector_bench.ps1 -Preset standard -ModelPath "C:\AI\models\your-model.gguf"
-.\scripts\run_selector_bench.ps1 -Preset standard -ModelPath "C:\AI\models\your-model.gguf" -UseRerank
+.\scripts\run_selector_bench.ps1 -Preset standard -ModelPath "<MODEL_PATH>"
+.\scripts\run_selector_bench.ps1 -Preset standard -ModelPath "<MODEL_PATH>" -UseRerank
 ```
 
 

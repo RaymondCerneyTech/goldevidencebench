@@ -1,0 +1,9 @@
+{
+  "unsafe_commit_rate": 0.05,
+  "flip_rate": 0.1,
+  "gold_present_rate": 0.9,
+  "selection_rate_given_present": 0.9,
+  "authority_violation_rate": 0.01,
+  "answer_correct_given_selected": 0.9,
+  "drift_step_rate_max": 0.25
+}

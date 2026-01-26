@@ -15,8 +15,21 @@ venv/
 *.json
 *.txt
 !.gitignore
+!configs/**/*.json
+!schemas/**/*.json
 runs/
 runs_wall_latest/
 runs_wall_linear/
 runs_wall_*/
+data/memories/user_*.txt
+data/memories/user_*.jsonl
+data/memories/private_*
+data/memories/*.md
+lean_demo/.lake/
+lean_demo/.cache/
+notes/
+scratch/
+tmp/
+*.bak
+*.swp
 README - Copy*.md

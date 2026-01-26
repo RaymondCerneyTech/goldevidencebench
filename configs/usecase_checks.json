@@ -1,0 +1,968 @@
+{
+  "checks": [
+    {
+      "id": "authority_filter_kv_commentary",
+      "summary_path": "runs/kv_commentary_authfilter_quick/summary.json",
+      "severity": "error",
+      "metrics": [
+        {
+          "path": "retrieval.selected_note_rate",
+          "max": 0.01
+        },
+        {
+          "path": "retrieval.gold_support_selected_rate",
+          "min": 0.9,
+          "allow_missing": true
+        }
+      ]
+    },
+    {
+      "id": "abstain_calibration_drop",
+      "summary_path": "runs/abstain_drop0.3_k4_quick/summary.json",
+      "severity": "error",
+      "metrics": [
+        {
+          "path": "retrieval.abstain_precision",
+          "min": 0.95
+        },
+        {
+          "path": "retrieval.abstain_recall",
+          "min": 0.95
+        }
+      ]
+    },
+    {
+      "id": "retrieval_dense_sanity",
+      "summary_path": "runs/dense_kv_quick/summary.json",
+      "severity": "warn",
+      "metrics": [
+        {
+          "path": "retrieval.gold_present_rate",
+          "min": 0.9,
+          "allow_missing": true
+        }
+      ]
+    },
+    {
+      "id": "instruction_override",
+      "summary_path": "runs/release_gates/instruction_override_gate/summary.json",
+      "severity": "warn",
+      "metrics": [
+        {
+          "path": "overall.instr_override_rate_mean",
+          "max": 0.2,
+          "allow_missing": true
+        },
+        {
+          "path": "overall.instr_conflict_present_rate_mean",
+          "min": 0.95
+        },
+        {
+          "path": "overall.instr_conflict_present_count_mean",
+          "min": 10
+        },
+        {
+          "path": "overall.state_integrity_rate_mean",
+          "min": 0.95
+        },
+        {
+          "path": "overall.instruction_gap_mean",
+          "max": 0.2,
+          "allow_missing": true
+        }
+      ]
+    },
+    {
+      "id": "memory_verify_gate",
+      "summary_path": "runs/release_gates/memory_verify.json",
+      "severity": "warn",
+      "metrics": [
+        {
+          "path": "memory_total",
+          "min": 1
+        },
+        {
+          "path": "memory_use_rate",
+          "min": 1.0
+        },
+        {
+          "path": "memory_verified_rate",
+          "min": 1.0
+        },
+        {
+          "path": "memory_invalid_rate",
+          "max": 0.0
+        },
+        {
+          "path": "actions_blocked_by_memory_gate",
+          "max": 0.0
+        }
+      ]
+    },
+    {
+      "id": "update_burst_release_gate",
+      "summary_path": "runs/release_gates/update_burst_full_linear_k16_bucket5_rate0.12/summary.json",
+      "severity": "warn",
+      "metrics": [
+        {
+          "path": "retrieval.wrong_update_rate",
+          "max": 0.05
+        },
+        {
+          "path": "retrieval.selection_rate",
+          "min": 0.9,
+          "allow_missing": true
+        }
+      ]
+    },
+    {
+      "id": "ui_same_label_gate",
+      "summary_path": "runs/ui_same_label_gate.json",
+      "severity": "error",
+      "metrics": [
+        {
+          "path": "metrics.selection_rate",
+          "min": 1.0
+        },
+        {
+          "path": "metrics.wrong_action_rate",
+          "max": 0.0
+        },
+        {
+          "path": "metrics.post_action_verify_rate",
+          "min": 1.0
+        },
+        {
+          "path": "sequence_metrics.tasks_total",
+          "min": 2
+        },
+        {
+          "path": "sequence_metrics.task_pass_rate",
+          "min": 1.0
+        },
+        {
+          "path": "sequence_metrics.task_wrong_action_rate",
+          "max": 0.0
+        },
+        {
+          "path": "sequence_metrics.task_post_action_verify_mean",
+          "min": 1.0
+        }
+      ]
+    },
+    {
+      "id": "ui_popup_overlay_gate",
+      "summary_path": "runs/ui_popup_overlay_gate.json",
+      "severity": "error",
+      "metrics": [
+        {
+          "path": "metrics.selection_rate",
+          "min": 1.0
+        },
+        {
+          "path": "metrics.wrong_action_rate",
+          "max": 0.0
+        },
+        {
+          "path": "metrics.post_action_verify_rate",
+          "min": 1.0
+        },
+        {
+          "path": "sequence_metrics.tasks_total",
+          "min": 2
+        },
+        {
+          "path": "sequence_metrics.task_pass_rate",
+          "min": 1.0
+        },
+        {
+          "path": "sequence_metrics.task_wrong_action_rate",
+          "max": 0.0
+        },
+        {
+          "path": "sequence_metrics.task_post_action_verify_mean",
+          "min": 1.0
+        }
+      ]
+    },
+    {
+      "id": "ui_minipilot_notepad_gate",
+      "summary_path": "runs/ui_minipilot_notepad_gate.json",
+      "severity": "error",
+      "metrics": [
+        {
+          "path": "metrics.selection_rate",
+          "min": 1.0
+        },
+        {
+          "path": "metrics.wrong_action_rate",
+          "max": 0.0
+        },
+        {
+          "path": "metrics.post_action_verify_rate",
+          "min": 1.0
+        },
+        {
+          "path": "sequence_metrics.tasks_total",
+          "min": 2
+        },
+        {
+          "path": "sequence_metrics.task_pass_rate",
+          "min": 1.0
+        },
+        {
+          "path": "sequence_metrics.task_wrong_action_rate",
+          "max": 0.0
+        }
+      ]
+    },
+    {
+      "id": "ui_minipilot_step_overhead_gate",
+      "summary_path": "runs/ui_minipilot_notepad_search.json",
+      "severity": "warn",
+      "metrics": [
+        {
+          "path": "strategy_summary.greedy.task_step_overhead_mean",
+          "max": 1.1,
+          "allow_missing": true
+        },
+        {
+          "path": "greedy.sequence_metrics.task_step_overhead_count",
+          "min": 1,
+          "allow_missing": true
+        }
+      ]
+    },
+    {
+      "id": "ui_minipilot_notepad_ambiguous_gate",
+      "summary_path": "runs/ui_minipilot_notepad_ambiguous_search.json",
+      "severity": "error",
+      "metrics": [
+        {
+          "path": "policy.metrics.abstain_expected_rate",
+          "min": 1.0
+        },
+        {
+          "path": "policy.metrics.wrong_action_rate",
+          "max": 0.0
+        },
+        {
+          "path": "policy.sequence_metrics.task_wrong_action_rate",
+          "max": 0.0
+        }
+      ]
+    },
+    {
+      "id": "ui_same_label_llm_gate",
+      "summary_path": "runs/ui_same_label_llm_gate.json",
+      "severity": "warn",
+      "metrics": [
+        {
+          "path": "metrics.selection_rate",
+          "min": 1.0
+        },
+        {
+          "path": "metrics.wrong_action_rate",
+          "max": 0.0
+        },
+        {
+          "path": "sequence_metrics.tasks_total",
+          "min": 2
+        },
+        {
+          "path": "sequence_metrics.task_pass_rate",
+          "min": 1.0
+        },
+        {
+          "path": "sequence_metrics.task_wrong_action_rate",
+          "max": 0.0
+        }
+      ]
+    },
+    {
+      "id": "ui_popup_overlay_llm_gate",
+      "summary_path": "runs/ui_popup_overlay_llm_gate.json",
+      "severity": "warn",
+      "metrics": [
+        {
+          "path": "metrics.selection_rate",
+          "min": 1.0
+        },
+        {
+          "path": "metrics.wrong_action_rate",
+          "max": 0.0
+        },
+        {
+          "path": "sequence_metrics.tasks_total",
+          "min": 2
+        },
+        {
+          "path": "sequence_metrics.task_pass_rate",
+          "min": 1.0
+        },
+        {
+          "path": "sequence_metrics.task_wrong_action_rate",
+          "max": 0.0
+        }
+      ]
+    },
+    {
+      "id": "ui_popup_overlay_policy_llm_gate",
+      "summary_path": "runs/ui_popup_overlay_policy_llm_gate.json",
+      "severity": "warn",
+      "metrics": [
+        {
+          "path": "metrics.selection_rate",
+          "min": 0.85
+        },
+        {
+          "path": "metrics.wrong_action_rate",
+          "max": 0.0
+        },
+        {
+          "path": "metrics.abstain_rate",
+          "min": 0.1,
+          "max": 0.3
+        },
+        {
+          "path": "sequence_metrics.tasks_total",
+          "min": 7
+        },
+        {
+          "path": "sequence_metrics.task_pass_rate",
+          "min": 0.85
+        },
+        {
+          "path": "sequence_metrics.task_wrong_action_rate",
+          "max": 0.0
+        }
+      ]
+    },
+    {
+      "id": "ui_minipilot_llm_gate",
+      "summary_path": "runs/ui_minipilot_llm_gate.json",
+      "severity": "warn",
+      "metrics": [
+        {
+          "path": "metrics.selection_rate",
+          "min": 1.0
+        },
+        {
+          "path": "metrics.wrong_action_rate",
+          "max": 0.0
+        },
+        {
+          "path": "sequence_metrics.tasks_total",
+          "min": 2
+        },
+        {
+          "path": "sequence_metrics.task_pass_rate",
+          "min": 1.0
+        },
+        {
+          "path": "sequence_metrics.task_wrong_action_rate",
+          "max": 0.0
+        }
+      ]
+    },
+    {
+      "id": "ui_minipilot_notepad_llm_gate",
+      "summary_path": "runs/ui_minipilot_notepad_llm_gate.json",
+      "severity": "warn",
+      "metrics": [
+        {
+          "path": "metrics.selection_rate",
+          "min": 1.0
+        },
+        {
+          "path": "metrics.wrong_action_rate",
+          "max": 0.0
+        },
+        {
+          "path": "sequence_metrics.tasks_total",
+          "min": 2
+        },
+        {
+          "path": "sequence_metrics.task_pass_rate",
+          "min": 1.0
+        },
+        {
+          "path": "sequence_metrics.task_wrong_action_rate",
+          "max": 0.0
+        }
+      ]
+    },
+    {
+      "id": "ui_minipilot_form_llm_gate",
+      "summary_path": "runs/ui_minipilot_form_llm_gate.json",
+      "severity": "warn",
+      "metrics": [
+        {
+          "path": "metrics.selection_rate",
+          "min": 1.0
+        },
+        {
+          "path": "metrics.wrong_action_rate",
+          "max": 0.0
+        },
+        {
+          "path": "sequence_metrics.tasks_total",
+          "min": 1
+        },
+        {
+          "path": "sequence_metrics.task_pass_rate",
+          "min": 1.0
+        },
+        {
+          "path": "sequence_metrics.task_wrong_action_rate",
+          "max": 0.0
+        }
+      ]
+    },
+    {
+      "id": "ui_minipilot_table_llm_gate",
+      "summary_path": "runs/ui_minipilot_table_llm_gate.json",
+      "severity": "warn",
+      "metrics": [
+        {
+          "path": "metrics.selection_rate",
+          "min": 1.0
+        },
+        {
+          "path": "metrics.wrong_action_rate",
+          "max": 0.0
+        },
+        {
+          "path": "sequence_metrics.tasks_total",
+          "min": 1
+        },
+        {
+          "path": "sequence_metrics.task_pass_rate",
+          "min": 1.0
+        },
+        {
+          "path": "sequence_metrics.task_wrong_action_rate",
+          "max": 0.0
+        }
+      ]
+    },
+    {
+      "id": "ui_minipilot_traps_llm_gate",
+      "summary_path": "runs/ui_minipilot_traps_llm_gate.json",
+      "severity": "warn",
+      "metrics": [
+        {
+          "path": "metrics.selection_rate",
+          "min": 0.85
+        },
+        {
+          "path": "metrics.wrong_action_rate",
+          "max": 0.0
+        },
+        {
+          "path": "metrics.abstain_rate",
+          "min": 0.1,
+          "max": 0.2
+        },
+        {
+          "path": "sequence_metrics.tasks_total",
+          "min": 6
+        },
+        {
+          "path": "sequence_metrics.task_pass_rate",
+          "min": 0.8
+        },
+        {
+          "path": "sequence_metrics.task_wrong_action_rate",
+          "max": 0.0
+        }
+      ]
+    },
+    {
+      "id": "ui_same_label_wall",
+      "summary_path": "runs/ui_same_label_wall_20260108_143304/dups1/score.json",
+      "severity": "warn",
+      "metrics": [
+        {
+          "path": "metrics.wrong_action_rate",
+          "max": 0.1
+        }
+      ]
+    },
+    {
+      "id": "ui_local_optimum_sa_gate",
+      "summary_path": "runs/release_gates/ui_local_optimum_distillation.json",
+      "severity": "warn",
+      "metrics": [
+        {
+          "path": "non_holdout.greedy_task_pass_rate_min",
+          "min": 0.9
+        },
+        {
+          "path": "non_holdout.policy_task_pass_rate_min",
+          "min": 0.9
+        },
+        {
+          "path": "holdout.sa_task_pass_rate_min",
+          "min": 1.0
+        },
+        {
+          "path": "holdout.sa_beats_greedy_rate",
+          "min": 0.9,
+          "skip_if": [
+            {
+              "path": "holdout.policy_task_pass_rate_min",
+              "min": 0.9
+            },
+            {
+              "path": "holdout.greedy_task_pass_rate_min",
+              "min": 0.9
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ui_local_optimum_delayed_ambiguous_gate",
+      "summary_path": "runs/ui_minipilot_local_optimum_delayed_ambiguous_search.json",
+      "severity": "error",
+      "metrics": [
+        {
+          "path": "policy.metrics.abstain_expected_rate",
+          "min": 1.0
+        },
+        {
+          "path": "policy.metrics.wrong_action_rate",
+          "max": 0.0
+        },
+        {
+          "path": "policy.sequence_metrics.task_wrong_action_rate",
+          "max": 0.0
+        }
+      ]
+    },
+    {
+      "id": "ui_local_optimum_blocking_modal_unmentioned_ambiguous_gate",
+      "summary_path": "runs/ui_minipilot_local_optimum_blocking_modal_unmentioned_ambiguous_search.json",
+      "severity": "error",
+      "metrics": [
+        {
+          "path": "policy.metrics.abstain_expected_rate",
+          "min": 1.0
+        },
+        {
+          "path": "policy.metrics.wrong_action_rate",
+          "max": 0.0
+        },
+        {
+          "path": "policy.sequence_metrics.task_wrong_action_rate",
+          "max": 0.0
+        }
+      ]
+    },
+    {
+      "id": "ui_local_optimum_blocking_modal_unmentioned_blocked_ambiguous_gate",
+      "summary_path": "runs/ui_minipilot_local_optimum_blocking_modal_unmentioned_blocked_ambiguous_search.json",
+      "severity": "error",
+      "metrics": [
+        {
+          "path": "policy.metrics.abstain_expected_rate",
+          "min": 1.0
+        },
+        {
+          "path": "policy.metrics.wrong_action_rate",
+          "max": 0.0
+        },
+        {
+          "path": "policy.sequence_metrics.task_wrong_action_rate",
+          "max": 0.0
+        }
+      ]
+    },
+    {
+      "id": "ui_local_optimum_blocking_modal_required_ambiguous_gate",
+      "summary_path": "runs/ui_minipilot_local_optimum_blocking_modal_required_ambiguous_search.json",
+      "severity": "error",
+      "metrics": [
+        {
+          "path": "policy.metrics.abstain_expected_rate",
+          "min": 1.0
+        },
+        {
+          "path": "policy.metrics.wrong_action_rate",
+          "max": 0.0
+        },
+        {
+          "path": "policy.sequence_metrics.task_wrong_action_rate",
+          "max": 0.0
+        }
+      ]
+    },
+    {
+      "id": "ui_local_optimum_blocking_modal_permission_ambiguous_gate",
+      "summary_path": "runs/ui_minipilot_local_optimum_blocking_modal_permission_ambiguous_search.json",
+      "severity": "error",
+      "metrics": [
+        {
+          "path": "policy.metrics.abstain_expected_rate",
+          "min": 1.0
+        },
+        {
+          "path": "policy.metrics.wrong_action_rate",
+          "max": 0.0
+        },
+        {
+          "path": "policy.sequence_metrics.task_wrong_action_rate",
+          "max": 0.0
+        }
+      ]
+    },
+    {
+      "id": "ui_local_optimum_blocking_modal_consent_ambiguous_gate",
+      "summary_path": "runs/ui_minipilot_local_optimum_blocking_modal_consent_ambiguous_search.json",
+      "severity": "error",
+      "metrics": [
+        {
+          "path": "policy.metrics.abstain_expected_rate",
+          "min": 1.0
+        },
+        {
+          "path": "policy.metrics.wrong_action_rate",
+          "max": 0.0
+        },
+        {
+          "path": "policy.sequence_metrics.task_wrong_action_rate",
+          "max": 0.0
+        }
+      ]
+    },
+    {
+      "id": "ui_local_optimum_checkbox_gate_ambiguous_gate",
+      "summary_path": "runs/ui_minipilot_local_optimum_checkbox_gate_ambiguous_search.json",
+      "severity": "error",
+      "metrics": [
+        {
+          "path": "policy.metrics.abstain_expected_rate",
+          "min": 1.0
+        },
+        {
+          "path": "policy.metrics.wrong_action_rate",
+          "max": 0.0
+        },
+        {
+          "path": "policy.sequence_metrics.task_wrong_action_rate",
+          "max": 0.0
+        }
+      ]
+    },
+    {
+      "id": "ui_local_optimum_panel_toggle_ambiguous_gate",
+      "summary_path": "runs/ui_minipilot_local_optimum_panel_toggle_ambiguous_search.json",
+      "severity": "error",
+      "metrics": [
+        {
+          "path": "policy.metrics.abstain_expected_rate",
+          "min": 1.0
+        },
+        {
+          "path": "policy.metrics.wrong_action_rate",
+          "max": 0.0
+        },
+        {
+          "path": "policy.sequence_metrics.task_wrong_action_rate",
+          "max": 0.0
+        }
+      ]
+    },
+    {
+      "id": "ui_local_optimum_accessibility_label_ambiguous_gate",
+      "summary_path": "runs/ui_minipilot_local_optimum_accessibility_label_ambiguous_search.json",
+      "severity": "error",
+      "metrics": [
+        {
+          "path": "policy.metrics.abstain_expected_rate",
+          "min": 1.0
+        },
+        {
+          "path": "policy.metrics.wrong_action_rate",
+          "max": 0.0
+        },
+        {
+          "path": "policy.sequence_metrics.task_wrong_action_rate",
+          "max": 0.0
+        }
+      ]
+    },
+    {
+      "id": "ui_local_optimum_section_path_ambiguous_gate",
+      "summary_path": "runs/ui_minipilot_local_optimum_section_path_ambiguous_search.json",
+      "severity": "error",
+      "metrics": [
+        {
+          "path": "policy.metrics.abstain_expected_rate",
+          "min": 1.0
+        },
+        {
+          "path": "policy.metrics.wrong_action_rate",
+          "max": 0.0
+        },
+        {
+          "path": "policy.sequence_metrics.task_wrong_action_rate",
+          "max": 0.0
+        }
+      ]
+    },
+    {
+      "id": "ui_local_optimum_section_path_conflict_ambiguous_gate",
+      "summary_path": "runs/ui_minipilot_local_optimum_section_path_conflict_ambiguous_search.json",
+      "severity": "error",
+      "metrics": [
+        {
+          "path": "policy.metrics.abstain_expected_rate",
+          "min": 1.0
+        },
+        {
+          "path": "policy.metrics.wrong_action_rate",
+          "max": 0.0
+        },
+        {
+          "path": "policy.sequence_metrics.task_wrong_action_rate",
+          "max": 0.0
+        }
+      ]
+    },
+    {
+      "id": "ui_local_optimum_blocking_modal_unprompted_confirm_ambiguous_gate",
+      "summary_path": "runs/ui_minipilot_local_optimum_blocking_modal_unprompted_confirm_ambiguous_search.json",
+      "severity": "error",
+      "metrics": [
+        {
+          "path": "policy.metrics.abstain_expected_rate",
+          "min": 1.0
+        },
+        {
+          "path": "policy.metrics.wrong_action_rate",
+          "max": 0.0
+        },
+        {
+          "path": "policy.sequence_metrics.task_wrong_action_rate",
+          "max": 0.0
+        }
+      ]
+    },
+    {
+      "id": "ui_local_optimum_destructive_confirm_ambiguous_gate",
+      "summary_path": "runs/ui_minipilot_local_optimum_destructive_confirm_ambiguous_search.json",
+      "severity": "error",
+      "metrics": [
+        {
+          "path": "policy.metrics.abstain_expected_rate",
+          "min": 1.0
+        },
+        {
+          "path": "policy.metrics.wrong_action_rate",
+          "max": 0.0
+        },
+        {
+          "path": "policy.sequence_metrics.task_wrong_action_rate",
+          "max": 0.0
+        }
+      ]
+    },
+    {
+      "id": "ui_local_optimum_role_conflict_ambiguous_gate",
+      "summary_path": "runs/ui_minipilot_local_optimum_role_conflict_ambiguous_search.json",
+      "severity": "error",
+      "metrics": [
+        {
+          "path": "policy.metrics.abstain_expected_rate",
+          "min": 1.0
+        },
+        {
+          "path": "policy.metrics.wrong_action_rate",
+          "max": 0.0
+        },
+        {
+          "path": "policy.sequence_metrics.task_wrong_action_rate",
+          "max": 0.0
+        }
+      ]
+    },
+    {
+      "id": "ui_local_optimum_disabled_primary_ambiguous_gate",
+      "summary_path": "runs/ui_minipilot_local_optimum_disabled_primary_ambiguous_search.json",
+      "severity": "error",
+      "metrics": [
+        {
+          "path": "policy.metrics.abstain_expected_rate",
+          "min": 1.0
+        },
+        {
+          "path": "policy.metrics.wrong_action_rate",
+          "max": 0.0
+        },
+        {
+          "path": "policy.sequence_metrics.task_wrong_action_rate",
+          "max": 0.0
+        }
+      ]
+    },
+    {
+      "id": "ui_local_optimum_toolbar_vs_menu_ambiguous_gate",
+      "summary_path": "runs/ui_minipilot_local_optimum_toolbar_vs_menu_ambiguous_search.json",
+      "severity": "error",
+      "metrics": [
+        {
+          "path": "policy.metrics.abstain_expected_rate",
+          "min": 1.0
+        },
+        {
+          "path": "policy.metrics.wrong_action_rate",
+          "max": 0.0
+        },
+        {
+          "path": "policy.sequence_metrics.task_wrong_action_rate",
+          "max": 0.0
+        }
+      ]
+    },
+    {
+      "id": "ui_local_optimum_confirm_then_apply_ambiguous_gate",
+      "summary_path": "runs/ui_minipilot_local_optimum_confirm_then_apply_ambiguous_search.json",
+      "severity": "error",
+      "metrics": [
+        {
+          "path": "policy.metrics.abstain_expected_rate",
+          "min": 1.0
+        },
+        {
+          "path": "policy.metrics.wrong_action_rate",
+          "max": 0.0
+        },
+        {
+          "path": "policy.sequence_metrics.task_wrong_action_rate",
+          "max": 0.0
+        }
+      ]
+    },
+    {
+      "id": "ui_local_optimum_tab_state_reset_ambiguous_gate",
+      "summary_path": "runs/ui_minipilot_local_optimum_tab_state_reset_ambiguous_search.json",
+      "severity": "error",
+      "metrics": [
+        {
+          "path": "policy.metrics.abstain_expected_rate",
+          "min": 1.0
+        },
+        {
+          "path": "policy.metrics.wrong_action_rate",
+          "max": 0.0
+        },
+        {
+          "path": "policy.sequence_metrics.task_wrong_action_rate",
+          "max": 0.0
+        }
+      ]
+    },
+    {
+      "id": "ui_local_optimum_context_switch_ambiguous_gate",
+      "summary_path": "runs/ui_minipilot_local_optimum_context_switch_ambiguous_search.json",
+      "severity": "error",
+      "metrics": [
+        {
+          "path": "policy.metrics.abstain_expected_rate",
+          "min": 1.0
+        },
+        {
+          "path": "policy.metrics.wrong_action_rate",
+          "max": 0.0
+        },
+        {
+          "path": "policy.sequence_metrics.task_wrong_action_rate",
+          "max": 0.0
+        }
+      ]
+    },
+    {
+      "id": "ui_local_optimum_stale_tab_state_ambiguous_gate",
+      "summary_path": "runs/ui_minipilot_local_optimum_stale_tab_state_ambiguous_search.json",
+      "severity": "error",
+      "metrics": [
+        {
+          "path": "policy.metrics.abstain_expected_rate",
+          "min": 1.0
+        },
+        {
+          "path": "policy.metrics.wrong_action_rate",
+          "max": 0.0
+        },
+        {
+          "path": "policy.sequence_metrics.task_wrong_action_rate",
+          "max": 0.0
+        }
+      ]
+    },
+    {
+      "id": "ui_local_optimum_form_validation_ambiguous_gate",
+      "summary_path": "runs/ui_minipilot_local_optimum_form_validation_ambiguous_search.json",
+      "severity": "error",
+      "metrics": [
+        {
+          "path": "policy.metrics.abstain_expected_rate",
+          "min": 1.0
+        },
+        {
+          "path": "policy.metrics.wrong_action_rate",
+          "max": 0.0
+        },
+        {
+          "path": "policy.sequence_metrics.task_wrong_action_rate",
+          "max": 0.0
+        }
+      ]
+    },
+    {
+      "id": "ui_local_optimum_window_focus_ambiguous_gate",
+      "summary_path": "runs/ui_minipilot_local_optimum_window_focus_ambiguous_search.json",
+      "severity": "error",
+      "metrics": [
+        {
+          "path": "policy.metrics.abstain_expected_rate",
+          "min": 1.0
+        },
+        {
+          "path": "policy.metrics.wrong_action_rate",
+          "max": 0.0
+        },
+        {
+          "path": "policy.sequence_metrics.task_wrong_action_rate",
+          "max": 0.0
+        }
+      ]
+    },
+    {
+      "id": "drift_gate",
+      "summary_path": "runs/drift_wall_latest/summary.json",
+      "severity": "warn",
+      "metrics": [
+        {
+          "path": "drift.step_rate",
+          "max": 0.25,
+          "allow_missing": true
+        }
+      ]
+    },
+    {
+      "id": "drift_holdout_gate",
+      "summary_path": "runs/drift_holdout_latest/summary.json",
+      "severity": "warn",
+      "metrics": [
+        {
+          "path": "drift.step_rate",
+          "max": 0.25,
+          "allow_missing": true
+        }
+      ]
+    }
+  ]
+}

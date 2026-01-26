@@ -1,0 +1,13 @@
+{
+  "profile": "ui_popup_overlay_stub",
+  "description": "Stub profile for popup/overlay UI distractors.",
+  "fixture_path": "data/ui_popup_overlay_fixture.jsonl",
+  "metrics": [
+    "gold_present_rate",
+    "selection_rate",
+    "wrong_action_rate",
+    "post_action_verify_rate",
+    "abstain_precision",
+    "abstain_recall"
+  ]
+}

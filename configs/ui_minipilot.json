@@ -1,0 +1,12 @@
+{
+  "profile": "ui_minipilot_stub",
+  "description": "Mini pilot UI fixture (single task, multi-step sequence).",
+  "fixture_path": "data/ui_minipilot_fixture.jsonl",
+  "metrics": [
+    "gold_present_rate",
+    "selection_rate",
+    "wrong_action_rate",
+    "post_action_verify_rate",
+    "abstain_rate"
+  ]
+}

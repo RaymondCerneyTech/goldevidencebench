@@ -1,0 +1,13 @@
+{
+  "profile": "ui_same_label_stub",
+  "description": "Stub profile for computer-use agents with same-label UI actions.",
+  "fixture_path": "data/ui_same_label_fixture.jsonl",
+  "metrics": [
+    "gold_present_rate",
+    "selection_rate",
+    "wrong_action_rate",
+    "post_action_verify_rate",
+    "abstain_precision",
+    "abstain_recall"
+  ]
+}
