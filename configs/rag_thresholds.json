@@ -1,0 +1,10 @@
+{
+  "lenient": {
+    "min_value_acc": 0.13,
+    "min_cite_f1": 0.12
+  },
+  "strict": {
+    "min_value_acc": 0.6,
+    "min_cite_f1": 0.55
+  }
+}

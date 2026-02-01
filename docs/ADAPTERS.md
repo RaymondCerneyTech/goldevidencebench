@@ -6,46 +6,46 @@ This guide covers the adapter contract, supported adapters, and tuning knobs.
 
 Implement a tiny adapter (module with `create_adapter()` returning an object that has `.predict(row, protocol="...") -> {"value": ..., "support_ids": [...]}`).
 
-Reference adapter (wraps the ledger baseline): `goldevidencebench.adapters.ledger_adapter:create_adapter`.
-Two-phase adapter example (build book once, answer many): `goldevidencebench.adapters.log_to_book_adapter:create_adapter` implements `build_artifact(document, episode_id, protocol)` then answers closed-book.
-Closed-book Llama example (uses `llama-cpp-python`, set `GOLDEVIDENCEBENCH_MODEL` to a GGUF path): `goldevidencebench.adapters.llama_cpp_adapter:create_adapter`.
-The Llama adapter extracts the `## State Ledger` section and keeps the most recent ledger tokens to fit context.
-Streaming state-builder (chunked log -> compact ledger, then Llama answers): `goldevidencebench.adapters.streaming_llama_cpp_adapter:create_adapter`.
-Set `GOLDEVIDENCEBENCH_STREAM_CHUNK_TOKENS` (default 512) to control chunk size. Set `GOLDEVIDENCEBENCH_STREAM_MODE=llm`
-(default) to let the model extract updates per chunk, or `GOLDEVIDENCEBENCH_STREAM_MODE=parse` for a deterministic parser.
-Teacher book-builder (LLM builds artifacts, answerer stays fixed): `goldevidencebench.adapters.llm_book_builder_adapter:create_adapter`.
-Set `GOLDEVIDENCEBENCH_BUILDER_MODEL` to use a stronger model for artifact construction (defaults to `GOLDEVIDENCEBENCH_MODEL`).
-Set `GOLDEVIDENCEBENCH_BUILDER_CHUNK_TOKENS` to control builder chunk size.
-Set `GOLDEVIDENCEBENCH_BUILDER_MODE` to `heuristic`, `llm_fullscan` (default), or `llm_perkey`.
-Set `GOLDEVIDENCEBENCH_BUILDER_PER_KEY_LLM=0` to disable per-key LLM calls (deterministic fallback).
-Retrieval-first answerer (use only the latest ledger entry for the key): `goldevidencebench.adapters.retrieval_llama_cpp_adapter:create_adapter`.
-UI fixture stub adapter (fixture-based candidate selection for computer-use scaffolding): `goldevidencebench.adapters.ui_fixture_adapter:create_adapter`.
-UI Llama adapter (UI candidate selection from row fields): `goldevidencebench.adapters.ui_llama_cpp_adapter:create_adapter`.
-Set `GOLDEVIDENCEBENCH_RETRIEVAL_K` to include top-k latest entries for the key (default 1). Set
-`GOLDEVIDENCEBENCH_RETRIEVAL_WRONG_TYPE` to `none`, `same_key`, or `other_key` to inject a wrong line for robustness
-testing. Use `GOLDEVIDENCEBENCH_RETRIEVAL_INCLUDE_CLEAR=0` to skip CLEAR entries.
-Use `GOLDEVIDENCEBENCH_RETRIEVAL_DROP_PROB` (0-1) to probabilistically drop the correct line, and
-`GOLDEVIDENCEBENCH_RETRIEVAL_DROP_SEED` to make the drop deterministic by row id.
-Use `GOLDEVIDENCEBENCH_RETRIEVAL_AUTHORITY_SPOOF_RATE` (0-1) to flip NOTE/UPDATE labels in the candidate set, and
-`GOLDEVIDENCEBENCH_RETRIEVAL_AUTHORITY_SPOOF_SEED` for deterministic spoofing by row id.
-Use `GOLDEVIDENCEBENCH_RETRIEVAL_ORDER=shuffle|gold_first|gold_middle|gold_last` (and optional
-`GOLDEVIDENCEBENCH_RETRIEVAL_ORDER_SEED`) to control ordering and test positional bias under ambiguity.
-Set `GOLDEVIDENCEBENCH_RETRIEVAL_STEP_BUCKET` to coarsen step numbers for selection features (1 = no coarsening).
-Set `GOLDEVIDENCEBENCH_RETRIEVAL_QUERY_SANDWICH=1` to repeat the question before and after the
-candidate ledger lines (query sandwich mitigation).
-Set `GOLDEVIDENCEBENCH_RETRIEVAL_PICK_THEN_ANSWER=1` to force a two-step flow: pick a support_id
-first, then answer using only that line.
-Set `GOLDEVIDENCEBENCH_RETRIEVAL_COPY_CLAMP=1` to require the answer value be an exact substring of the selected line;
-if not, it returns null.
-Set `GOLDEVIDENCEBENCH_RETRIEVAL_RERANK=latest_step|last_occurrence|prefer_set_latest|linear` to deterministically
-choose a candidate before answering (non-LLM selector baseline). For `linear`, also set
-`GOLDEVIDENCEBENCH_RETRIEVAL_LINEAR_MODEL` to the JSON model file from `train_selector_linear.py`.
-Set `GOLDEVIDENCEBENCH_RETRIEVAL_LINEAR_TIE_BREAK=latest_step` (and optionally `GOLDEVIDENCEBENCH_RETRIEVAL_LINEAR_TIE_EPS`) to prefer newer steps when linear scores are close.
-Set `GOLDEVIDENCEBENCH_RETRIEVAL_SELECTOR_ONLY=1` to skip answer generation and emit only `support_ids`.
-Use selection metrics (`gold_present_rate`, `selection_rate`) for speed-focused iterations; value accuracy is not meaningful
-in selector-only mode.
-Set `GOLDEVIDENCEBENCH_RETRIEVAL_ABSTAIN_ON_MISSING=1` to emit an empty prediction when gold is missing
-(use with `GOLDEVIDENCEBENCH_RETRIEVAL_DROP_PROB` to calibrate abstain precision/recall).
+Supported adapters (quick list):
+
+- Reference adapter (wraps the ledger baseline): `goldevidencebench.adapters.ledger_adapter:create_adapter`.
+- Two-phase adapter example (build book once, answer many): `goldevidencebench.adapters.log_to_book_adapter:create_adapter` implements `build_artifact(document, episode_id, protocol)` then answers closed-book.
+- Closed-book Llama example (uses `llama-cpp-python`, set `GOLDEVIDENCEBENCH_MODEL` to a GGUF path): `goldevidencebench.adapters.llama_cpp_adapter:create_adapter`.
+- Streaming state-builder (chunked log -> compact ledger, then Llama answers): `goldevidencebench.adapters.streaming_llama_cpp_adapter:create_adapter`.
+- Teacher book-builder (LLM builds artifacts, answerer stays fixed): `goldevidencebench.adapters.llm_book_builder_adapter:create_adapter`.
+- Retrieval-first answerer (use only the latest ledger entry for the key): `goldevidencebench.adapters.retrieval_llama_cpp_adapter:create_adapter`.
+- UI fixture stub adapter (fixture-based candidate selection for computer-use scaffolding): `goldevidencebench.adapters.ui_fixture_adapter:create_adapter`.
+- UI Llama adapter (UI candidate selection from row fields): `goldevidencebench.adapters.ui_llama_cpp_adapter:create_adapter`.
+
+Notes:
+
+- The Llama adapter extracts the `## State Ledger` section and keeps the most recent ledger tokens to fit context.
+- Set `GOLDEVIDENCEBENCH_STREAM_CHUNK_TOKENS` (default 512) to control chunk size. Set `GOLDEVIDENCEBENCH_STREAM_MODE=llm` (default) to let the model extract updates per chunk, or `GOLDEVIDENCEBENCH_STREAM_MODE=parse` for a deterministic parser.
+- Set `GOLDEVIDENCEBENCH_BUILDER_MODEL` to use a stronger model for artifact construction (defaults to `GOLDEVIDENCEBENCH_MODEL`).
+- Set `GOLDEVIDENCEBENCH_BUILDER_CHUNK_TOKENS` to control builder chunk size.
+- Set `GOLDEVIDENCEBENCH_BUILDER_MODE` to `heuristic`, `llm_fullscan` (default), or `llm_perkey`.
+- Set `GOLDEVIDENCEBENCH_BUILDER_PER_KEY_LLM=0` to disable per-key LLM calls (deterministic fallback).
+
+### Retrieval knobs (quick list)
+
+- `GOLDEVIDENCEBENCH_RETRIEVAL_K`: include top-k latest entries for the key (default 1).
+- `GOLDEVIDENCEBENCH_RETRIEVAL_WRONG_TYPE`: `none`, `same_key`, or `other_key` to inject a wrong line for robustness testing.
+- `GOLDEVIDENCEBENCH_RETRIEVAL_INCLUDE_CLEAR=0`: skip CLEAR entries.
+- `GOLDEVIDENCEBENCH_RETRIEVAL_DROP_PROB`: (0-1) probabilistically drop the correct line.
+- `GOLDEVIDENCEBENCH_RETRIEVAL_DROP_SEED`: make drops deterministic by row id.
+- `GOLDEVIDENCEBENCH_RETRIEVAL_AUTHORITY_SPOOF_RATE`: (0-1) flip NOTE/UPDATE labels in the candidate set.
+- `GOLDEVIDENCEBENCH_RETRIEVAL_AUTHORITY_SPOOF_SEED`: deterministic spoofing by row id.
+- `GOLDEVIDENCEBENCH_RETRIEVAL_ORDER`: `shuffle|gold_first|gold_middle|gold_last` (use `GOLDEVIDENCEBENCH_RETRIEVAL_ORDER_SEED` for deterministic order).
+- `GOLDEVIDENCEBENCH_RETRIEVAL_STEP_BUCKET`: coarsen step numbers for selection features (1 = no coarsening).
+- `GOLDEVIDENCEBENCH_RETRIEVAL_QUERY_SANDWICH=1`: repeat the question before and after the candidate ledger lines.
+- `GOLDEVIDENCEBENCH_RETRIEVAL_PICK_THEN_ANSWER=1`: pick a support_id first, then answer using only that line.
+- `GOLDEVIDENCEBENCH_RETRIEVAL_COPY_CLAMP=1`: require the answer value be an exact substring of the selected line (returns null otherwise).
+- `GOLDEVIDENCEBENCH_RETRIEVAL_RERANK`: `latest_step|last_occurrence|prefer_set_latest|linear` (non-LLM selector baseline).
+- `GOLDEVIDENCEBENCH_RETRIEVAL_LINEAR_MODEL`: JSON model file from `train_selector_linear.py` (for `linear`).
+- `GOLDEVIDENCEBENCH_RETRIEVAL_LINEAR_TIE_BREAK`: `latest_step` (optional `GOLDEVIDENCEBENCH_RETRIEVAL_LINEAR_TIE_EPS`).
+- `GOLDEVIDENCEBENCH_RETRIEVAL_SELECTOR_ONLY=1`: skip answer generation and emit only `support_ids`.
+- `GOLDEVIDENCEBENCH_RETRIEVAL_ABSTAIN_ON_MISSING=1`: emit an empty prediction when gold is missing (use with `GOLDEVIDENCEBENCH_RETRIEVAL_DROP_PROB` to calibrate abstain precision/recall).
+- Selection metrics (`gold_present_rate`, `selection_rate`) are best for speed-focused iterations; value accuracy is not meaningful in selector-only mode.
 
 Retrieval order bias (example, k=4, s3q16, kv/standard, gold always present):
 
@@ -75,7 +75,7 @@ Plot the order-bias figure:
 python .\scripts\plot_order_bias.py --in-csv .\runs\summary_all.csv --out .\docs\figures\order_bias_s5q24_llm.png
 ```
 
-![Order bias (LLM-only, k=4, same_key, s5q24)](docs/figures/order_bias_s5q24_llm.png)
+![Order bias (LLM-only, k=4, same_key, s5q24)](figures/order_bias_s5q24_llm.png)
 
 Order-bias (selector on: latest_step, same settings):
 
@@ -94,7 +94,7 @@ Plot the reranker k-curve:
 python .\scripts\plot_rerank_curve.py --in-csv .\runs\summary_all.csv --out .\docs\figures\rerank_k_curve_s5q24.png
 ```
 
-![Reranker k-curve (same_key, shuffle, s5q24)](docs/figures/rerank_k_curve_s5q24.png)
+![Reranker k-curve (same_key, shuffle, s5q24)](figures/rerank_k_curve_s5q24.png)
 
 Multi-model spot check (Meta-Llama-3.1-8B-Instruct Q4_K_M vs Qwen, s3q16):
 
@@ -251,7 +251,7 @@ KV selector bake-off (s5q24, k=4, same_key, shuffle):
 | prefer_set_latest | 1.0 | 1.0 | 0.9750 | 0.9750 | 0.9750 |
 | linear | 1.0 | 1.0 | 0.9750 | 0.9750 | 0.9750 |
 
-![Compute vs quality (kv, s5q24)](docs/figures/compute_vs_quality_kv_s5q24.png)
+![Compute vs quality (kv, s5q24)](figures/compute_vs_quality_kv_s5q24.png)
 
 Multi-model check (kv, latest_step, s5q24):
 
@@ -262,7 +262,7 @@ Multi-model check (kv, latest_step, s5q24):
 
 Even with identical retrieval/selection, model quality still matters for answer extraction; Qwen outperforms Llama here.
 
-![KV model check (latest_step, s5q24)](docs/figures/model_compare_kv_latest_step_s5q24.png)
+![KV model check (latest_step, s5q24)](figures/model_compare_kv_latest_step_s5q24.png)
 
 Linear selector order generalization (kv_commentary, k=4, s5q24):
 
@@ -284,7 +284,7 @@ Pick-then-answer A/B (kv_commentary, s3q16, authority filter on):
 
 Pick-then-answer adds no benefit once authority filtering removes NOTE noise.
 
-![Order bias (kv_commentary, linear, k=4, s5q24)](docs/figures/order_bias_kv_commentary_linear_s5q24.png)
+![Order bias (kv_commentary, linear, k=4, s5q24)](figures/order_bias_kv_commentary_linear_s5q24.png)
 
 In this mode, NOTE lines appear after real updates, so `latest_step` can fail while `prefer_set_latest` holds.
 
@@ -299,7 +299,7 @@ Order-bias check with NOTE-aware rerank (kv_commentary, k=4, s3q16):
 
 With `prefer_update_latest`, order bias disappears in kv_commentary while end-to-end accuracy stays perfect.
 
-![Order bias (kv_commentary, prefer_update_latest, k=4, s3q16)](docs/figures/order_bias_kv_commentary_prefer_update_s3q16.png)
+![Order bias (kv_commentary, prefer_update_latest, k=4, s3q16)](figures/order_bias_kv_commentary_prefer_update_s3q16.png)
 
 - rerank none: accuracy_when_gold_present 0.3333, selection_rate 0.3333
 - rerank latest_step: accuracy_when_gold_present 0.625, selection_rate 0.625

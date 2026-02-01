@@ -1,0 +1,69 @@
+{
+  "name": "compliance_benchmark",
+  "description": "Fixtures emphasizing safety and bad-actor resistance.",
+  "fixtures": [
+    {
+      "id": "destructive_confirm",
+      "label": "Destructive confirm",
+      "failure_mode": "danger_confirm",
+      "fixture": "data/ui_minipilot_local_optimum_destructive_confirm_fixture.jsonl",
+      "observed": "data/ui_minipilot_local_optimum_destructive_confirm_observed_ok.jsonl"
+    },
+    {
+      "id": "unprompted_confirm",
+      "label": "Unprompted confirm",
+      "failure_mode": "unexpected_confirm",
+      "fixture": "data/ui_minipilot_local_optimum_blocking_modal_unprompted_confirm_fixture.jsonl",
+      "observed": "data/ui_minipilot_local_optimum_blocking_modal_unprompted_confirm_observed_ok.jsonl"
+    },
+    {
+      "id": "blocking_modal_required",
+      "label": "Blocking modal required",
+      "failure_mode": "modal_block",
+      "fixture": "data/ui_minipilot_local_optimum_blocking_modal_required_fixture.jsonl",
+      "observed": "data/ui_minipilot_local_optimum_blocking_modal_required_observed_ok.jsonl"
+    },
+    {
+      "id": "blocking_modal_permission",
+      "label": "Blocking modal permission",
+      "failure_mode": "permission_gate",
+      "fixture": "data/ui_minipilot_local_optimum_blocking_modal_permission_fixture.jsonl",
+      "observed": "data/ui_minipilot_local_optimum_blocking_modal_permission_observed_ok.jsonl"
+    },
+    {
+      "id": "blocking_modal_consent",
+      "label": "Blocking modal consent",
+      "failure_mode": "consent_gate",
+      "fixture": "data/ui_minipilot_local_optimum_blocking_modal_consent_fixture.jsonl",
+      "observed": "data/ui_minipilot_local_optimum_blocking_modal_consent_observed_ok.jsonl"
+    },
+    {
+      "id": "role_conflict",
+      "label": "Role conflict",
+      "failure_mode": "role_conflict",
+      "fixture": "data/ui_minipilot_local_optimum_role_conflict_fixture.jsonl",
+      "observed": "data/ui_minipilot_local_optimum_role_conflict_observed_ok.jsonl"
+    },
+    {
+      "id": "disabled_primary",
+      "label": "Disabled primary",
+      "failure_mode": "disabled_action",
+      "fixture": "data/ui_minipilot_local_optimum_disabled_primary_fixture.jsonl",
+      "observed": "data/ui_minipilot_local_optimum_disabled_primary_observed_ok.jsonl"
+    },
+    {
+      "id": "checkbox_gate",
+      "label": "Checkbox gate",
+      "failure_mode": "consent_gate",
+      "fixture": "data/ui_minipilot_local_optimum_checkbox_gate_fixture.jsonl",
+      "observed": "data/ui_minipilot_local_optimum_checkbox_gate_observed_ok.jsonl"
+    },
+    {
+      "id": "state_gate",
+      "label": "State gate (generic)",
+      "failure_mode": "state_gate",
+      "fixture": "data/ui_minipilot_state_gate_fixture.jsonl",
+      "observed": "data/ui_minipilot_state_gate_observed_ok.jsonl"
+    }
+  ]
+}

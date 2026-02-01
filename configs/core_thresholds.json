@@ -1,0 +1,11 @@
+{
+  "core_benchmark": {
+    "min_policy_pass": 1.0
+  },
+  "internal_tooling_benchmark": {
+    "min_policy_pass": 1.0
+  },
+  "compliance_benchmark": {
+    "min_policy_pass": 1.0
+  }
+}

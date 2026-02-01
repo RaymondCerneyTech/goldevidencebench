@@ -1,0 +1,55 @@
+{
+  "name": "internal_tooling_benchmark",
+  "description": "Fixtures emphasizing state drift and wrong-path errors in multi-step workflows.",
+  "fixtures": [
+    {
+      "id": "stale_tab_state",
+      "label": "Stale tab state",
+      "failure_mode": "stale_state",
+      "fixture": "data/ui_minipilot_local_optimum_stale_tab_state_fixture.jsonl",
+      "observed": "data/ui_minipilot_local_optimum_stale_tab_state_observed_ok.jsonl"
+    },
+    {
+      "id": "context_switch",
+      "label": "Context switch",
+      "failure_mode": "context_switch",
+      "fixture": "data/ui_minipilot_local_optimum_context_switch_fixture.jsonl",
+      "observed": "data/ui_minipilot_local_optimum_context_switch_observed_ok.jsonl"
+    },
+    {
+      "id": "window_focus",
+      "label": "Window focus",
+      "failure_mode": "focus_loss",
+      "fixture": "data/ui_minipilot_local_optimum_window_focus_fixture.jsonl",
+      "observed": "data/ui_minipilot_local_optimum_window_focus_observed_ok.jsonl"
+    },
+    {
+      "id": "tab_state_reset",
+      "label": "Tab state reset",
+      "failure_mode": "state_reset",
+      "fixture": "data/ui_minipilot_local_optimum_tab_state_reset_fixture.jsonl",
+      "observed": "data/ui_minipilot_local_optimum_tab_state_reset_observed_ok.jsonl"
+    },
+    {
+      "id": "section_path",
+      "label": "Section path",
+      "failure_mode": "path_conflict",
+      "fixture": "data/ui_minipilot_local_optimum_section_path_fixture.jsonl",
+      "observed": "data/ui_minipilot_local_optimum_section_path_observed_ok.jsonl"
+    },
+    {
+      "id": "blocking_modal_detour",
+      "label": "Blocking modal detour",
+      "failure_mode": "modal_detour",
+      "fixture": "data/ui_minipilot_local_optimum_blocking_modal_detour_fixture.jsonl",
+      "observed": "data/ui_minipilot_local_optimum_blocking_modal_detour_observed_ok.jsonl"
+    },
+    {
+      "id": "notepad_wrong_directory_detour",
+      "label": "Wrong directory detour",
+      "failure_mode": "navigation_detour",
+      "fixture": "data/ui_minipilot_notepad_wrong_directory_detour_fixture.jsonl",
+      "observed": "data/ui_minipilot_notepad_wrong_directory_detour_observed_ok.jsonl"
+    }
+  ]
+}

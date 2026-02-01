@@ -24,6 +24,11 @@ def _parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--out", type=Path, default=None, help="Optional output markdown path.")
     parser.add_argument("--print", action="store_true", help="Print the delta report to stdout.")
+    parser.add_argument(
+        "--full",
+        action="store_true",
+        help="Include unchanged metrics/fields in the delta report.",
+    )
     return parser.parse_args()
 
 
@@ -82,7 +87,7 @@ def main() -> int:
         print(f"Other run directory not found: {other_dir}")
         return 1
     delta = run_diff.compare_runs(base_dir=base_dir, other_dir=other_dir)
-    report = run_diff.render_delta_report(delta)
+    report = run_diff.render_delta_report(delta, full=ns.full)
 
     out_path = ns.out
     if out_path is None:

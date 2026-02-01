@@ -1,0 +1,36 @@
+{
+  "name": "rag_benchmark_lenient",
+  "description": "Lenient RAG benchmark (baseline pass targets).",
+  "datasets": [
+    {
+      "id": "authority_camo",
+      "label": "Authority camouflage",
+      "failure_mode": "authority_camo",
+      "data": "data/kv_commentary_note_camo.jsonl"
+    },
+    {
+      "id": "kv_commentary",
+      "label": "KV commentary (baseline)",
+      "failure_mode": "baseline",
+      "data": "data/kv_commentary.jsonl"
+    },
+    {
+      "id": "kv_commentary_large",
+      "label": "KV commentary (large)",
+      "failure_mode": "baseline_large",
+      "data": "data/goldevidencebench_kv_commentary.jsonl"
+    },
+    {
+      "id": "kv_train",
+      "label": "KV training mix",
+      "failure_mode": "mixed",
+      "data": "data/kv_train.jsonl"
+    },
+    {
+      "id": "goldevidencebench",
+      "label": "GoldEvidenceBench (baseline)",
+      "failure_mode": "baseline",
+      "data": "data/goldevidencebench.jsonl"
+    }
+  ]
+}

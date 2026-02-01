@@ -14,6 +14,7 @@ dependencies = ["pydantic>=2.7"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "ruff>=0.5"]
+pdf = ["pypdf>=4.2"]
 
 [project.scripts]
 goldevidencebench = "goldevidencebench.cli:main"

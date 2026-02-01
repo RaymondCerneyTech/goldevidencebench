@@ -3,7 +3,7 @@
 Sample run folder layout (from any run that writes `summary.json`):
 
 ```
-runs\example_run\
+runs/<run_dir>/
   summary.json
   diagnosis.json
   thread.jsonl

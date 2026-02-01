@@ -90,6 +90,106 @@ def _model_fingerprint(repro: dict[str, Any]) -> dict[str, Any]:
     return {}
 
 
+def _load_case_pack(run_dir: Path) -> dict[str, Any]:
+    return _load_json(run_dir / "case_pack_summary.json")
+
+
+def _find_step(summary: dict[str, Any], name: str) -> dict[str, Any] | None:
+    steps = summary.get("steps") or []
+    for step in steps:
+        if isinstance(step, dict) and step.get("name") == name:
+            return step
+    return None
+
+
+def _load_bad_actor_metrics(run_dir: Path, step: dict[str, Any]) -> dict[str, Any]:
+    details = step.get("details", {}) if isinstance(step, dict) else {}
+    expected_fail = details.get("expected_fail")
+    metrics: dict[str, Any] = {
+        "status": step.get("status") if isinstance(step, dict) else None,
+        "expected_fail_observed": details.get("expected_fail_observed"),
+        "wall_rate": details.get("wall_rate"),
+    }
+    holdout_gate = details.get("holdout_gate")
+    step_run_dir = Path(step.get("run_dir", "")) if isinstance(step, dict) else Path()
+    gate_path = (step_run_dir / holdout_gate) if holdout_gate else None
+    if gate_path and gate_path.exists():
+        gate = _load_json(gate_path)
+        gate_status = gate.get("status")
+        canary = gate.get("canary") or {}
+        fix_auth = gate.get("fix_authority") or {}
+        fix_pref = gate.get("fix_prefer_set_latest") or {}
+        metrics.update(
+            {
+                "gate_status": gate_status,
+                "canary_drift_step_rate": canary.get("drift_step_rate"),
+                "canary_pass": canary.get("pass"),
+                "fix_authority_drift_step_rate": fix_auth.get("drift_step_rate"),
+                "fix_authority_pass": fix_auth.get("pass"),
+                "fix_prefer_set_latest_drift_step_rate": fix_pref.get("drift_step_rate"),
+                "fix_prefer_set_latest_pass": fix_pref.get("pass"),
+            }
+        )
+        if expected_fail and gate_status:
+            metrics["expected_fail_observed"] = gate_status != "PASS"
+    # Prefer wall rate from the local bad_actor wall summary if present.
+    wall_dir = step_run_dir / "wall"
+    if wall_dir.exists():
+        wall_summaries = sorted(wall_dir.rglob("summary.json"))
+        if wall_summaries:
+            wall_data = _load_json(wall_summaries[-1])
+            drift = wall_data.get("drift") or {}
+            wall_rate = drift.get("step_rate")
+            if wall_rate is not None:
+                metrics["wall_rate"] = wall_rate
+    return metrics
+
+
+def _case_pack_delta(base_dir: Path, other_dir: Path) -> dict[str, Any]:
+    base_summary = _load_case_pack(base_dir)
+    other_summary = _load_case_pack(other_dir)
+    if not base_summary or not other_summary:
+        return {"present": False}
+    base_bad = _find_step(base_summary, "bad_actor_demo")
+    other_bad = _find_step(other_summary, "bad_actor_demo")
+    if not base_bad or not other_bad:
+        return {"present": False}
+    base_metrics = _load_bad_actor_metrics(base_dir, base_bad)
+    other_metrics = _load_bad_actor_metrics(other_dir, other_bad)
+    changes: list[dict[str, Any]] = []
+    for key in (
+        "expected_fail_observed",
+        "wall_rate",
+        "gate_status",
+        "canary_drift_step_rate",
+        "canary_pass",
+        "fix_authority_drift_step_rate",
+        "fix_authority_pass",
+        "fix_prefer_set_latest_drift_step_rate",
+        "fix_prefer_set_latest_pass",
+    ):
+        before = base_metrics.get(key)
+        after = other_metrics.get(key)
+        if before != after:
+            changes.append({"metric": key, "base": before, "other": after})
+    return {
+        "present": True,
+        "base_summary": {
+            "status": base_summary.get("status"),
+            "model_id": base_summary.get("model_id"),
+            "source_pdf": base_summary.get("source_pdf"),
+        },
+        "other_summary": {
+            "status": other_summary.get("status"),
+            "model_id": other_summary.get("model_id"),
+            "source_pdf": other_summary.get("source_pdf"),
+        },
+        "base_bad_actor": base_metrics,
+        "other_bad_actor": other_metrics,
+        "changes": changes,
+    }
+
+
 def compare_runs(
     *,
     base_dir: Path,
@@ -114,11 +214,15 @@ def compare_runs(
     other_metrics = other_diag.get("supporting_metrics") or {}
 
     metric_deltas: list[dict[str, Any]] = []
+    metric_values: dict[str, dict[str, Any]] = {}
     for key in METRIC_DIRECTIONS:
+        base_val = base_metrics.get(key)
+        other_val = other_metrics.get(key)
+        metric_values[key] = {"base": base_val, "other": other_val}
         entry = _metric_delta(
             key,
-            base_metrics.get(key),
-            other_metrics.get(key),
+            base_val,
+            other_val,
         )
         if entry:
             metric_deltas.append(entry)
@@ -183,14 +287,78 @@ def compare_runs(
         "other_dir": str(other_dir),
         "summary": summary,
         "metric_deltas": metric_deltas,
+        "metric_values": metric_values,
         "top_regressions": regressions[:5],
         "top_improvements": improvements[:5],
         "gate_changes": gate_changes,
         "config_changes": config_changes,
+        "case_pack": _case_pack_delta(base_dir, other_dir),
     }
 
 
-def render_delta_report(delta: dict[str, Any]) -> str:
+def render_delta_report(delta: dict[str, Any], *, full: bool = False) -> str:
+    case_pack = delta.get("case_pack", {})
+    if case_pack.get("present"):
+        lines = [
+            "# Case Pack Delta Report",
+            "",
+            f"Base: {delta['base_dir']}",
+            f"Other: {delta['other_dir']}",
+            "",
+            "## Case pack summary",
+        ]
+        base_summary = case_pack.get("base_summary", {})
+        other_summary = case_pack.get("other_summary", {})
+        lines.append(
+            f"- status: {base_summary.get('status')} -> {other_summary.get('status')}"
+        )
+        lines.append(
+            f"- model_id: {base_summary.get('model_id')} -> {other_summary.get('model_id')}"
+        )
+        if base_summary.get("source_pdf") or other_summary.get("source_pdf"):
+            lines.append(
+                f"- source_pdf: {base_summary.get('source_pdf')} -> {other_summary.get('source_pdf')}"
+            )
+
+        if full:
+            base_bad = case_pack.get("base_bad_actor", {})
+            other_bad = case_pack.get("other_bad_actor", {})
+            lines.extend(["", "## Case pack (bad-actor metrics)"])
+            for key in (
+                "status",
+                "gate_status",
+                "expected_fail_observed",
+                "wall_rate",
+                "canary_drift_step_rate",
+                "canary_pass",
+                "fix_authority_drift_step_rate",
+                "fix_authority_pass",
+                "fix_prefer_set_latest_drift_step_rate",
+                "fix_prefer_set_latest_pass",
+            ):
+                lines.append(
+                    f"- {key}: {base_bad.get(key)} -> {other_bad.get(key)}"
+                )
+        else:
+            changes = case_pack.get("changes", [])
+            lines.extend(["", "## Case pack changes"])
+            if changes:
+                for entry in changes:
+                    lines.append(
+                        f"- {entry['metric']}: {entry.get('base')} -> {entry.get('other')}"
+                    )
+            else:
+                lines.append("- none (no bad-actor metric deltas)")
+
+        config_changes = delta.get("config_changes", [])
+        if config_changes:
+            lines.extend(["", "## Config changes"])
+            for entry in config_changes:
+                lines.append(
+                    f"- {entry['field']}: {entry.get('base')} -> {entry.get('other')}"
+                )
+        return "\n".join(lines) + "\n"
+
     lines = [
         "# Run Delta Report",
         "",
@@ -228,6 +396,23 @@ def render_delta_report(delta: dict[str, Any]) -> str:
             )
     else:
         lines.append("- none")
+
+    if full:
+        lines.extend(["", "## Metric deltas (all)"])
+        metric_values = delta.get("metric_values", {})
+        for key in METRIC_DIRECTIONS:
+            entry = metric_values.get(key, {})
+            base_val = entry.get("base")
+            other_val = entry.get("other")
+            if base_val is None and other_val is None:
+                continue
+            if base_val is None or other_val is None:
+                lines.append(f"- {key}: {base_val} -> {other_val}")
+            else:
+                delta_val = other_val - base_val
+                lines.append(
+                    f"- {key}: {_format_delta(delta_val)} ({base_val:.4f} -> {other_val:.4f})"
+                )
 
     lines.extend(["", "## Gate status changes"])
     gate_changes = delta.get("gate_changes", [])

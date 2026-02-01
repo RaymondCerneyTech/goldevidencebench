@@ -68,8 +68,12 @@ def _print_report(res, prefix: str = "", eff: dict[str, Any] | None = None) -> N
     if res.state_integrity_rate is not None:
         print(f" state_integrity={res.state_integrity_rate:.3f}", end="")
     if eff:
+        wall_s = eff.get("wall_s")
+        if wall_s is None:
+            wall_s = eff.get("wall")
+        wall_display = f"{wall_s:.2f}" if isinstance(wall_s, (int, float)) else "n/a"
         print(
-            f" tokens={eff['tokens']} (~{eff['tokens_per_q']:.1f}/q) passes={eff['passes']} wall_s={eff['wall']:.2f}",
+            f" tokens={eff['tokens']} (~{eff['tokens_per_q']:.1f}/q) passes={eff['passes']} wall_s={wall_display}",
             end="",
         )
     print()

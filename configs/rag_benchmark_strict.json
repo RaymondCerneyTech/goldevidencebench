@@ -1,0 +1,54 @@
+{
+  "name": "rag_benchmark_strict",
+  "description": "Strict RAG benchmark (includes hard/small datasets).",
+  "datasets": [
+    {
+      "id": "domain_stale",
+      "label": "Policy handbook (stale docs)",
+      "failure_mode": "stale_doc",
+      "data": "data/rag_domain_stale.jsonl"
+    },
+    {
+      "id": "domain_authority",
+      "label": "Policy handbook (authority decoys)",
+      "failure_mode": "authority_decoy",
+      "data": "data/rag_domain_authority.jsonl"
+    },
+    {
+      "id": "authority_camo",
+      "label": "Authority camouflage",
+      "failure_mode": "authority_camo",
+      "data": "data/kv_commentary_note_camo.jsonl"
+    },
+    {
+      "id": "kv_commentary",
+      "label": "KV commentary (baseline)",
+      "failure_mode": "baseline",
+      "data": "data/kv_commentary.jsonl"
+    },
+    {
+      "id": "kv_commentary_large",
+      "label": "KV commentary (large)",
+      "failure_mode": "baseline_large",
+      "data": "data/goldevidencebench_kv_commentary.jsonl"
+    },
+    {
+      "id": "kv_train",
+      "label": "KV training mix",
+      "failure_mode": "mixed",
+      "data": "data/kv_train.jsonl"
+    },
+    {
+      "id": "goldevidencebench",
+      "label": "GoldEvidenceBench (baseline)",
+      "failure_mode": "baseline",
+      "data": "data/goldevidencebench.jsonl"
+    },
+    {
+      "id": "goldevidencebench_small",
+      "label": "GoldEvidenceBench (small)",
+      "failure_mode": "baseline_small",
+      "data": "data/goldevidencebench_small.jsonl"
+    }
+  ]
+}

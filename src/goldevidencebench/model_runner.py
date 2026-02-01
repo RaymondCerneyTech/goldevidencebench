@@ -96,6 +96,16 @@ def validate_adapter_output(
     if len(supports) > max_support_k:
         raise ValueError(f"support_ids exceeds max_support_k={max_support_k}")
 
+    citation_mode = row.get("meta", {}).get("citation_mode")
+    if citation_mode == "doc_id":
+        allowed = row.get("meta", {}).get("doc_ids")
+        if isinstance(allowed, list):
+            allowed_set = {str(item) for item in allowed}
+            for sid in supports:
+                if sid not in allowed_set:
+                    raise ValueError(f"support_id {sid!r} not in doc_ids")
+        return {"value": parsed.value, "support_ids": supports}
+
     valid_ids = _valid_support_ids(row)
     for sid in supports:
         if sid not in valid_ids:
@@ -114,6 +124,7 @@ def run_adapter(
     preds: list[dict[str, Any]] = []
     raw_preds: list[dict[str, Any]] = []
     tokens = 0
+    llm_tokens = 0
     artifact_stats: list[dict[str, Any]] = []
     perf_stats: list[dict[str, Any]] = []
     retrieval_stats: list[dict[str, Any]] = []
@@ -148,6 +159,9 @@ def run_adapter(
                     perf = None
                 if perf:
                     perf_stats.append(perf)
+                    total_tokens = perf.get("total_tokens") if isinstance(perf, dict) else None
+                    if isinstance(total_tokens, (int, float)):
+                        llm_tokens += int(total_tokens)
             if hasattr(adapter, "take_raw"):
                 try:
                     raw = adapter.take_raw()
@@ -167,6 +181,7 @@ def run_adapter(
                 except Exception:
                     diag = None
                 if isinstance(diag, dict):
+                    diag.setdefault("id", row.get("id"))
                     retrieval_stats.append(diag)
             validated = validate_adapter_output(row=row, raw=out, protocol=protocol, max_support_k=max_support_k)
             pid = row["id"]
@@ -179,12 +194,13 @@ def run_adapter(
                 }
             )
 
+    final_tokens = llm_tokens if llm_tokens > 0 else tokens
     return ModelResult(
         predictions=preds,
         raw_predictions=raw_preds,
         retrieval_stats=retrieval_stats,
-        tokens=tokens,
-        tokens_per_q=(tokens / len(data_rows)) if data_rows else 0.0,
+        tokens=final_tokens,
+        tokens_per_q=(final_tokens / len(data_rows)) if data_rows else 0.0,
         passes=1,
         artifact_stats=artifact_stats,
         perf_stats=perf_stats,

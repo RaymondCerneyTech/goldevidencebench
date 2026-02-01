@@ -8,7 +8,14 @@ param(
     [ValidateSet("stale_tab_state", "focus_drift")]
     [string]$HoldoutName = "stale_tab_state",
     [double]$CanaryMin = 0.5,
-    [string]$RunsDir = ""
+    [string]$RunsDir = "",
+    [string]$GateArtifactPath = "",
+    [string]$LatestDir = "",
+    [bool]$FixAuthorityFilter = $true,
+    [ValidateSet("latest_step", "prefer_set_latest")]
+    [string]$FixPreferRerank = "prefer_set_latest",
+    [double]$AuthoritySpoofRate = 0.0,
+    [int]$AuthoritySpoofSeed = 0
 )
 
 if (-not $ModelPath) {
@@ -68,6 +75,8 @@ function Invoke-Variant {
         [bool]$AuthorityFilter
     )
     $env:GOLDEVIDENCEBENCH_RETRIEVAL_AUTHORITY_FILTER = if ($AuthorityFilter) { "1" } else { "0" }
+    $env:GOLDEVIDENCEBENCH_RETRIEVAL_AUTHORITY_SPOOF_RATE = "$AuthoritySpoofRate"
+    $env:GOLDEVIDENCEBENCH_RETRIEVAL_AUTHORITY_SPOOF_SEED = "$AuthoritySpoofSeed"
     $outDir = Join-Path $finalRunsDir $Label
     & $holdoutScript -ModelPath $ModelPath -Steps $Steps -Keys $Keys -Queries $Queries -Seeds $Seeds `
         -Rerank $Rerank -Adapter $Adapter -RunsDir $outDir -HoldoutName $HoldoutName | Out-Host
@@ -91,8 +100,8 @@ Write-Host "Canary min drift.step_rate: $CanaryMin"
 Write-Host "Drift max (fix paths): $driftMax"
 
 $canary = Invoke-Variant -Label "canary_latest_step" -Rerank "latest_step" -AuthorityFilter:$false
-$fixAuthority = Invoke-Variant -Label "fix_authority_latest_step" -Rerank "latest_step" -AuthorityFilter:$true
-$fixPrefer = Invoke-Variant -Label "fix_prefer_set_latest" -Rerank "prefer_set_latest" -AuthorityFilter:$false
+$fixAuthority = Invoke-Variant -Label "fix_authority_latest_step" -Rerank "latest_step" -AuthorityFilter:$FixAuthorityFilter
+$fixPrefer = Invoke-Variant -Label "fix_prefer_set_latest" -Rerank $FixPreferRerank -AuthorityFilter:$false
 
 function Test-Variant {
     param(
@@ -122,9 +131,17 @@ $fixPreferPass = Test-Variant -Rate $fixPreferRate -Min $null -Max $driftMax
 
 $status = if ($canaryPass -and $fixAuthorityPass -and $fixPreferPass) { "PASS" } else { "FAIL" }
 
-$gateDir = "runs\\release_gates"
-New-Item -ItemType Directory -Path $gateDir -Force | Out-Null
-$gateArtifact = Join-Path $gateDir "drift_holdout_gate.json"
+$gateArtifact = $GateArtifactPath
+if (-not $gateArtifact) {
+    $gateDir = "runs\\release_gates"
+    New-Item -ItemType Directory -Path $gateDir -Force | Out-Null
+    $gateArtifact = Join-Path $gateDir "drift_holdout_gate.json"
+} else {
+    $gateDir = Split-Path -Parent $gateArtifact
+    if ($gateDir) {
+        New-Item -ItemType Directory -Path $gateDir -Force | Out-Null
+    }
+}
 
 $artifact = [ordered]@{
     status = $status
@@ -158,8 +175,10 @@ $artifact = [ordered]@{
 $utf8NoBom = New-Object System.Text.UTF8Encoding $false
 [System.IO.File]::WriteAllText($gateArtifact, ($artifact | ConvertTo-Json -Depth 6), $utf8NoBom)
 
-$latestDir = "runs\\drift_holdout_latest"
-New-Item -ItemType Directory -Path $latestDir -Force | Out-Null
+if (-not $LatestDir) {
+    $LatestDir = "runs\\drift_holdout_latest"
+}
+New-Item -ItemType Directory -Path $LatestDir -Force | Out-Null
 $snapshot = $canary
 if ($fixAuthorityPass) {
     $snapshot = $fixAuthority
@@ -169,17 +188,17 @@ if ($fixAuthorityPass) {
 $summaryPath = $snapshot.summary_path
 $diagnosisPath = Join-Path (Split-Path $summaryPath) "diagnosis.json"
 if (Test-Path $summaryPath) {
-    Copy-Item $summaryPath -Destination (Join-Path $latestDir "summary.json") -Force
+    Copy-Item $summaryPath -Destination (Join-Path $LatestDir "summary.json") -Force
 }
 if (Test-Path $diagnosisPath) {
-    Copy-Item $diagnosisPath -Destination (Join-Path $latestDir "diagnosis.json") -Force
+    Copy-Item $diagnosisPath -Destination (Join-Path $LatestDir "diagnosis.json") -Force
 }
 
 Write-Host "Canary drift.step_rate=$canaryRate pass=$canaryPass"
 Write-Host "Fix authority drift.step_rate=$fixAuthorityRate pass=$fixAuthorityPass"
 Write-Host "Fix prefer_set_latest drift.step_rate=$fixPreferRate pass=$fixPreferPass"
 Write-Host "Drift holdout gate: $status"
-Write-Host "Latest drift holdout snapshot: $latestDir"
+Write-Host "Latest drift holdout snapshot: $LatestDir"
 Write-Host "Gate artifact: $gateArtifact"
 
 if ($status -ne "PASS") {

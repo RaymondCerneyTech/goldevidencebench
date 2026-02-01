@@ -1,7 +1,7 @@
 # Trap Families Backlog
 
 This list tracks implemented trap families and a backlog of untried ones.
-Use `scripts/next_trap_family.ps1` to pick the next backlog item to implement.
+Use `.\scripts\next_trap_family.ps1` to pick the next backlog item to implement.
 
 ## Implemented
 
