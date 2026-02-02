@@ -956,6 +956,7 @@
       "id": "drift_holdout_gate",
       "summary_path": "runs/drift_holdout_latest/summary.json",
       "severity": "warn",
+      "canary_min": 0.5,
       "metrics": [
         {
           "path": "drift.step_rate",

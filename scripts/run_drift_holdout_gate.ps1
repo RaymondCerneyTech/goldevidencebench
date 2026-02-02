@@ -52,6 +52,27 @@ function Get-DriftMax {
     return $fallback
 }
 
+function Get-CanaryMin {
+    param([string]$ConfigPath)
+    $fallback = 0.5
+    if (-not (Test-Path $ConfigPath)) {
+        return $fallback
+    }
+    try {
+        $config = Get-Content -Raw -Path $ConfigPath | ConvertFrom-Json
+        $check = $config.checks | Where-Object { $_.id -eq "drift_holdout_gate" } | Select-Object -First 1
+        if (-not $check) {
+            return $fallback
+        }
+        if ($null -ne $check.canary_min) {
+            return [double]$check.canary_min
+        }
+    } catch {
+        return $fallback
+    }
+    return $fallback
+}
+
 function Get-DriftRate {
     param([string]$SummaryPath)
     if (-not (Test-Path $SummaryPath)) {
@@ -66,7 +87,11 @@ function Get-DriftRate {
 
 $holdoutScript = Join-Path $PSScriptRoot "run_drift_holdouts.ps1"
 
-$driftMax = Get-DriftMax -ConfigPath ".\\configs\\usecase_checks.json"
+$configPath = ".\\configs\\usecase_checks.json"
+$driftMax = Get-DriftMax -ConfigPath $configPath
+if (-not $PSBoundParameters.ContainsKey("CanaryMin")) {
+    $CanaryMin = Get-CanaryMin -ConfigPath $configPath
+}
 
 function Invoke-Variant {
     param(
@@ -101,7 +126,7 @@ Write-Host "Drift max (fix paths): $driftMax"
 
 $canary = Invoke-Variant -Label "canary_latest_step" -Rerank "latest_step" -AuthorityFilter:$false
 $fixAuthority = Invoke-Variant -Label "fix_authority_latest_step" -Rerank "latest_step" -AuthorityFilter:$FixAuthorityFilter
-$fixPrefer = Invoke-Variant -Label "fix_prefer_set_latest" -Rerank $FixPreferRerank -AuthorityFilter:$false
+$fixPrefer = Invoke-Variant -Label "fix_prefer_set_latest" -Rerank $FixPreferRerank -AuthorityFilter:$FixAuthorityFilter
 
 function Test-Variant {
     param(
@@ -196,7 +221,7 @@ if (Test-Path $diagnosisPath) {
 
 Write-Host "Canary drift.step_rate=$canaryRate pass=$canaryPass"
 Write-Host "Fix authority drift.step_rate=$fixAuthorityRate pass=$fixAuthorityPass"
-Write-Host "Fix prefer_set_latest drift.step_rate=$fixPreferRate pass=$fixPreferPass"
+Write-Host "Fix prefer_set_latest (authority filter on) drift.step_rate=$fixPreferRate pass=$fixPreferPass"
 Write-Host "Drift holdout gate: $status"
 Write-Host "Latest drift holdout snapshot: $LatestDir"
 Write-Host "Gate artifact: $gateArtifact"

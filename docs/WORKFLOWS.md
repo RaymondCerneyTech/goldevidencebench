@@ -85,11 +85,11 @@ Release check (runs pinned gates and UI stubs):
 
 - `stale_tab_state`: model tends to commit stale UI state.
 
-Expected outcomes (thresholds in [scripts/run_drift_holdout_gate.ps1](../scripts/run_drift_holdout_gate.ps1)):
+Expected outcomes (thresholds in [configs/usecase_checks.json](../configs/usecase_checks.json)):
 
 - Canary (latest_step, authority filter off) is expected to FAIL per `drift.step_rate` thresholds.
 - Fix A (authority filter on) is expected to PASS per `drift.step_rate` thresholds.
-- Fix B (prefer_set_latest) is expected to PASS per `drift.step_rate` thresholds.
+- Fix B (prefer_set_latest, authority filter on) is expected to PASS per `drift.step_rate` thresholds.
 - Artifact: `runs/release_gates/drift_holdout_gate.json` (overwritten on each release check). Per-run summaries live under `runs/<run_dir>/`.
 
 What the terms mean:

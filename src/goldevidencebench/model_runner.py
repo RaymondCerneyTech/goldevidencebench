@@ -4,7 +4,7 @@ import importlib
 from dataclasses import dataclass
 from typing import Any, Protocol
 
-from pydantic import BaseModel, ValidationError, field_validator, model_validator
+from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
 
 from goldevidencebench.baselines import parse_book_ledger, parse_updates, validate_book_artifact
 
@@ -44,7 +44,7 @@ class ModelResult:
 class AdapterOutput(BaseModel):
     value: str | None
     support_id: str | None = None
-    support_ids: list[str] = []
+    support_ids: list[str] = Field(default_factory=list)
 
     model_config = {"extra": "forbid"}
 
@@ -73,8 +73,10 @@ class AdapterOutput(BaseModel):
         return self
 
 
-def _valid_support_ids(row: dict[str, Any]) -> set[str]:
-    if row.get("document"):
+def _valid_support_ids(row: dict[str, Any], protocol: str) -> set[str]:
+    if protocol == "closed_book":
+        entries = parse_book_ledger(row["book"])
+    elif row.get("document"):
         entries = parse_updates(row["document"])
     else:
         entries = parse_book_ledger(row["book"])
@@ -106,7 +108,7 @@ def validate_adapter_output(
                     raise ValueError(f"support_id {sid!r} not in doc_ids")
         return {"value": parsed.value, "support_ids": supports}
 
-    valid_ids = _valid_support_ids(row)
+    valid_ids = _valid_support_ids(row, protocol)
     for sid in supports:
         if sid not in valid_ids:
             raise ValueError(f"support_id {sid!r} not in episode updates (protocol={protocol})")

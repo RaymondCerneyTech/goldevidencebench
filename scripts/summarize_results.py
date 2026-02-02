@@ -1021,6 +1021,10 @@ def main() -> int:
             writer = csv.DictWriter(f, fieldnames=sorted(decomp_rows[0].keys()))
             writer.writeheader()
             writer.writerows(decomp_rows)
+    schema_validation.validate_or_raise(
+        summary,
+        schema_validation.schema_path("summary.schema.json"),
+    )
     args.out_json.write_text(json.dumps(summary, indent=2), encoding="utf-8")
     thresholds_path = Path("configs") / "diagnosis_thresholds.json"
     thresholds = diagnosis_mod.load_thresholds(thresholds_path)

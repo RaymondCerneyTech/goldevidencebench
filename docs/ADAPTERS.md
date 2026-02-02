@@ -46,6 +46,7 @@ Notes:
 - `GOLDEVIDENCEBENCH_RETRIEVAL_SELECTOR_ONLY=1`: skip answer generation and emit only `support_ids`.
 - `GOLDEVIDENCEBENCH_RETRIEVAL_ABSTAIN_ON_MISSING=1`: emit an empty prediction when gold is missing (use with `GOLDEVIDENCEBENCH_RETRIEVAL_DROP_PROB` to calibrate abstain precision/recall).
 - Selection metrics (`gold_present_rate`, `selection_rate`) are best for speed-focused iterations; value accuracy is not meaningful in selector-only mode.
+- Note: for drift holdouts (e.g., `stale_tab_state`), the `prefer_set_latest` fix path is evaluated with the authority filter enabled; it is not a substitute for filtering NOTE lines.
 
 Retrieval order bias (example, k=4, s3q16, kv/standard, gold always present):
 

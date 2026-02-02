@@ -4,6 +4,7 @@ import argparse
 import json
 from pathlib import Path
 
+from goldevidencebench import schema_validation
 from goldevidencebench.rag_benchmark import (
     render_rag_benchmark_report,
     summarize_rag_benchmark,
@@ -96,6 +97,10 @@ def main() -> int:
             ]
         summary["status"] = "PASS" if not failures else "FAIL"
 
+    schema_validation.validate_or_raise(
+        summary,
+        schema_validation.schema_path("rag_benchmark_summary.schema.json"),
+    )
     out_path = Path(args.out) if args.out else runs_dir / "summary.json"
     out_path.write_text(json.dumps(summary, indent=2), encoding="utf-8")
 

@@ -10,7 +10,7 @@ def _schema_root() -> Path:
 
 
 def load_schema(path: Path) -> dict[str, Any]:
-    return json.loads(path.read_text(encoding="utf-8"))
+    return json.loads(path.read_text(encoding="utf-8-sig"))
 
 
 def _matches_type(value: Any, expected: str) -> bool:

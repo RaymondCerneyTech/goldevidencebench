@@ -1,0 +1,65 @@
+{
+  "type": "object",
+  "required": [
+    "schema_version",
+    "run_dir",
+    "thresholds_version",
+    "status",
+    "primary_bottleneck",
+    "supporting_metrics",
+    "evidence_examples",
+    "prescription",
+    "second_best_prescription",
+    "required_inputs_next_run"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string"
+    },
+    "run_dir": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "thresholds_version": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "holdout_name": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "status": {
+      "type": "string"
+    },
+    "primary_bottleneck": {
+      "type": "string"
+    },
+    "supporting_metrics": {
+      "type": "object"
+    },
+    "evidence_examples": {
+      "type": "array"
+    },
+    "prescription": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "second_best_prescription": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "required_inputs_next_run": {
+      "type": "array"
+    }
+  }
+}

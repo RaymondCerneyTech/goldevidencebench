@@ -1,0 +1,27 @@
+{
+  "type": "object",
+  "required": [
+    "rows",
+    "overall",
+    "overall_raw",
+    "by_group",
+    "by_group_raw"
+  ],
+  "properties": {
+    "rows": {
+      "type": "integer"
+    },
+    "overall": {
+      "type": "object"
+    },
+    "overall_raw": {
+      "type": "object"
+    },
+    "by_group": {
+      "type": "array"
+    },
+    "by_group_raw": {
+      "type": "array"
+    }
+  }
+}

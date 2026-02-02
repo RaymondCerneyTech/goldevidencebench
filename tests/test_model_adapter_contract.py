@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 
+from goldevidencebench.baselines import parse_book_ledger
 from goldevidencebench.adapters.ledger_adapter import create_adapter
 from goldevidencebench.adapters.log_to_book_adapter import LogToBookAdapter
 from goldevidencebench.generate import EpisodeConfig, generate_dataset
@@ -76,6 +77,24 @@ def test_adapter_output_validation_accepts_doc_id_supports() -> None:
         max_support_k=3,
     )
     assert parsed == {"value": "foo", "support_ids": ["DOC1"]}
+
+
+def test_adapter_output_validation_closed_book_uses_book_ids() -> None:
+    cfg = EpisodeConfig(steps=6, keys=2, queries=2, twins=False, distractor_profile="standard")
+    row = generate_dataset(seed=11, episodes=1, cfg=cfg)[0]
+    book_ids = parse_book_ledger(row["book"])
+    assert book_ids
+    book_uid = book_ids[0]["uid"]
+    # Force a mismatched document so open-book validation would fail.
+    row["document"] = "## Episode Log\n- [UAAAAAA] UPDATE step=1 SET tag.00 = bogus"
+
+    parsed = validate_adapter_output(
+        row=row,
+        raw={"value": "foo", "support_ids": [book_uid]},
+        protocol="closed_book",
+        max_support_k=3,
+    )
+    assert parsed == {"value": "foo", "support_ids": [book_uid]}
 
 
 def test_build_artifact_adapter_runs_closed_book() -> None:

@@ -1,0 +1,27 @@
+{
+  "type": "object",
+  "required": [
+    "artifact_version",
+    "benchmark",
+    "config_path",
+    "runs_dir",
+    "results"
+  ],
+  "properties": {
+    "artifact_version": {
+      "type": "string"
+    },
+    "benchmark": {
+      "type": "string"
+    },
+    "config_path": {
+      "type": "string"
+    },
+    "runs_dir": {
+      "type": "string"
+    },
+    "results": {
+      "type": "array"
+    }
+  }
+}

@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from goldevidencebench.baselines import parse_book_ledger
+from goldevidencebench import schema_validation
 
 Diagnosis = dict[str, Any]
 
@@ -436,8 +437,8 @@ def _holdout_prescriptions(holdout_name: str) -> tuple[dict[str, Any], dict[str,
                 "L",
             ),
             _entry(
-                "Use prefer_set_latest on holdouts",
-                "Recency on authoritative SET updates breaks the stale-tab decoy.",
+                "Use prefer_set_latest with authority filter on holdouts",
+                "Prefer_set_latest is evaluated with the authority filter enabled; keep NOTE lines filtered so recency favors authoritative SET updates.",
                 "S",
                 "M",
             ),
@@ -451,8 +452,8 @@ def _holdout_prescriptions(holdout_name: str) -> tuple[dict[str, Any], dict[str,
                 "M",
             ),
             _entry(
-                "Use prefer_set_latest on holdouts",
-                "Recency on authoritative SET updates reduces sibling-value confusion.",
+                "Use prefer_set_latest with authority filter on holdouts",
+                "Prefer_set_latest is evaluated with the authority filter enabled; filter NOTE lines so recency reduces sibling-value confusion.",
                 "S",
                 "M",
             ),
@@ -556,6 +557,8 @@ def build_diagnosis(
 
 
 def write_diagnosis(path: Path, diagnosis: Diagnosis) -> None:
+    schema_path = schema_validation.schema_path("diagnosis.schema.json")
+    schema_validation.validate_or_raise(diagnosis, schema_path)
     path.write_text(json.dumps(diagnosis, indent=2), encoding="utf-8")
 
 
