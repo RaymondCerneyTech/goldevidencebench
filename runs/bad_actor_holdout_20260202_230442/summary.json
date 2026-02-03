@@ -1,0 +1,99 @@
+{
+  "rows": 1,
+  "overall": {
+    "value_acc_mean": 0.9166666666666666,
+    "exact_acc_mean": 0.9166666666666666,
+    "cite_f1_mean": 0.9166666666666666,
+    "entailment_mean": 1.0
+  },
+  "overall_raw": {},
+  "by_group": [
+    {
+      "state_mode": "",
+      "distractor_profile": "",
+      "n": 1,
+      "value_acc_mean": 0.9166666666666666,
+      "exact_acc_mean": 0.9166666666666666,
+      "cite_f1_mean": 0.9166666666666666,
+      "entailment_mean": 1.0
+    }
+  ],
+  "by_group_raw": [],
+  "retrieval": {
+    "n": 12,
+    "gold_in_context_rate": 1.0,
+    "correct_rank_mean": 1.0,
+    "drop_rate": 0.0,
+    "gold_present_count": 12,
+    "accuracy_when_gold_present": 0.9166666666666666,
+    "selection_rate": 0.9166666666666666,
+    "gold_present_rate": 1.0,
+    "answer_acc_given_gold_selected": 1.0,
+    "value_acc_when_gold_selected": 1.0,
+    "value_is_substring_of_selected_line_rate": 1.0,
+    "support_consistency_rate": 1.0,
+    "gold_support_selected_rate": 0.9166666666666666,
+    "selected_note_rate": 0.0,
+    "selected_wrong_update_rate": 1.0,
+    "wrong_update_rate": 0.08333333333333333,
+    "spoof_accept_rate": 0.0,
+    "spoof_accept_rate_non_gold": 0.0,
+    "gold_missing_rate": 0.0,
+    "abstain_rate": 0.0,
+    "abstain_precision": null,
+    "abstain_recall": null,
+    "decomposition_line": "1.0000 -> 0.9167 -> 0.9167 -> 0.9167"
+  },
+  "recency": {
+    "tokens_since_update": [
+      {
+        "bucket": "0-200",
+        "n": 7,
+        "value_acc": 0.8571428571428571,
+        "exact_acc": 0.8571428571428571
+      },
+      {
+        "bucket": "200-400",
+        "n": 4,
+        "value_acc": 1.0,
+        "exact_acc": 1.0
+      },
+      {
+        "bucket": "400-800",
+        "n": 1,
+        "value_acc": 1.0,
+        "exact_acc": 1.0
+      }
+    ],
+    "distractors_since_update": [
+      {
+        "bucket": "0-2",
+        "n": 12,
+        "value_acc": 0.9166666666666666,
+        "exact_acc": 0.9166666666666666
+      }
+    ],
+    "writes_to_key": [
+      {
+        "bucket": "4-8",
+        "n": 3,
+        "value_acc": 0.6666666666666666,
+        "exact_acc": 0.6666666666666666
+      },
+      {
+        "bucket": "8+",
+        "n": 9,
+        "value_acc": 1.0,
+        "exact_acc": 1.0
+      }
+    ]
+  },
+  "drift": {
+    "step_rate": 0.0,
+    "persistence_rate": 0.0,
+    "wrong_commit_rate": 0.0,
+    "run_rate": 0.0,
+    "step_count": 11,
+    "run_count": 1
+  }
+}
