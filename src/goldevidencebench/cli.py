@@ -3,6 +3,8 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -367,6 +369,11 @@ def _cmd_ui_summary(ns: argparse.Namespace) -> int:
 
 
 def _cmd_run(ns: argparse.Namespace) -> int:
+    if getattr(ns, "preset", None):
+        return _run_preset(ns)
+    if ns.data is None:
+        print("Missing --data (or use --preset).")
+        return 2
     data_rows = list(read_jsonl(ns.data))
     protocols = ["open_book", "closed_book"] if ns.protocol == "both" else [ns.protocol]
     results_payloads = []
@@ -626,6 +633,48 @@ def _cmd_sweep(ns: argparse.Namespace) -> int:
     return 0
 
 
+def _run_preset(ns: argparse.Namespace) -> int:
+    preset = ns.preset
+    repo_root = Path(__file__).resolve().parents[2]
+    scripts_dir = repo_root / "scripts"
+    model_path = ns.model_path or get_env("MODEL")
+    adapter = ns.adapter or "goldevidencebench.adapters.mock_adapter:create_adapter"
+
+    if preset in {"regression", "release"} and not model_path:
+        print("Set --model-path (or GOLDEVIDENCEBENCH_MODEL) for regression/release presets.")
+        return 2
+
+    if preset == "smoke":
+        script = scripts_dir / "run_adapter_baseline.ps1"
+        args = [
+            "-Preset",
+            "smoke",
+            "-Adapter",
+            adapter,
+        ]
+    elif preset == "regression":
+        script = scripts_dir / "run_regression_check.ps1"
+        args = ["-ModelPath", model_path]
+    else:
+        script = scripts_dir / "run_release_check.ps1"
+        args = ["-ModelPath", model_path]
+
+    if os.name == "nt":
+        ps = shutil.which("powershell") or "powershell"
+        cmd = [ps, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(script), *args]
+    else:
+        ps = shutil.which("pwsh")
+        if not ps:
+            print(
+                "PowerShell not found. On Linux/macOS, run the Python entrypoints directly "
+                "(see docs/WORKFLOWS.md) or install pwsh for preset execution."
+            )
+            return 2
+        cmd = [ps, "-NoProfile", "-File", str(script), *args]
+
+    return subprocess.call(cmd, cwd=str(repo_root))
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="goldevidencebench")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -717,8 +766,29 @@ def build_parser() -> argparse.ArgumentParser:
     )
     gr.set_defaults(func=_cmd_grade)
 
-    r = sub.add_parser("run", help="Run a baseline and print metrics (optionally write predictions).")
-    r.add_argument("--data", required=True, type=Path)
+    r = sub.add_parser(
+        "run",
+        help="Run a baseline and print metrics (optionally write predictions), or run a preset.",
+    )
+    r.add_argument(
+        "--preset",
+        choices=["smoke", "regression", "release"],
+        default=None,
+        help="Optional preset entrypoint (smoke/regression/release).",
+    )
+    r.add_argument(
+        "--model-path",
+        type=str,
+        default=None,
+        help="Model path for regression/release presets (or set GOLDEVIDENCEBENCH_MODEL).",
+    )
+    r.add_argument(
+        "--adapter",
+        type=str,
+        default=None,
+        help="Adapter override for the smoke preset (default: mock_adapter).",
+    )
+    r.add_argument("--data", required=False, type=Path)
     r.add_argument("--baseline", choices=["naive", "ledger"], default="ledger")
     r.add_argument("--citations", choices=["auto", "on", "off"], default="auto")
     r.add_argument("--support-metric", choices=["f1", "exact"], default="f1")

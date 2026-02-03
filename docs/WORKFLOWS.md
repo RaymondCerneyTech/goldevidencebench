@@ -81,6 +81,10 @@ Release check (runs pinned gates and UI stubs):
 
 Gate threshold sources and artifacts are listed in [docs/GATES.md](docs/GATES.md).
 
+Drift wall signals:
+- Safety wall (default/latest): `runs/drift_wall_latest` (release-relevant).
+- Stress wall (optional): `runs/drift_wall_latest_stress` (diagnostic pressure test).
+
 ## Drift holdout gate
 
 **Drift holdout gate expectations (`stale_tab_state`)**
@@ -128,7 +132,7 @@ Compliance/safety benchmark (bad-actor resistance + safety gates):
 .\scripts\run_core_benchmark.ps1 -ConfigPath "configs\compliance_benchmark.json"
 ```
 
-Reference run (selector baselines):
+Reference run (commit policy baselines):
 
 ```powershell
 .\scripts\run_reference.ps1 -Preset standard -ModelPath "<MODEL_PATH>"

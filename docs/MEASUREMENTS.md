@@ -4,6 +4,7 @@ This file captures the detailed experiments, tables, and historical plans that w
 Use this as the long-form reference; the main README now focuses on current capabilities and primary workflows.
 Move superseded sections to [MEASUREMENTS_ARCHIVE.md](MEASUREMENTS_ARCHIVE.md) to keep this file scannable.
 Paths in this doc use Windows-friendly examples unless explicitly labeled.
+Terminology note: this doc uses "selector" to mean the commit policy that chooses which candidate commits to state. Script and env var names still use "selector".
 
 ## GoldEvidenceBench
 

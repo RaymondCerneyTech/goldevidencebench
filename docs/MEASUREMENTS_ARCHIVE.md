@@ -1,6 +1,7 @@
 # Measurements Archive
 
 Move older or superseded experiment writeups here to keep `MEASUREMENTS.md` focused and readable.
+Terminology note: this archive uses "selector" to mean the commit policy that chooses which candidate commits to state. Script and env var names still use "selector".
 
 ## Archived: v2/v3 notes (moved from MEASUREMENTS.md)
 

@@ -3,12 +3,14 @@
 This page lists each gate or benchmark, where its thresholds live, and the artifact it produces.
 Treat the linked config files as the source of truth for PASS/FAIL semantics.
 
+Terminology note: "commit policy" (aka selector/reranker) is the chooser that picks which candidate commits to state. Script and env var names still use "selector".
+
 ## Core gates and benchmarks
 
 | Gate / Benchmark | Command | Threshold / Fixture Config | Primary Artifact |
 | --- | --- | --- | --- |
 | Drift holdout gate | `.\scripts\run_drift_holdout_gate.ps1` | `configs/usecase_checks.json` (`drift_holdout_gate`: `canary_min`, `drift.step_rate` max) | `runs/release_gates/drift_holdout_gate.json` |
-| Drift wall | `.\scripts\run_drift_wall.ps1` | `configs/usecase_checks.json` (`drift_gate`) | `runs/drift_wall_latest/summary.json` |
+| Drift wall | `.\scripts\run_drift_wall.ps1` | `configs/usecase_checks.json` (`drift_gate`) | `runs/drift_wall_latest/summary.json` (safety wall); optional stress wall at `runs/drift_wall_latest_stress/summary.json` |
 | Core benchmark | `.\scripts\run_core_benchmark.ps1` | `configs/core_benchmark.json` + `configs/core_thresholds.json` | `runs/<run_dir>/summary.json` |
 | RAG benchmark (lenient/strict) | `.\scripts\run_rag_benchmark.ps1 -Preset lenient|strict` | `configs/rag_benchmark_lenient.json` / `configs/rag_benchmark_strict.json` + `configs/rag_thresholds.json` | `runs/<run_dir>/summary.json` |
 

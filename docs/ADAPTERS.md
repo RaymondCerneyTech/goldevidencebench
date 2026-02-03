@@ -28,6 +28,8 @@ Notes:
 
 ### Retrieval knobs (quick list)
 
+Terminology: the commit policy chooses which candidate commits to state. Script and env var names still use "selector" for this chooser.
+
 - `GOLDEVIDENCEBENCH_RETRIEVAL_K`: include top-k latest entries for the key (default 1).
 - `GOLDEVIDENCEBENCH_RETRIEVAL_WRONG_TYPE`: `none`, `same_key`, or `other_key` to inject a wrong line for robustness testing.
 - `GOLDEVIDENCEBENCH_RETRIEVAL_INCLUDE_CLEAR=0`: skip CLEAR entries.
@@ -40,12 +42,12 @@ Notes:
 - `GOLDEVIDENCEBENCH_RETRIEVAL_QUERY_SANDWICH=1`: repeat the question before and after the candidate ledger lines.
 - `GOLDEVIDENCEBENCH_RETRIEVAL_PICK_THEN_ANSWER=1`: pick a support_id first, then answer using only that line.
 - `GOLDEVIDENCEBENCH_RETRIEVAL_COPY_CLAMP=1`: require the answer value be an exact substring of the selected line (returns null otherwise).
-- `GOLDEVIDENCEBENCH_RETRIEVAL_RERANK`: `latest_step|last_occurrence|prefer_set_latest|linear` (non-LLM selector baseline).
+- `GOLDEVIDENCEBENCH_RETRIEVAL_RERANK`: `latest_step|last_occurrence|prefer_set_latest|linear` (non-LLM commit policy baseline).
 - `GOLDEVIDENCEBENCH_RETRIEVAL_LINEAR_MODEL`: JSON model file from `train_selector_linear.py` (for `linear`).
 - `GOLDEVIDENCEBENCH_RETRIEVAL_LINEAR_TIE_BREAK`: `latest_step` (optional `GOLDEVIDENCEBENCH_RETRIEVAL_LINEAR_TIE_EPS`).
 - `GOLDEVIDENCEBENCH_RETRIEVAL_SELECTOR_ONLY=1`: skip answer generation and emit only `support_ids`.
 - `GOLDEVIDENCEBENCH_RETRIEVAL_ABSTAIN_ON_MISSING=1`: emit an empty prediction when gold is missing (use with `GOLDEVIDENCEBENCH_RETRIEVAL_DROP_PROB` to calibrate abstain precision/recall).
-- Selection metrics (`gold_present_rate`, `selection_rate`) are best for speed-focused iterations; value accuracy is not meaningful in selector-only mode.
+- Selection metrics (`gold_present_rate`, `selection_rate`) are best for speed-focused iterations; value accuracy is not meaningful in selector-only (commit-policy-only) mode.
 - Note: for drift holdouts (e.g., `stale_tab_state`), the `prefer_set_latest` fix path is evaluated with the authority filter enabled; it is not a substitute for filtering NOTE lines.
 
 Retrieval order bias (example, k=4, s3q16, kv/standard, gold always present):
@@ -78,7 +80,7 @@ python .\scripts\plot_order_bias.py --in-csv .\runs\summary_all.csv --out .\docs
 
 ![Order bias (LLM-only, k=4, same_key, s5q24)](figures/order_bias_s5q24_llm.png)
 
-Order-bias (selector on: latest_step, same settings):
+Order-bias (commit policy on: latest_step, same settings):
 
 | order | selection_rate | accuracy_when_gold_present | value_acc |
 | --- | --- | --- | --- |
@@ -87,7 +89,7 @@ Order-bias (selector on: latest_step, same settings):
 | gold_last | 1.0000 | 0.9750 | 0.9750 |
 | shuffle | 1.0000 | 0.9750 | 0.9750 |
 
-Selector removes order bias in this regime.
+Commit policy removes order bias in this regime.
 
 Plot the reranker k-curve:
 
@@ -164,7 +166,7 @@ Selector failure mode (kv_commentary: NOTE lines are non-authoritative):
 
 NOTE-aware rerank: set `GOLDEVIDENCEBENCH_RETRIEVAL_RERANK=prefer_update_latest` to ignore NOTE lines unless no UPDATE-style lines exist.
 
-Note: these kv_commentary results are selector experiments; for drift holdouts, the prefer_set_latest fix path is evaluated with authority filtering enabled (NOTE lines filtered).
+Note: these kv_commentary results are commit policy experiments; for drift holdouts, the prefer_set_latest fix path is evaluated with authority filtering enabled (NOTE lines filtered).
 
 ```powershell
 $env:GOLDEVIDENCEBENCH_RETRIEVAL_RERANK = "latest_step"
@@ -176,7 +178,7 @@ goldevidencebench sweep --out runs --seeds 2 --episodes 1 --steps 120 --queries 
 python .\scripts\summarize_results.py --in .\runs\combined.json --out-json .\runs\summary.json
 ```
 
-Example outcome (kv_commentary, prefer_set_latest): value_acc 0.75, exact_acc 0.75, entailment 1.0. With naive latest_step in the same setting, value_acc was 0.25 and exact_acc 0.0, showing NOTE lines can break recency-based selectors and a simple policy fixes it in this setting.
+Example outcome (kv_commentary, prefer_set_latest): value_acc 0.75, exact_acc 0.75, entailment 1.0. With naive latest_step in the same setting, value_acc was 0.25 and exact_acc 0.0, showing NOTE lines can break recency-based commit policies and a simple policy fixes it in this setting.
 
 KV commentary sanity check (from runs/summary_all.csv, matched A/B: same seeds + settings):
 
@@ -187,7 +189,7 @@ KV commentary sanity check (from runs/summary_all.csv, matched A/B: same seeds +
 
 Matched A/B (kv_commentary) shows `latest_step` maximizes selection but can cite non-authoritative NOTE lines (entailment drops), while `prefer_set_latest` preserves entailment.
 
-KV commentary selector A/B (s3q16, k=4, same_key, shuffle):
+KV commentary commit policy A/B (s3q16, k=4, same_key, shuffle):
 
 | preset | k | rerank | gold_present | selection_rate | accuracy_when_gold_present | value_acc | entailment |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -196,9 +198,9 @@ KV commentary selector A/B (s3q16, k=4, same_key, shuffle):
 | custom | 4 | prefer_update_latest | 1.0 | 0.7292 | 1.0 | 1.0 | 1.0 |
 | custom | 4 | linear | 1.0 | 1.0 | 0.7292 | 0.7292 | 0.8542 |
 
-In kv_commentary, `prefer_set_latest` and `prefer_update_latest` keep end-to-end accuracy/entailment perfect even though selection_rate is lower, while the linear selector always chooses the gold line but still produces incorrect answers in ~27% of cases. This suggests the linear model is not robust to NOTE-line noise yet.
+In kv_commentary, `prefer_set_latest` and `prefer_update_latest` keep end-to-end accuracy/entailment perfect even though selection_rate is lower, while the linear commit policy (selector) always chooses the gold line but still produces incorrect answers in ~27% of cases. This suggests the linear model is not robust to NOTE-line noise yet.
 
-KV commentary selector bake-off (s5q24, k=4, same_key, shuffle):
+KV commentary commit policy bake-off (s5q24, k=4, same_key, shuffle):
 
 | preset | k | rerank | gold_present | selection_rate | accuracy_when_gold_present | value_acc | entailment |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -217,7 +219,7 @@ KV commentary grid (s3q16, same_key, k in {2,4,8}):
 | linear | 4 | 1.0000 | 0.7292 | 0.7292 | 0.8542 |
 | linear | 8 | 1.0000 | 0.7292 | 0.7292 | 0.8542 |
 
-The learned selector still fails on NOTE authoritativeness across k, while prefer_set_latest stays perfect end-to-end in these kv_commentary runs.
+The learned commit policy (selector) still fails on NOTE authoritativeness across k, while prefer_set_latest stays perfect end-to-end in these kv_commentary runs.
 
 Authority filter baseline (GOLDEVIDENCEBENCH_RETRIEVAL_AUTHORITY_FILTER=1, linear rerank, s3q16):
 
@@ -235,7 +237,7 @@ Authority filter stability (s5q24):
 | 4 | 1.0000 | 1.0000 | 1.0000 | 1.0000 |
 | 8 | 1.0000 | 1.0000 | 1.0000 | 1.0000 |
 
-With authority filtering, the selector becomes fully NOTE-robust across k.
+With authority filtering, the commit policy becomes fully NOTE-robust across k.
 
 | preset | k | rerank | gold_present | selection_rate | accuracy_when_gold_present | value_acc | entailment |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -243,9 +245,9 @@ With authority filtering, the selector becomes fully NOTE-robust across k.
 | custom | 4 | prefer_update_latest | 1.0 | 0.5833 | 1.0 | 1.0 | 1.0 |
 | custom | 4 | linear | 1.0 | 0.9833 | 0.5667 | 0.5667 | 0.7250 |
 
-At s5q24, NOTE-aware deterministic policies remain perfect end-to-end, while the linear selector still loses accuracy and entailment despite near-perfect selection.
+At s5q24, NOTE-aware deterministic policies remain perfect end-to-end, while the linear commit policy (selector) still loses accuracy and entailment despite near-perfect selection.
 
-KV selector bake-off (s5q24, k=4, same_key, shuffle):
+KV commit policy bake-off (s5q24, k=4, same_key, shuffle):
 
 | rerank | gold_present | selection_rate | accuracy_when_gold_present | value_acc | entailment |
 | --- | --- | --- | --- | --- | --- |
@@ -267,7 +269,7 @@ Even with identical retrieval/selection, model quality still matters for answer 
 
 ![KV model check (latest_step, s5q24)](figures/model_compare_kv_latest_step_s5q24.png)
 
-Linear selector order generalization (kv_commentary, k=4, s5q24):
+Linear commit policy order generalization (kv_commentary, k=4, s5q24):
 
 | order | selection_rate | accuracy_when_gold_present | value_acc | entailment |
 | --- | --- | --- | --- | --- |
@@ -307,7 +309,7 @@ With `prefer_update_latest`, order bias disappears in kv_commentary while end-to
 - rerank none: accuracy_when_gold_present 0.3333, selection_rate 0.3333
 - rerank latest_step: accuracy_when_gold_present 0.625, selection_rate 0.625
 
-A simple deterministic selector can outperform the LLM under ambiguity.
+A simple deterministic commit policy can outperform the LLM under ambiguity.
 
 Reranker k-curve (same_key, shuffle, s3q16), accuracy_when_gold_present:
 
@@ -343,7 +345,7 @@ Headline takeaways:
 - Deterministic reranking (latest_step/prefer_set_latest) restores near-perfect selection when gold is present.
 - Naive positional heuristics (last_occurrence) fail under shuffle, showing order bias is real.
 
-## Reference proof (selector vs LLM)
+## Reference proof (commit policy vs LLM)
 
 latest_step reranking uses only fields present in the candidate ledger lines (no hidden gold metadata).
 
@@ -374,7 +376,7 @@ Report preset (s5q24) run (same table, larger sample):
 | standard | 4 | prefer_set_latest | 1 | 1 | 0.9667 |
 | standard | 8 | prefer_set_latest | 1 | 1 | 0.9667 |
 
-Interpretation: selection under ambiguity is the bottleneck. The LLM-only selector degrades as k grows, while simple deterministic reranking (latest_step or prefer_set_latest) restores near-perfect selection when gold is present. last_occurrence underperforms because shuffled candidates break recency-by-position.
+Interpretation: selection under ambiguity is the bottleneck. The LLM-only commit policy (selector) degrades as k grows, while simple deterministic reranking (latest_step or prefer_set_latest) restores near-perfect selection when gold is present. last_occurrence underperforms because shuffled candidates break recency-by-position.
 
 ```powershell
 .\scripts\run_selector_bench.ps1 -Preset standard -ModelPath "<MODEL_PATH>"

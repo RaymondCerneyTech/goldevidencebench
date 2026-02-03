@@ -17,6 +17,14 @@ Install (editable): `python -m pip install -e .`
 
 On Linux/macOS, run the Python entrypoints directly (see [docs/WORKFLOWS.md](docs/WORKFLOWS.md)); the PowerShell runners are Windows-first.
 
+Cross-platform front door (presets):
+
+```powershell
+python -m goldevidencebench run --preset smoke
+python -m goldevidencebench run --preset regression --model-path "<MODEL_PATH>"
+python -m goldevidencebench run --preset release --model-path "<MODEL_PATH>"
+```
+
 Key artifacts (smoke run):
 
 ```
@@ -47,6 +55,48 @@ This verifies, without any model or API keys:
 - The CLI/scripts produce artifacts with the expected structure.
 - The gate logic (thresholds, exit codes) behaves deterministically.
 - You can inspect the evidence artifacts before wiring a real model.
+
+## Run -> Artifacts -> Failure story
+
+One command:
+
+```powershell
+.\scripts\run_regression_check.ps1 -ModelPath "<MODEL_PATH>"
+```
+
+Tiny artifact tree:
+
+```
+runs/<run_dir>/
+  report.md
+  summary.json
+  diagnosis.json
+  compact_state.json
+  thread.jsonl
+  repro_commands.json
+```
+
+Example excerpt (report.md + diagnosis.json from `runs/bad_actor_holdout_20260202_230442`):
+
+```
+Overall: FAIL
+Primary bottleneck: action_safety
+unsafe_commit_rate: 0.0833 (<= 0.0500) FAIL
+authority_violation_rate: 0.0000 (<= 0.0100) PASS
+drift.step_rate: 0.0000 (<= 0.2500) PASS
+{"primary_bottleneck":"action_safety","top_fix":"Tighten safety gate for unsafe commits"}
+{"next_fix":"Add abstain/escalation on unsafe signals"}
+```
+
+Screenshot (rendered excerpt):
+
+![Report + diagnosis excerpt](docs/sample_artifacts/report_diagnosis_excerpt.svg)
+
+Mini failure story: an authority decoy was selected -> a wrong commit happened -> drift persisted across steps.
+
+Canonical caught regression story: see [docs/KNOWN_REGRESSION.md](docs/KNOWN_REGRESSION.md).
+
+Pinned sample artifact pack (intentional FAIL example): see [docs/sample_artifacts](docs/sample_artifacts).
 
 ## If you want the one-pager case pack (model + PDF)
 
@@ -113,6 +163,17 @@ Other eval tools are great for different goals:
 - Unit-test-style evals for prompt iterations in app development.
 
 This repo is intentionally narrow: it prioritizes **repeatable regression gating** over breadth of benchmarks.
+
+## Comparison (quick)
+
+| Capability | GoldEvidenceBench | OpenAI Evals | LangSmith | RAGAS | lm-eval-harness |
+| --- | --- | --- | --- | --- | --- |
+| Local/offline | Yes (Windows-first) | No (API-first) | No (hosted) | Yes | Yes |
+| Artifact bundles | Yes (report/summary/diagnosis/repro) | Limited (run logs) | Yes (run views) | No | Limited |
+| Holdout + canary gates | Yes (built-in) | Custom | Custom | No | No |
+| State-drift fixtures | Yes (long-horizon state logs) | Custom | Custom | No | No |
+| State-update decision policy | Yes (commit policy + authority/commit) | Custom | Custom | Partial | No |
+| CI gate outputs | Yes (exit codes + artifacts) | Custom | Yes (hosted) | No | Custom |
 
 ## Short roadmap
 
@@ -195,9 +256,13 @@ Case pack: see **If you want the one-pager case pack (model + PDF)** above.
 
 Details for RAG domain packs, open-book vs closed-book, and dataset formats live in [docs/WORKFLOWS.md](docs/WORKFLOWS.md).
 
-## Individual 'Why' Steps (DecisionPoints)
+## State-update decisions (DecisionPoints)
 
-Long tasks are modeled as chains of 'why' steps (DecisionPoints): each step is a constrained choice among candidates (evidence/action/state update). Example DecisionPoint: choose which candidate key/value to commit when multiple plausible evidence entries exist. GoldEvidenceBench scores these choices, especially commit decisions, to prevent drift. Diagnosis and holdout reports tie failures back to the specific why-step so fixes are targeted and repeatable.
+```
+Retrieve -> Candidate set -> Commit policy -> Commit -> State -> Answer
+```
+
+Long tasks are modeled as chains of state-update decisions (DecisionPoints): each step is a constrained choice among candidates (evidence/action/state update). Example DecisionPoint: choose which candidate key/value to commit when multiple plausible evidence entries exist. GoldEvidenceBench scores these choices, especially commit decisions, to prevent drift. Diagnosis and holdout reports tie failures back to the specific decision step so fixes are targeted and repeatable.
 
 ## Glossary (short)
 
@@ -206,6 +271,7 @@ Long tasks are modeled as chains of 'why' steps (DecisionPoints): each step is a
 - Canary: a known-fail baseline used to confirm the holdout is sensitive to drift.
 - Wall: a broader set of fixtures used for baseline coverage.
 - Authority filter: rejects low-authority evidence (e.g., NOTE/INFO decoys).
+- State-update decision (DecisionPoint): a step that chooses which evidence/action commits to state.
 - Retrieval vs selection vs answering: find evidence -> choose candidate -> produce final answer.
 - PASS/FAIL: PASS means all configured gates met thresholds; FAIL/WARN means inspect the gate artifacts.
 
@@ -239,7 +305,9 @@ Drift wall + drift holdout gate:
 .\scripts\run_drift_holdout_gate.ps1 -ModelPath "<MODEL_PATH>"
 ```
 
-Tip: add `-SafetyMode` to `run_drift_wall.ps1` for CLEAR-aware reranking + authority filtering when you want a safety‑default wall run. Use `-LatestTag stress` if you want a separate “stress wall” snapshot under `runs/drift_wall_latest_stress`.
+Note: `runs/drift_wall_latest` is the safety wall snapshot; `runs/drift_wall_latest_stress` is optional for diagnostic pressure tests.
+
+Tip: add `-SafetyMode` to `run_drift_wall.ps1` for CLEAR-aware reranking + authority filtering when you want a safety-default wall run. Use `-LatestTag stress` if you want a separate "stress wall" snapshot under `runs/drift_wall_latest_stress`.
 
 Drift holdout semantics and expected-fail canaries: see [docs/WORKFLOWS.md](docs/WORKFLOWS.md) (Drift holdout gate).
 
