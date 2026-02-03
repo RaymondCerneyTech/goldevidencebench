@@ -18,6 +18,10 @@ venv/
 !.gitignore
 !configs/**/*.json
 !schemas/**/*.json
+!data/ui_minipilot_local_optimum_unsaved_changes_fixture.jsonl
+!data/ui_minipilot_local_optimum_unsaved_changes_observed_ok.jsonl
+!data/rag_domain_exception.jsonl
+!data/bad_actor_holdout_e0001.jsonl
 runs/
 runs_wall_latest/
 runs_wall_linear/

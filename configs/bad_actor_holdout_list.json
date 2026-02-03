@@ -1,0 +1,9 @@
+{
+  "holdouts": [
+    {
+      "id": "bad_actor_e0001",
+      "fixture": "data/bad_actor_holdout_e0001.jsonl",
+      "source_run": "runs/case_pack_20260129_215013/bad_actor/wall/drift_steps80/seed0-steps80-book400-modekv-profstandard/data.jsonl"
+    }
+  ]
+}

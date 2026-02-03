@@ -66,6 +66,13 @@
       "observed": "data/ui_minipilot_local_optimum_destructive_confirm_observed_ok.jsonl"
     },
     {
+      "id": "unsaved_changes",
+      "label": "Unsaved changes prompt",
+      "failure_mode": "unsaved_changes",
+      "fixture": "data/ui_minipilot_local_optimum_unsaved_changes_fixture.jsonl",
+      "observed": "data/ui_minipilot_local_optimum_unsaved_changes_observed_ok.jsonl"
+    },
+    {
       "id": "disabled_primary",
       "label": "Disabled primary",
       "failure_mode": "disabled_action",

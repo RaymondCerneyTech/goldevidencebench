@@ -16,6 +16,7 @@ Use `.\scripts\next_trap_family.ps1` to pick the next backlog item to implement.
 - local_optimum_blocking_modal_consent
 - local_optimum_blocking_modal_unprompted_confirm
 - local_optimum_destructive_confirm
+- local_optimum_unsaved_changes
 - local_optimum_tab_detour
 - local_optimum_panel_toggle
 - local_optimum_accessibility_label

@@ -5,14 +5,17 @@ param(
     [int]$Seeds = 1,
     [string]$Adapter = "goldevidencebench.adapters.retrieval_llama_cpp_adapter:create_adapter",
     [string]$RunsDir = "",
-    [ValidateSet("none", "latest_step", "prefer_set_latest")]
+    [ValidateSet("none", "latest_step", "prefer_set_latest", "prefer_update_latest")]
     [string]$Rerank = "none",
+    [bool]$AuthorityFilter = $false,
+    [switch]$SafetyMode,
     [float]$NoteRate = 0.12,
     [int]$MaxBookTokens = 400,
     [float]$Threshold = 0.10,
     [ValidateSet("gte", "lte")]
     [string]$Direction = "gte",
-    [switch]$UpdateConfig
+    [switch]$UpdateConfig,
+    [string]$LatestTag = ""
 )
 
 if (-not $ModelPath) {
@@ -28,16 +31,29 @@ if (-not $finalRunsDir) {
 New-Item -ItemType Directory -Path $finalRunsDir -Force | Out-Null
 
 $env:GOLDEVIDENCEBENCH_MODEL = $ModelPath
+if ($SafetyMode) {
+    if (-not $PSBoundParameters.ContainsKey("Rerank") -or $Rerank -eq "none") {
+        $Rerank = "prefer_update_latest"
+    }
+    if (-not $PSBoundParameters.ContainsKey("AuthorityFilter")) {
+        $AuthorityFilter = $true
+    }
+}
 $env:GOLDEVIDENCEBENCH_RETRIEVAL_RERANK = $Rerank
 $env:GOLDEVIDENCEBENCH_RETRIEVAL_WRONG_TYPE = "same_key"
 $env:GOLDEVIDENCEBENCH_RETRIEVAL_ORDER = "shuffle"
 $env:GOLDEVIDENCEBENCH_RETRIEVAL_ORDER_SEED = "0"
+$env:GOLDEVIDENCEBENCH_RETRIEVAL_AUTHORITY_FILTER = if ($AuthorityFilter) { "1" } else { "0" }
 
 Write-Host "Drift wall sweep"
 Write-Host "RunsDir: $finalRunsDir"
 Write-Host "Steps: $($Steps -join ',')"
 Write-Host "Seeds: $Seeds Queries: $Queries"
 Write-Host "Rerank: $Rerank Adapter: $Adapter"
+Write-Host ("Authority filter: {0}" -f $AuthorityFilter)
+if ($SafetyMode) {
+    Write-Host "Safety mode: enabled"
+}
 
 foreach ($step in $Steps) {
     $outDir = Join-Path $finalRunsDir "drift_steps$step"
@@ -48,7 +64,21 @@ foreach ($step in $Steps) {
         --no-derived-queries --no-twins --require-citations --max-book-tokens $MaxBookTokens `
         --adapter $Adapter --results-json "$outDir\combined.json"
 
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "Drift wall sweep failed for steps=$step. Check -ModelPath and adapter settings."
+        exit 1
+    }
+
+    if (-not (Test-Path "$outDir\combined.json")) {
+        Write-Error "Missing combined.json for steps=$step (expected $outDir\\combined.json)."
+        exit 1
+    }
+
     python .\scripts\summarize_results.py --in "$outDir\combined.json" --out-json "$outDir\summary.json"
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "Summarize failed for steps=$step."
+        exit 1
+    }
 }
 
 $wallOut = Join-Path $finalRunsDir "drift_wall.json"
@@ -66,7 +96,7 @@ if ($UpdateConfig) {
 }
 python .\scripts\find_drift_wall.py @wallArgs
 
-$latestDir = "runs\\drift_wall_latest"
+$latestDir = if ($LatestTag) { "runs\\drift_wall_latest_$LatestTag" } else { "runs\\drift_wall_latest" }
 New-Item -ItemType Directory -Path $latestDir -Force | Out-Null
 $maxStep = ($Steps | Measure-Object -Maximum).Maximum
 $latestRun = Join-Path $finalRunsDir "drift_steps$maxStep"

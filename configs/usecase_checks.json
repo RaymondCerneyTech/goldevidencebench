@@ -941,6 +941,17 @@
       ]
     },
     {
+      "id": "bad_actor_holdout_gate",
+      "summary_path": "runs/bad_actor_holdout_latest/summary.json",
+      "severity": "error",
+      "metrics": [
+        {
+          "path": "retrieval.wrong_update_rate",
+          "max": 0.05
+        }
+      ]
+    },
+    {
       "id": "drift_gate",
       "summary_path": "runs/drift_wall_latest/summary.json",
       "severity": "warn",
@@ -948,6 +959,11 @@
         {
           "path": "drift.step_rate",
           "max": 0.25,
+          "allow_missing": true
+        },
+        {
+          "path": "retrieval.wrong_update_rate",
+          "max": 0.05,
           "allow_missing": true
         }
       ]

@@ -66,6 +66,7 @@ This prints the one-pager path when generated and appends a summary to `docs/RUN
 - `.\scripts\run_regression_check.ps1` means drift gates pass on the drift wall + holdout fixtures.
 - `.\scripts\run_rag_benchmark.ps1 -Preset lenient/strict` means value_acc/cite_f1 meet thresholds on the listed datasets.
 - See **Behavioral contract (core)** below for the full list.
+- Gate source-of-truth configs and artifacts: see [docs/GATES.md](docs/GATES.md).
 
 ## Project goals
 
@@ -174,6 +175,8 @@ Release check (full suite):
 .\scripts\run_release_check.ps1 -ModelPath "<MODEL_PATH>"
 ```
 
+Includes the bad_actor holdout safety gate (fixtures in `configs/bad_actor_holdout_list.json`, thresholds in `configs/usecase_checks.json`), using `prefer_update_latest` rerank (CLEAR-aware) with authority filtering by default.
+
 Core benchmark (curated fixtures):
 
 ```powershell
@@ -235,6 +238,8 @@ Drift wall + drift holdout gate:
 .\scripts\run_drift_wall.ps1 -ModelPath "<MODEL_PATH>"
 .\scripts\run_drift_holdout_gate.ps1 -ModelPath "<MODEL_PATH>"
 ```
+
+Tip: add `-SafetyMode` to `run_drift_wall.ps1` for CLEAR-aware reranking + authority filtering when you want a safety‑default wall run. Use `-LatestTag stress` if you want a separate “stress wall” snapshot under `runs/drift_wall_latest_stress`.
 
 Drift holdout semantics and expected-fail canaries: see [docs/WORKFLOWS.md](docs/WORKFLOWS.md) (Drift holdout gate).
 

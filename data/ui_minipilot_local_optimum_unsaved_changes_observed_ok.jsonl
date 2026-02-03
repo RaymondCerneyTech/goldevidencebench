@@ -1,0 +1,4 @@
+{"id":"step_unsaved_changes_0001","observed_delta":{"event":"open_unsaved_prompt"}}
+{"id":"step_unsaved_changes_0002","observed_delta":{"event":"confirm_save_changes"}}
+{"id":"step_unsaved_changes_0101","observed_delta":{"event":"open_unsaved_prompt_b"}}
+{"id":"step_unsaved_changes_0102","observed_delta":{"event":"confirm_save_changes_b"}}

@@ -1,0 +1,33 @@
+{
+  "holdouts": [
+    "local_optimum_section_path",
+    "local_optimum_section_path_conflict",
+    "local_optimum_blocking_modal_detour",
+    "local_optimum_tab_detour",
+    "local_optimum_disabled_primary",
+    "local_optimum_toolbar_vs_menu",
+    "local_optimum_confirm_then_apply",
+    "local_optimum_tab_state_reset",
+    "local_optimum_context_switch",
+    "local_optimum_stale_tab_state",
+    "local_optimum_form_validation",
+    "local_optimum_window_focus",
+    "local_optimum_panel_toggle",
+    "local_optimum_accessibility_label",
+    "local_optimum_checkbox_gate",
+    "local_optimum_blocking_modal_required",
+    "local_optimum_blocking_modal_permission",
+    "local_optimum_blocking_modal_consent",
+    "local_optimum_blocking_modal_unmentioned",
+    "local_optimum_blocking_modal_unmentioned_blocked",
+    "local_optimum_blocking_modal",
+    "local_optimum_overlay",
+    "local_optimum_primary",
+    "local_optimum_delayed_solvable",
+    "local_optimum_role_mismatch",
+    "local_optimum_role_conflict",
+    "local_optimum_destructive_confirm",
+    "local_optimum_unsaved_changes",
+    "local_optimum_blocking_modal_unprompted_confirm"
+  ]
+}

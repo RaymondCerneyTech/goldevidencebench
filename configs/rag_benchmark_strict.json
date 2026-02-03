@@ -15,6 +15,12 @@
       "data": "data/rag_domain_authority.jsonl"
     },
     {
+      "id": "domain_exception",
+      "label": "Policy handbook (exceptions)",
+      "failure_mode": "policy_exception",
+      "data": "data/rag_domain_exception.jsonl"
+    },
+    {
       "id": "authority_camo",
       "label": "Authority camouflage",
       "failure_mode": "authority_camo",

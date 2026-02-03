@@ -3,9 +3,9 @@
 Runs GoldEvidenceBench release checks and gates.
 
 .DESCRIPTION
-Executes a suite of checks (retrieval, UI stubs, local-optimum variants) and
-optionally the drift holdout gate. The UI local-optimum distillation holdout
-defaults to local_optimum_blocking_modal_unmentioned_blocked.
+Executes a suite of checks (retrieval, UI stubs, local-optimum variants), runs
+the bad actor holdout gate, and optionally the drift holdout gate. The UI
+local-optimum distillation holdout defaults to local_optimum_blocking_modal_unmentioned_blocked.
 
 .PARAMETER VariantsHoldoutName
 Holdout for UI local-optimum distillation (default:
@@ -29,11 +29,13 @@ param(
     [double]$AutoCurriculumGapMin = 0.1,
     [double]$AutoCurriculumSolvedMin = 0.9,
     [string]$AutoCurriculumStatePath = "runs\\release_gates\\ui_holdout_autocurriculum.json",
-    [string]$HoldoutList = "local_optimum_section_path,local_optimum_section_path_conflict,local_optimum_blocking_modal_detour,local_optimum_tab_detour,local_optimum_disabled_primary,local_optimum_toolbar_vs_menu,local_optimum_confirm_then_apply,local_optimum_tab_state_reset,local_optimum_context_switch,local_optimum_stale_tab_state,local_optimum_form_validation,local_optimum_window_focus,local_optimum_panel_toggle,local_optimum_accessibility_label,local_optimum_checkbox_gate,local_optimum_blocking_modal_required,local_optimum_blocking_modal_permission,local_optimum_blocking_modal_consent,local_optimum_blocking_modal_unmentioned,local_optimum_blocking_modal_unmentioned_blocked,local_optimum_blocking_modal,local_optimum_overlay,local_optimum_primary,local_optimum_delayed_solvable,local_optimum_role_mismatch,local_optimum_role_conflict,local_optimum_destructive_confirm,local_optimum_blocking_modal_unprompted_confirm",
+    [string]$HoldoutList = "",
+    [string]$HoldoutListPath = "configs\\ui_holdout_list.json",
     [switch]$SkipVariants
 )
 
 $RequiredVariantsHoldout = "local_optimum_blocking_modal_unmentioned_blocked"
+$DefaultHoldoutList = "local_optimum_section_path,local_optimum_section_path_conflict,local_optimum_blocking_modal_detour,local_optimum_tab_detour,local_optimum_disabled_primary,local_optimum_toolbar_vs_menu,local_optimum_confirm_then_apply,local_optimum_tab_state_reset,local_optimum_context_switch,local_optimum_stale_tab_state,local_optimum_form_validation,local_optimum_window_focus,local_optimum_panel_toggle,local_optimum_accessibility_label,local_optimum_checkbox_gate,local_optimum_blocking_modal_required,local_optimum_blocking_modal_permission,local_optimum_blocking_modal_consent,local_optimum_blocking_modal_unmentioned,local_optimum_blocking_modal_unmentioned_blocked,local_optimum_blocking_modal,local_optimum_overlay,local_optimum_primary,local_optimum_delayed_solvable,local_optimum_role_mismatch,local_optimum_role_conflict,local_optimum_destructive_confirm,local_optimum_unsaved_changes,local_optimum_blocking_modal_unprompted_confirm"
 
 if ($RunSweeps -and -not $ModelPath) {
     Write-Error "Set -ModelPath or GOLDEVIDENCEBENCH_MODEL before running sweeps."
@@ -162,9 +164,29 @@ if (-not $SkipThresholds) {
             Write-Host "AutoCurriculum: no prior distillation report found; using configured holdout."
         }
     } elseif ($RotateHoldout) {
+    $resolvedList = $HoldoutList
+    if (-not $resolvedList) {
+        if (Test-Path $HoldoutListPath) {
+            try {
+                $holdoutConfig = Get-Content $HoldoutListPath -Raw | ConvertFrom-Json
+                if ($holdoutConfig -and $holdoutConfig.holdouts) {
+                    $holdoutNames = @(
+                        $holdoutConfig.holdouts | ForEach-Object { $_.ToString().Trim() } | Where-Object { $_ }
+                    )
+                }
+            } catch {
+                $holdoutNames = @()
+            }
+        }
+    }
+    if (-not $holdoutNames -or $holdoutNames.Count -eq 0) {
+        if (-not $resolvedList) {
+            $resolvedList = $DefaultHoldoutList
+        }
         $holdoutNames = @(
-            $HoldoutList -split "," | ForEach-Object { $_.Trim() } | Where-Object { $_ }
+            $resolvedList -split "," | ForEach-Object { $_.Trim() } | Where-Object { $_ }
         )
+    }
         if (-not $holdoutNames -or $holdoutNames.Count -eq 0) {
             Write-Host "RotateHoldout ignored: HoldoutList is empty."
         } else {
@@ -435,6 +457,16 @@ if (-not $SkipThresholds) {
             Write-Error "Drift holdout gate failed."
             exit 1
         }
+    }
+    if (-not $ModelPath) {
+        Write-Error "Set -ModelPath or GOLDEVIDENCEBENCH_MODEL before running the bad actor holdout gate."
+        exit 1
+    }
+    Write-Host "Running bad actor holdout gate..."
+    .\scripts\run_bad_actor_holdout_gate.ps1 -ModelPath $ModelPath
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "Bad actor holdout gate failed."
+        exit 1
     }
     python .\scripts\check_thresholds.py --config .\configs\usecase_checks.json
     $exitCode = $LASTEXITCODE

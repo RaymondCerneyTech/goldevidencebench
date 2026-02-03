@@ -164,6 +164,8 @@ Selector failure mode (kv_commentary: NOTE lines are non-authoritative):
 
 NOTE-aware rerank: set `GOLDEVIDENCEBENCH_RETRIEVAL_RERANK=prefer_update_latest` to ignore NOTE lines unless no UPDATE-style lines exist.
 
+Note: these kv_commentary results are selector experiments; for drift holdouts, the prefer_set_latest fix path is evaluated with authority filtering enabled (NOTE lines filtered).
+
 ```powershell
 $env:GOLDEVIDENCEBENCH_RETRIEVAL_RERANK = "latest_step"
 $env:GOLDEVIDENCEBENCH_RETRIEVAL_K = "4"
@@ -174,7 +176,7 @@ goldevidencebench sweep --out runs --seeds 2 --episodes 1 --steps 120 --queries 
 python .\scripts\summarize_results.py --in .\runs\combined.json --out-json .\runs\summary.json
 ```
 
-Example outcome (kv_commentary, prefer_set_latest): value_acc 0.75, exact_acc 0.75, entailment 1.0. With naive latest_step in the same setting, value_acc was 0.25 and exact_acc 0.0, showing NOTE lines can break recency-based selectors and a simple policy fixes it.
+Example outcome (kv_commentary, prefer_set_latest): value_acc 0.75, exact_acc 0.75, entailment 1.0. With naive latest_step in the same setting, value_acc was 0.25 and exact_acc 0.0, showing NOTE lines can break recency-based selectors and a simple policy fixes it in this setting.
 
 KV commentary sanity check (from runs/summary_all.csv, matched A/B: same seeds + settings):
 
@@ -183,7 +185,7 @@ KV commentary sanity check (from runs/summary_all.csv, matched A/B: same seeds +
 | custom | 4 | latest_step | 1 | 1.0 | 0.75 | 0.75 |
 | custom | 4 | prefer_set_latest | 1 | 0.75 | 0.75 | 1.0 |
 
-Matched A/B shows `latest_step` maximizes selection but can cite non-authoritative NOTE lines (entailment drops), while `prefer_set_latest` preserves entailment.
+Matched A/B (kv_commentary) shows `latest_step` maximizes selection but can cite non-authoritative NOTE lines (entailment drops), while `prefer_set_latest` preserves entailment.
 
 KV commentary selector A/B (s3q16, k=4, same_key, shuffle):
 
@@ -215,7 +217,7 @@ KV commentary grid (s3q16, same_key, k in {2,4,8}):
 | linear | 4 | 1.0000 | 0.7292 | 0.7292 | 0.8542 |
 | linear | 8 | 1.0000 | 0.7292 | 0.7292 | 0.8542 |
 
-The learned selector still fails on NOTE authoritativeness across k, while prefer_set_latest stays perfect end-to-end.
+The learned selector still fails on NOTE authoritativeness across k, while prefer_set_latest stays perfect end-to-end in these kv_commentary runs.
 
 Authority filter baseline (GOLDEVIDENCEBENCH_RETRIEVAL_AUTHORITY_FILTER=1, linear rerank, s3q16):
 
@@ -287,7 +289,7 @@ Pick-then-answer adds no benefit once authority filtering removes NOTE noise.
 
 ![Order bias (kv_commentary, linear, k=4, s5q24)](figures/order_bias_kv_commentary_linear_s5q24.png)
 
-In this mode, NOTE lines appear after real updates, so `latest_step` can fail while `prefer_set_latest` holds.
+In this order-bias test, NOTE lines appear after real updates, so `latest_step` can fail while `prefer_set_latest` holds.
 
 Order-bias check with NOTE-aware rerank (kv_commentary, k=4, s3q16):
 

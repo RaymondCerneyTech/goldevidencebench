@@ -79,6 +79,8 @@ Release check (runs pinned gates and UI stubs):
 .\scripts\run_release_check.ps1 -ModelPath "<MODEL_PATH>"
 ```
 
+Gate threshold sources and artifacts are listed in [docs/GATES.md](docs/GATES.md).
+
 ## Drift holdout gate
 
 **Drift holdout gate expectations (`stale_tab_state`)**
@@ -159,6 +161,7 @@ Domain pack contents:
 
 - Policy handbook stale-doc traps (`data/rag_domain_stale.jsonl`)
 - Policy handbook authority decoys (`data/rag_domain_authority.jsonl`)
+- Policy handbook exceptions (`data/rag_domain_exception.jsonl`)
 
 The domain pack is included in the **strict** preset by default so lenient stays green for CI.
 

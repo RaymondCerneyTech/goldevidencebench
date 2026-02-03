@@ -38,7 +38,10 @@ function Get-DriftMax {
     }
     try {
         $config = Get-Content -Raw -Path $ConfigPath | ConvertFrom-Json
-        $check = $config.checks | Where-Object { $_.id -eq "drift_gate" } | Select-Object -First 1
+        $check = $config.checks | Where-Object { $_.id -eq "drift_holdout_gate" } | Select-Object -First 1
+        if (-not $check) {
+            $check = $config.checks | Where-Object { $_.id -eq "drift_gate" } | Select-Object -First 1
+        }
         if (-not $check) {
             return $fallback
         }
