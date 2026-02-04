@@ -185,7 +185,8 @@ def validate_compaction_artifacts(
         end_marker = False
         has_observation = False
         has_action = False
-        for line in thread_path.read_text(encoding="utf-8").splitlines():
+        schema_path = schema_validation.schema_path("thread_event.schema.json")
+        for line_num, line in enumerate(thread_path.read_text(encoding="utf-8").splitlines(), start=1):
             if not line.strip():
                 continue
             try:
@@ -193,6 +194,9 @@ def validate_compaction_artifacts(
             except json.JSONDecodeError:
                 errors.append("thread.jsonl has invalid JSON line")
                 break
+            event_errors = schema_validation.validate_artifact(event, schema_path)
+            for err in event_errors:
+                errors.append(f"thread.jsonl line {line_num}: {err}")
             notes = event.get("notes")
             event_type = event.get("type")
             if notes == "start_marker":

@@ -5,7 +5,9 @@
     "run_dir",
     "thresholds_version",
     "status",
+    "failure_case_id",
     "primary_bottleneck",
+    "triage",
     "supporting_metrics",
     "evidence_examples",
     "prescription",
@@ -34,11 +36,45 @@
         "null"
       ]
     },
+    "failure_case_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "status": {
       "type": "string"
     },
     "primary_bottleneck": {
       "type": "string"
+    },
+    "triage": {
+      "type": "object",
+      "required": [
+        "retrieval_ok",
+        "selection_ok",
+        "extraction_ok"
+      ],
+      "properties": {
+        "retrieval_ok": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "selection_ok": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "extraction_ok": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      }
     },
     "supporting_metrics": {
       "type": "object"

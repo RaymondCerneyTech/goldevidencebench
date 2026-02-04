@@ -177,6 +177,29 @@ def _apply_drift_applicability(metrics: dict[str, float | None], *, is_drift_run
         metrics[key] = None
 
 
+def _triage_tuple(
+    metrics: dict[str, float | None], thresholds: dict[str, float]
+) -> dict[str, bool | None]:
+    def _min_ok(value: float | None, threshold: float | None) -> bool | None:
+        if value is None or threshold is None:
+            return None
+        return value >= threshold
+
+    return {
+        "retrieval_ok": _min_ok(
+            metrics.get("gold_present_rate"), thresholds.get("gold_present_rate")
+        ),
+        "selection_ok": _min_ok(
+            metrics.get("selection_rate_given_present"),
+            thresholds.get("selection_rate_given_present"),
+        ),
+        "extraction_ok": _min_ok(
+            metrics.get("answer_correct_given_selected"),
+            thresholds.get("answer_correct_given_selected"),
+        ),
+    }
+
+
 def classify_bottleneck(metrics: dict[str, float | None], thresholds: dict[str, float]) -> str:
     unsafe = metrics.get("unsafe_commit_rate")
     if unsafe is not None and unsafe > thresholds["unsafe_commit_rate"]:
@@ -477,6 +500,7 @@ def build_diagnosis(
     thresholds_path: Path | None = None,
     run_dir: Path | str | None = None,
     holdout_name: str | None = None,
+    failure_case_id: str | None = None,
 ) -> Diagnosis:
     thresholds = thresholds or DEFAULT_THRESHOLDS.copy()
     metrics = extract_metrics(summary)
@@ -485,6 +509,7 @@ def build_diagnosis(
     is_drift_run = bool(summary.get("drift")) or (holdout_name in HOLDOUT_NAMES)
     _apply_drift_applicability(metrics, is_drift_run=is_drift_run)
     required_inputs = _required_inputs(metrics, is_drift_run=is_drift_run)
+    triage = _triage_tuple(metrics, thresholds)
     bottleneck = classify_bottleneck(metrics, thresholds)
     status = "FAIL"
     primary = bottleneck if bottleneck != "pass" else "answering"
@@ -546,8 +571,10 @@ def build_diagnosis(
         "run_dir": run_dir_value,
         "thresholds_version": thresholds_version,
         "holdout_name": holdout_name,
+        "failure_case_id": failure_case_id,
         "status": status,
         "primary_bottleneck": primary,
+        "triage": triage,
         "supporting_metrics": metrics,
         "evidence_examples": _normalize_examples(evidence_examples),
         "prescription": prescription,

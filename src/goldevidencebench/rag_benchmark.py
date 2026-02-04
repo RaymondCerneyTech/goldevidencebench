@@ -97,6 +97,9 @@ def summarize_rag_benchmark(config_path: Path, runs_dir: Path) -> dict[str, Any]
     results: list[dict[str, Any]] = []
     missing: list[str] = []
     value_accs: list[float | None] = []
+    exact_accs: list[float | None] = []
+    entailment_rates: list[float | None] = []
+    answer_corrects: list[float | None] = []
     cite_f1s: list[float | None] = []
     instruction_accs: list[float | None] = []
     state_integrity_rates: list[float | None] = []
@@ -128,6 +131,9 @@ def summarize_rag_benchmark(config_path: Path, runs_dir: Path) -> dict[str, Any]
         if not isinstance(efficiency, dict):
             efficiency = {}
         value_acc = _extract_metric(metrics, "value_acc")
+        exact_acc = _extract_metric(metrics, "exact_acc")
+        entailment = _extract_metric(metrics, "entailment")
+        answer_correct_given_selected = _extract_metric(metrics, "answer_correct_given_selected")
         cite_f1 = _extract_metric(metrics, "cite_f1")
         instruction_acc = _extract_metric(metrics, "instruction_acc")
         state_integrity_rate = _extract_metric(metrics, "state_integrity_rate")
@@ -163,6 +169,9 @@ def summarize_rag_benchmark(config_path: Path, runs_dir: Path) -> dict[str, Any]
                 retrieval_hit_rate = hits / total
 
         value_accs.append(value_acc)
+        exact_accs.append(exact_acc)
+        entailment_rates.append(entailment)
+        answer_corrects.append(answer_correct_given_selected)
         cite_f1s.append(cite_f1)
         instruction_accs.append(instruction_acc)
         state_integrity_rates.append(state_integrity_rate)
@@ -177,6 +186,9 @@ def summarize_rag_benchmark(config_path: Path, runs_dir: Path) -> dict[str, Any]
                 "result_path": str(result_path),
                 "status": "ok",
                 "value_acc": value_acc,
+                "exact_acc": exact_acc,
+                "entailment": entailment,
+                "answer_correct_given_selected": answer_correct_given_selected,
                 "cite_f1": cite_f1,
                 "instruction_acc": instruction_acc,
                 "state_integrity_rate": state_integrity_rate,
@@ -200,6 +212,9 @@ def summarize_rag_benchmark(config_path: Path, runs_dir: Path) -> dict[str, Any]
         "missing": missing,
         "means": {
             "value_acc": _mean(value_accs),
+            "exact_acc": _mean(exact_accs),
+            "entailment": _mean(entailment_rates),
+            "answer_correct_given_selected": _mean(answer_corrects),
             "cite_f1": _mean(cite_f1s),
             "instruction_acc": _mean(instruction_accs),
             "state_integrity_rate": _mean(state_integrity_rates),
@@ -236,6 +251,16 @@ def render_rag_benchmark_report(summary: dict[str, Any]) -> str:
         contract_bits = []
         if thresholds.get("value_acc") is not None:
             contract_bits.append(f"value_acc >= {thresholds.get('value_acc')}")
+        if thresholds.get("exact_acc") is not None:
+            contract_bits.append(f"exact_acc >= {thresholds.get('exact_acc')}")
+        if thresholds.get("entailment") is not None:
+            contract_bits.append(f"entailment >= {thresholds.get('entailment')}")
+        if thresholds.get("answer_correct_given_selected") is not None:
+            contract_bits.append(
+                "answer_correct_given_selected >= {0}".format(
+                    thresholds.get("answer_correct_given_selected")
+                )
+            )
         if thresholds.get("cite_f1") is not None:
             contract_bits.append(f"cite_f1 >= {thresholds.get('cite_f1')}")
         if contract_bits:
@@ -252,6 +277,9 @@ def render_rag_benchmark_report(summary: dict[str, Any]) -> str:
     lines.append("## Means")
     means = summary.get("means", {})
     lines.append(f"- value_acc: {means.get('value_acc', 'n/a')}")
+    lines.append(f"- exact_acc: {means.get('exact_acc', 'n/a')}")
+    lines.append(f"- entailment: {means.get('entailment', 'n/a')}")
+    lines.append(f"- answer_correct_given_selected: {means.get('answer_correct_given_selected', 'n/a')}")
     lines.append(f"- cite_f1: {means.get('cite_f1', 'n/a')}")
     lines.append(f"- retrieval_hit_rate: {means.get('retrieval_hit_rate', 'n/a')}")
     lines.append(f"- instruction_acc: {means.get('instruction_acc', 'n/a')}")
@@ -259,18 +287,21 @@ def render_rag_benchmark_report(summary: dict[str, Any]) -> str:
     lines.append("")
     lines.append("## Datasets")
     lines.append(
-        "| ID | Label | Failure mode | value_acc | cite_f1 | retrieval_hit | wall_s_per_q | tokens_per_q | Status |"
+        "| ID | Label | Failure mode | value_acc | exact_acc | entailment | answer_correct | cite_f1 | retrieval_hit | wall_s_per_q | tokens_per_q | Status |"
     )
-    lines.append("| --- | --- | --- | --- | --- | --- | --- | --- | --- |")
+    lines.append("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |")
     for entry in summary.get("results", []):
         if not isinstance(entry, dict):
             continue
         lines.append(
-            "| {id} | {label} | {failure} | {value} | {cite} | {retrieval} | {wall} | {tokens} | {status} |".format(
+            "| {id} | {label} | {failure} | {value} | {exact} | {entailment} | {answer} | {cite} | {retrieval} | {wall} | {tokens} | {status} |".format(
                 id=entry.get("id", ""),
                 label=entry.get("label", ""),
                 failure=entry.get("failure_mode", ""),
                 value=_fmt_rate(entry.get("value_acc")),
+                exact=_fmt_rate(entry.get("exact_acc")),
+                entailment=_fmt_rate(entry.get("entailment")),
+                answer=_fmt_rate(entry.get("answer_correct_given_selected")),
                 cite=_fmt_rate(entry.get("cite_f1")),
                 retrieval=_fmt_rate(entry.get("retrieval_hit_rate")),
                 wall=_fmt_rate(entry.get("wall_s_per_q")),

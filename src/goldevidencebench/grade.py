@@ -8,6 +8,7 @@ from typing import Any
 class GradeResult:
     n: int
     value_acc: float
+    answer_correct_given_selected: float | None
     citation_precision: float | None
     citation_recall: float | None
     citation_f1: float | None
@@ -227,6 +228,8 @@ def grade_rows(
     cite_total = 0
     bloat_total = 0
     bloat_count = 0
+    gold_selected_total = 0
+    gold_selected_value_ok = 0
     entail_total = 0
     entail_ok = 0
     exact_ok = 0
@@ -253,18 +256,23 @@ def grade_rows(
         gold_supports = _norm_support_list(gold.get("support_ids"))
         if not gold_supports:
             gold_supports = _norm_support_list(gold.get("support_id"))
+        pred_supports_scored = pred_supports[:max_support_k]
 
         n += 1
         is_value_ok = pv == gv
         if is_value_ok:
             value_ok += 1
 
+        if gold_supports and set(gold_supports).issubset(set(pred_supports_scored)):
+            gold_selected_total += 1
+            if is_value_ok:
+                gold_selected_value_ok += 1
+
         require = row["meta"].get("requires_citation", False) if citations == "auto" else citations == "on"
         is_cite_ok = True
         is_entails = True
         if require:
             cite_total += 1
-            pred_supports_scored = pred_supports[:max_support_k]
             prec, rec, f1 = _prf1(pred=pred_supports_scored, gold=gold_supports)
             cite_prec_sum += prec
             cite_rec_sum += rec
@@ -327,6 +335,9 @@ def grade_rows(
     return GradeResult(
         n=n,
         value_acc=value_ok / n if n else 0.0,
+        answer_correct_given_selected=(
+            gold_selected_value_ok / gold_selected_total if gold_selected_total else None
+        ),
         citation_precision=(cite_prec_sum / cite_total) if cite_total else None,
         citation_recall=(cite_rec_sum / cite_total) if cite_total else None,
         citation_f1=(cite_f1_sum / cite_total) if cite_total else None,

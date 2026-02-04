@@ -1,0 +1,94 @@
+{
+  "type": "object",
+  "required": [
+    "schema_version",
+    "ts",
+    "run_id",
+    "step",
+    "type",
+    "why_type",
+    "inputs_ref",
+    "outputs_ref",
+    "notes",
+    "case_id",
+    "step_id",
+    "candidate_id",
+    "selected_id",
+    "gold_id"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string"
+    },
+    "ts": {
+      "type": "string"
+    },
+    "run_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "step": {
+      "type": "integer"
+    },
+    "type": {
+      "type": "string"
+    },
+    "why_type": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "inputs_ref": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "outputs_ref": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "notes": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "case_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "step_id": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "candidate_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "selected_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "gold_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "additionalProperties": true
+}

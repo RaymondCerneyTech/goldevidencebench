@@ -216,6 +216,7 @@ def _cmd_model(ns: argparse.Namespace) -> int:
             "env": _env_snapshot(),
             "metrics": {
                 "value_acc": res.value_acc,
+                "answer_correct_given_selected": res.answer_correct_given_selected,
                 "exact_acc": res.exact_acc,
                 "cite_f1": res.citation_f1,
                 "cite_p": res.citation_precision,
@@ -238,6 +239,7 @@ def _cmd_model(ns: argparse.Namespace) -> int:
         if raw_res is not None:
             results_payload["metrics_raw"] = {
                 "value_acc": raw_res.value_acc,
+                "answer_correct_given_selected": raw_res.answer_correct_given_selected,
                 "exact_acc": raw_res.exact_acc,
                 "cite_f1": raw_res.citation_f1,
                 "cite_p": raw_res.citation_precision,

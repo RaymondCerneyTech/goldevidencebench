@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from goldevidencebench import diagnosis as diagnosis_mod
+from goldevidencebench.util import read_jsonl
 
 STATUS_MAP = {
     "PASS": "PASS",
@@ -43,6 +44,65 @@ def _format_plain(value: Any) -> str:
     if isinstance(value, float):
         return f"{value:.4f}"
     return str(value)
+
+
+def _find_decision_event(thread_path: Path, case_id: str | None) -> dict[str, Any] | None:
+    if not case_id or not thread_path.exists():
+        return None
+    try:
+        with thread_path.open("r", encoding="utf-8-sig") as handle:
+            for line in handle:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    event = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if (
+                    isinstance(event, dict)
+                    and event.get("type") == "decision"
+                    and str(event.get("case_id")) == case_id
+                ):
+                    return event
+    except OSError:
+        return None
+    return None
+
+
+def _find_jsonl_row(path: Path, case_id: str | None) -> dict[str, Any] | None:
+    if not case_id or not path.exists():
+        return None
+    try:
+        for row in read_jsonl(path):
+            if str(row.get("id")) == case_id:
+                return row
+    except (OSError, json.JSONDecodeError):
+        return None
+    return None
+
+
+def _build_decision_audit(run_dir: Path, case_id: str | None) -> dict[str, Any] | None:
+    event = _find_decision_event(run_dir / "thread.jsonl", case_id)
+    if not event:
+        return None
+    inputs_ref = event.get("inputs_ref")
+    outputs_ref = event.get("outputs_ref")
+    data_row = _find_jsonl_row(run_dir / inputs_ref, case_id) if inputs_ref else None
+    pred_row = _find_jsonl_row(run_dir / outputs_ref, case_id) if outputs_ref else None
+    gold_value = None
+    if isinstance(data_row, dict):
+        gold_block = data_row.get("gold") or {}
+        if isinstance(gold_block, dict):
+            gold_value = gold_block.get("value")
+    pred_value = pred_row.get("value") if isinstance(pred_row, dict) else None
+    return {
+        "case_id": case_id,
+        "selected_id": event.get("selected_id"),
+        "gold_id": event.get("gold_id"),
+        "pred_value": pred_value,
+        "gold_value": gold_value,
+    }
 
 
 def _metric_rows(
@@ -133,10 +193,12 @@ def generate_report(
     status = STATUS_MAP.get(status_raw, status_raw)
     primary = diagnosis.get("primary_bottleneck", "unknown")
     holdout = diagnosis.get("holdout_name")
+    failure_case_id = diagnosis.get("failure_case_id")
     supporting = diagnosis.get("supporting_metrics") or {}
 
     metric_lines = _metric_rows(supporting, thresholds)
     repro_commands = _load_repro_commands(summary_path.parent)
+    decision_audit = _build_decision_audit(summary_path.parent, failure_case_id)
 
     rationale = None
     prescription = diagnosis.get("prescription") or {}
@@ -157,6 +219,7 @@ def generate_report(
     ]
     if holdout:
         report_lines.append(f"Holdout: {holdout}")
+    report_lines.append(f"Failure case: {_format_plain(failure_case_id)}")
     report_lines.extend(
         [
             "",
@@ -170,6 +233,28 @@ def generate_report(
             "",
             "## What failed and why",
             why,
+        ]
+    )
+    report_lines.extend(
+        [
+            "",
+            "## Decision audit",
+        ]
+    )
+    if decision_audit:
+        report_lines.append(f"- case_id: {_format_plain(decision_audit.get('case_id'))}")
+        report_lines.append(f"- selected_id: {_format_plain(decision_audit.get('selected_id'))}")
+        report_lines.append(f"- gold_id: {_format_plain(decision_audit.get('gold_id'))}")
+        report_lines.append(f"- pred_value: {_format_plain(decision_audit.get('pred_value'))}")
+        gold_value = decision_audit.get("gold_value")
+        gold_value_line = _format_plain(gold_value)
+        if gold_value is None:
+            gold_value_line = f"{gold_value_line} (not provided by fixture)"
+        report_lines.append(f"- gold_value: {gold_value_line}")
+    else:
+        report_lines.append("Decision audit not available (missing thread log or case id).")
+    report_lines.extend(
+        [
             "",
             "## Repro commands",
         ]

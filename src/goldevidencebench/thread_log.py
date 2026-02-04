@@ -22,6 +22,11 @@ def build_event(
     inputs_ref: str | None = None,
     outputs_ref: str | None = None,
     notes: str | None = None,
+    case_id: str | None = None,
+    step_id: int | None = None,
+    candidate_id: str | None = None,
+    selected_id: str | None = None,
+    gold_id: str | None = None,
     ts: datetime | None = None,
 ) -> dict[str, Any]:
     return {
@@ -34,6 +39,11 @@ def build_event(
         "inputs_ref": inputs_ref,
         "outputs_ref": outputs_ref,
         "notes": notes,
+        "case_id": case_id,
+        "step_id": step_id,
+        "candidate_id": candidate_id,
+        "selected_id": selected_id,
+        "gold_id": gold_id,
     }
 
 
