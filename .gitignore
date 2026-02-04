@@ -23,8 +23,6 @@ venv/
 !data/rag_domain_exception.jsonl
 !data/bad_actor_holdout_e0001.jsonl
 runs/*
-!runs/bad_actor_holdout_20260202_230442/
-!runs/bad_actor_holdout_20260202_230442/**
 runs_wall_latest/
 runs_wall_linear/
 runs_wall_*/
