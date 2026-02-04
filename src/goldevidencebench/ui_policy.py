@@ -654,6 +654,23 @@ def _candidate_advances_state(candidate: dict[str, Any]) -> bool:
     return False
 
 
+def _candidate_opens_unsaved_prompt(candidate: dict[str, Any]) -> bool:
+    for field in ("next_state", "state"):
+        state = candidate.get(field)
+        if not isinstance(state, dict):
+            continue
+        if state.get("unsaved_prompt") is True:
+            return True
+    return False
+
+
+def _filter_unsaved_prompt_openers(
+    candidates: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    matches = [candidate for candidate in candidates if _candidate_opens_unsaved_prompt(candidate)]
+    return matches or candidates
+
+
 def _filter_state_advances(
     candidates: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
@@ -764,7 +781,28 @@ def preselect_candidates(
         if len(advanced) != len(candidates):
             candidates = advanced
             label_hint = True
+    skip_label_keywords = False
     if apply_rules:
+        expected_delta = row.get("expected_delta")
+        expected_event = None
+        if isinstance(expected_delta, dict):
+            expected_event = expected_delta.get("event")
+        wants_unsaved_prompt = (
+            isinstance(expected_event, str) and "unsaved_prompt" in expected_event
+        )
+        if not wants_unsaved_prompt and expected_event is None:
+            requires_state = row.get("requires_state")
+            requires_unsaved = isinstance(requires_state, dict) and requires_state.get("unsaved_prompt") is True
+            if not requires_unsaved:
+                tokens = set(_tokenize_text(instruction))
+                if "save" in tokens and any(_candidate_opens_unsaved_prompt(candidate) for candidate in candidates):
+                    wants_unsaved_prompt = True
+        if wants_unsaved_prompt:
+            unsaved_filtered = _filter_unsaved_prompt_openers(candidates)
+            if len(unsaved_filtered) != len(candidates):
+                candidates = unsaved_filtered
+                skip_label_keywords = True
+    if apply_rules and not skip_label_keywords:
         candidates, label_token = _filter_by_label_keywords(candidates, instruction)
         label_hint = label_hint or (label_token is not None)
         role_hint = _desired_role_from_instruction(instruction)
@@ -931,7 +969,29 @@ def preselect_candidates_with_trace(
             _record_removed(current, filtered, "overlay_advances_state", reasons)
             label_hint = True
         current = filtered
+    skip_label_keywords = False
     if apply_rules:
+        expected_delta = row.get("expected_delta")
+        expected_event = None
+        if isinstance(expected_delta, dict):
+            expected_event = expected_delta.get("event")
+        wants_unsaved_prompt = (
+            isinstance(expected_event, str) and "unsaved_prompt" in expected_event
+        )
+        if not wants_unsaved_prompt and expected_event is None:
+            requires_state = row.get("requires_state")
+            requires_unsaved = isinstance(requires_state, dict) and requires_state.get("unsaved_prompt") is True
+            if not requires_unsaved:
+                tokens = set(_tokenize_text(instruction))
+                if "save" in tokens and any(_candidate_opens_unsaved_prompt(candidate) for candidate in current):
+                    wants_unsaved_prompt = True
+        if wants_unsaved_prompt:
+            filtered = _filter_unsaved_prompt_openers(current)
+            if len(filtered) != len(current):
+                _record_removed(current, filtered, "unsaved_prompt_required", reasons)
+                skip_label_keywords = True
+            current = filtered
+    if apply_rules and not skip_label_keywords:
         filtered, token = _filter_by_label_keywords(current, instruction)
         if token:
             _record_removed(current, filtered, f"label_keyword_mismatch:{token}", reasons)
