@@ -215,8 +215,16 @@ if ($fixAuthorityPass) {
 }
 $summaryPath = $snapshot.summary_path
 $diagnosisPath = Join-Path (Split-Path $summaryPath) "diagnosis.json"
+$compactJsonPath = Join-Path (Split-Path $summaryPath) "summary_compact.json"
+$compactCsvPath = Join-Path (Split-Path $summaryPath) "summary_compact.csv"
 if (Test-Path $summaryPath) {
     Copy-Item $summaryPath -Destination (Join-Path $LatestDir "summary.json") -Force
+}
+if (Test-Path $compactJsonPath) {
+    Copy-Item $compactJsonPath -Destination (Join-Path $LatestDir "summary_compact.json") -Force
+}
+if (Test-Path $compactCsvPath) {
+    Copy-Item $compactCsvPath -Destination (Join-Path $LatestDir "summary_compact.csv") -Force
 }
 if (Test-Path $diagnosisPath) {
     Copy-Item $diagnosisPath -Destination (Join-Path $LatestDir "diagnosis.json") -Force

@@ -91,3 +91,4 @@ if (-not [double]::IsNaN($MinSaPass)) {
 python .\scripts\summarize_core_benchmark.py @summaryArgs | Out-Host
 
 Write-Host "Core benchmark summary: $summaryPath"
+.\scripts\set_latest_pointer.ps1 -RunDir $OutRoot -PointerPath "runs\\latest_core_benchmark" | Out-Host

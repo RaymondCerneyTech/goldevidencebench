@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 from pathlib import Path
 
@@ -9,6 +10,13 @@ from goldevidencebench.core_benchmark import (
     render_core_benchmark_report,
     summarize_core_benchmark,
 )
+
+
+def _write_compact_csv(path: Path, rows: list[dict[str, object]], fieldnames: list[str]) -> None:
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
 
 
 def main() -> int:
@@ -77,6 +85,47 @@ def main() -> int:
     report_text = render_core_benchmark_report(summary)
     report_path = Path(args.report) if args.report else runs_dir / "report.md"
     report_path.write_text(report_text, encoding="utf-8")
+
+    compact_rows: list[dict[str, object]] = []
+    for entry in summary.get("results", []):
+        if not isinstance(entry, dict):
+            continue
+        compact_rows.append(
+            {
+                "id": entry.get("id"),
+                "label": entry.get("label"),
+                "failure_mode": entry.get("failure_mode"),
+                "policy_task_pass_rate": entry.get("policy_task_pass_rate"),
+                "greedy_task_pass_rate": entry.get("greedy_task_pass_rate"),
+                "sa_task_pass_rate": entry.get("sa_task_pass_rate"),
+                "status": entry.get("status"),
+            }
+        )
+    compact_summary = {
+        "benchmark": summary.get("benchmark"),
+        "runs_dir": summary.get("runs_dir"),
+        "generated_at": summary.get("generated_at"),
+        "status": summary.get("status"),
+        "thresholds": summary.get("thresholds"),
+        "means": summary.get("means"),
+        "fixtures": compact_rows,
+    }
+    compact_json_path = out_path.with_name("summary_compact.json")
+    compact_csv_path = out_path.with_name("summary_compact.csv")
+    compact_json_path.write_text(json.dumps(compact_summary, indent=2), encoding="utf-8")
+    _write_compact_csv(
+        compact_csv_path,
+        compact_rows,
+        [
+            "id",
+            "label",
+            "failure_mode",
+            "policy_task_pass_rate",
+            "greedy_task_pass_rate",
+            "sa_task_pass_rate",
+            "status",
+        ],
+    )
 
     print(f"Wrote {out_path}")
     print(f"Wrote {report_path}")

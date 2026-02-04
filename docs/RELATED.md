@@ -3,6 +3,10 @@
 This list is intentionally short and curated (not exhaustive).
 As of the time this project was created, these were the most relevant touchpoints.
 
+Light framing note: constraints create coherence in complex systems. In GoldEvidenceBench,
+fixtures, schemas, and gates make those constraints explicit so long-horizon behavior is testable.
+If you want the conceptual treatment, see Alicia Juarrero, Context Changes Everything (MIT Press).
+
 ## Long-context + positional sensitivity
 - Lost in the Middle (position bias in long contexts): https://arxiv.org/abs/2307.03172
 - StreamingLLM / Attention Sinks (long-context behavior + streaming tricks): https://arxiv.org/abs/2309.17453

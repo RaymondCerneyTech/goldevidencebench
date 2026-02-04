@@ -101,8 +101,16 @@ New-Item -ItemType Directory -Path $latestDir -Force | Out-Null
 $maxStep = ($Steps | Measure-Object -Maximum).Maximum
 $latestRun = Join-Path $finalRunsDir "drift_steps$maxStep"
 $latestSummary = Join-Path $latestRun "summary.json"
+$latestCompactJson = Join-Path $latestRun "summary_compact.json"
+$latestCompactCsv = Join-Path $latestRun "summary_compact.csv"
 if (Test-Path $latestSummary) {
     Copy-Item $latestSummary -Destination (Join-Path $latestDir "summary.json") -Force
+}
+if (Test-Path $latestCompactJson) {
+    Copy-Item $latestCompactJson -Destination (Join-Path $latestDir "summary_compact.json") -Force
+}
+if (Test-Path $latestCompactCsv) {
+    Copy-Item $latestCompactCsv -Destination (Join-Path $latestDir "summary_compact.csv") -Force
 }
 if (Test-Path $wallOut) {
     Copy-Item $wallOut -Destination (Join-Path $latestDir "drift_wall.json") -Force

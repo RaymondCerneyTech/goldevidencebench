@@ -17,3 +17,14 @@ Included files:
 Notes:
 - Paths inside these artifacts are Windows-style from the original run.
 - The failure is intentional (unsafe-commit case, action_safety bottleneck); your current gates may now pass.
+
+## Open-book citation gap example
+
+This pack shows the classic failure mode: **citations look great but answers are wrong**.
+
+Source run:
+- runs/rag_open_book_demo_20260203_232122/rag_open_book_run
+
+Included files:
+- open_book_citation_gap/report.md
+- open_book_citation_gap/summary.json

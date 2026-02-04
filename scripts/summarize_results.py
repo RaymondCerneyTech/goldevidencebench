@@ -10,7 +10,7 @@ import sys
 from datetime import datetime, timezone
 from collections import defaultdict
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from goldevidencebench import drift as drift_mod
 from goldevidencebench import grade as grade_mod
@@ -214,6 +214,37 @@ def _flatten(row: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
+def _build_compact_summary(
+    summary: dict[str, Any],
+    diagnosis: dict[str, Any],
+    run_dir: Path,
+) -> dict[str, Any]:
+    overall = summary.get("overall") or {}
+    retrieval = summary.get("retrieval") or {}
+    drift = summary.get("drift") or {}
+    return {
+        "run_dir": str(run_dir),
+        "status": diagnosis.get("status"),
+        "primary_bottleneck": diagnosis.get("primary_bottleneck"),
+        "failure_case_id": diagnosis.get("failure_case_id"),
+        "value_acc": overall.get("value_acc_mean"),
+        "exact_acc": overall.get("exact_acc_mean"),
+        "cite_f1": overall.get("cite_f1_mean"),
+        "entailment": overall.get("entailment_mean"),
+        "selection_rate": retrieval.get("selection_rate"),
+        "wrong_update_rate": retrieval.get("wrong_update_rate"),
+        "gold_present_rate": retrieval.get("gold_present_rate"),
+        "drift_step_rate": drift.get("step_rate"),
+    }
+
+
+def _write_compact_csv(path: Path, row: dict[str, Any], fieldnames: list[str]) -> None:
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerow({key: row.get(key) for key in fieldnames})
+
+
 def _mean(values: list[float]) -> float:
     return sum(values) / len(values) if values else 0.0
 
@@ -282,6 +313,140 @@ def _relpath(path: Path, base: Path) -> str:
         return str(path.relative_to(base))
     except ValueError:
         return str(path)
+
+
+def _coerce_int(value: Any) -> int | None:
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _build_decision_payload(
+    *,
+    data_row: dict[str, Any],
+    pred: dict[str, Any] | None,
+    diag: dict[str, Any] | None,
+    data_ref: str,
+    preds_ref: str,
+) -> dict[str, Any]:
+    case_id = data_row.get("id")
+    meta = data_row.get("meta") or {}
+    step_id = _coerce_int(meta.get("q_index"))
+    pred_supports = _norm_support_list(pred.get("support_ids") or pred.get("support_id")) if pred else []
+    gold_supports = _norm_support_list(
+        data_row.get("gold", {}).get("support_ids") or data_row.get("gold", {}).get("support_id")
+    )
+    gold_id = None
+    if diag:
+        gold_id = diag.get("correct_uid") or diag.get("gold_uid")
+    if gold_id is None and gold_supports:
+        gold_id = gold_supports[0]
+    selected_id = None
+    if diag:
+        selected_id = diag.get("selected_uid") or diag.get("reranked_uid")
+    if selected_id is None and pred_supports:
+        selected_id = pred_supports[0]
+    candidate_id = None
+    if diag:
+        candidate_id = diag.get("reranked_uid") or diag.get("selected_uid")
+    if candidate_id is None and pred_supports:
+        candidate_id = pred_supports[0]
+    return {
+        "case_id": case_id,
+        "step_id": step_id,
+        "candidate_id": candidate_id,
+        "selected_id": selected_id,
+        "gold_id": gold_id,
+        "inputs_ref": data_ref,
+        "outputs_ref": preds_ref,
+    }
+
+
+def _build_failure_record(
+    *,
+    data_row: dict[str, Any],
+    pred: dict[str, Any],
+    diag: dict[str, Any],
+) -> dict[str, Any]:
+    case_id = data_row.get("id")
+    gold_value = _norm_value(data_row.get("gold", {}).get("value"))
+    pred_value = _norm_value(pred.get("value"))
+    gold_supports = _norm_support_list(
+        data_row.get("gold", {}).get("support_ids") or data_row.get("gold", {}).get("support_id")
+    )
+    correct_uid = diag.get("correct_uid") or diag.get("gold_uid") or (gold_supports[0] if gold_supports else None)
+    gold_uid = diag.get("gold_uid") or (gold_supports[0] if gold_supports else None)
+    pred_supports = _norm_support_list(pred.get("support_ids") or pred.get("support_id"))
+    selected_uid = diag.get("selected_uid") or diag.get("reranked_uid")
+    selected_entry_op = None
+    if selected_uid:
+        selected_entry = next(
+            (e for e in parse_book_ledger(data_row.get("book") or "") if e.get("uid") == selected_uid),
+            None,
+        )
+        if selected_entry:
+            selected_entry_op = str(selected_entry.get("op") or "").upper()
+    gold_missing = diag.get("gold_missing")
+    if gold_missing is None:
+        gold_missing = diag.get("correct_included") is not True or diag.get("dropped_correct") is True
+    abstained = diag.get("abstained") is True or _is_abstain(pred)
+    is_authority_violation = selected_entry_op == "NOTE"
+    is_wrong_update = bool(gold_uid and selected_uid and selected_uid != gold_uid)
+    is_unsafe_commit = is_wrong_update and selected_entry_op != "NOTE"
+    is_selection_fail = bool(diag.get("correct_included") is True and correct_uid and correct_uid not in pred_supports)
+    is_retrieval_fail = bool(gold_missing or diag.get("correct_included") is False or diag.get("dropped_correct"))
+    is_answering_fail = gold_value is not None and pred_value is not None and gold_value != pred_value
+    return {
+        "case_id": case_id,
+        "gold_value": gold_value,
+        "pred_value": pred_value,
+        "gold_uid": gold_uid,
+        "correct_uid": correct_uid,
+        "selected_uid": selected_uid,
+        "selected_op": selected_entry_op,
+        "pred_supports": pred_supports,
+        "gold_missing": gold_missing,
+        "abstained": abstained,
+        "is_authority_violation": is_authority_violation,
+        "is_unsafe_commit": is_unsafe_commit,
+        "is_selection_fail": is_selection_fail,
+        "is_retrieval_fail": is_retrieval_fail,
+        "is_answering_fail": is_answering_fail,
+    }
+
+
+def _pick_failure_case_id(
+    failure_records: list[dict[str, Any]],
+    diagnosis: dict[str, Any],
+) -> str | None:
+    status = diagnosis.get("status")
+    if status == "PASS":
+        return None
+    primary = diagnosis.get("primary_bottleneck")
+    if not isinstance(primary, str):
+        primary = ""
+    predicates: dict[str, Callable[[dict[str, Any]], bool]] = {
+        "action_safety": lambda r: bool(r.get("is_unsafe_commit")),
+        "authority": lambda r: bool(r.get("is_authority_violation")),
+        "retrieval": lambda r: bool(r.get("is_retrieval_fail")),
+        "selection": lambda r: bool(r.get("is_selection_fail")),
+        "answering": lambda r: bool(r.get("is_answering_fail")),
+        "instability": lambda r: bool(r.get("is_answering_fail")),
+    }
+    predicate = predicates.get(primary)
+    if predicate:
+        for record in failure_records:
+            case_id = record.get("case_id")
+            if case_id and predicate(record):
+                return case_id
+    for record in failure_records:
+        case_id = record.get("case_id")
+        if case_id:
+            return case_id
+    return None
 
 
 def _compute_decomposition(
@@ -698,7 +863,13 @@ def summarize(rows: list[dict[str, Any]]) -> dict[str, Any]:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Summarize GoldEvidenceBench results JSON into CSV/JSON.")
     parser.add_argument("--in", dest="input_path", type=Path, default=Path("runs/combined.json"))
-    parser.add_argument("--out-csv", dest="out_csv", type=Path, default=Path("runs/summary.csv"))
+    parser.add_argument(
+        "--out-csv",
+        dest="out_csv",
+        type=Path,
+        default=None,
+        help="Optional path for summary CSV output (defaults to sibling of --out-json).",
+    )
     parser.add_argument("--out-json", dest="out_json", type=Path, default=Path("runs/summary.json"))
     parser.add_argument(
         "--out-decomp-csv",
@@ -727,7 +898,11 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    rows = json.loads(args.input_path.read_text(encoding="utf-8"))
+    if args.out_csv is None:
+        args.out_csv = args.out_json.with_name("summary.csv")
+
+    rows = json.loads(args.input_path.read_text(encoding="utf-8-sig"))
+    run_dir = args.out_json.parent
     flat = [_flatten(row) for row in rows]
     summary = summarize(rows)
     recency_edges = _parse_edges(args.recency_buckets, "200,400,800,1600")
@@ -761,6 +936,8 @@ def main() -> int:
     drift_examples: list[dict[str, Any]] = []
     holdout_names: set[str] = set()
     context_keys: set[str] = set()
+    decision_payloads: list[dict[str, Any]] = []
+    failure_records: list[dict[str, Any]] = []
 
     recency_rows = []
     for row in rows:
@@ -851,13 +1028,34 @@ def main() -> int:
         support_metric = cfg.get("support_metric", "f1")
         max_support_k = int(cfg.get("max_support_k", 3))
         entailment_check = bool(cfg.get("entailment_check", True))
+        data_ref = _relpath(Path(data_path), run_dir)
+        preds_ref = _relpath(preds_path, run_dir)
         for data_row in data_rows:
-            pred = pred_by_id.get(data_row.get("id"))
+            rid = data_row.get("id")
+            if not rid:
+                continue
+            pred = pred_by_id.get(rid)
+            diag = retrieval_by_id.get(rid)
+            decision_payloads.append(
+                _build_decision_payload(
+                    data_row=data_row,
+                    pred=pred,
+                    diag=diag,
+                    data_ref=data_ref,
+                    preds_ref=preds_ref,
+                )
+            )
             if pred is None:
                 continue
-            diag = retrieval_by_id.get(data_row.get("id"))
             if not diag:
                 continue
+            failure_records.append(
+                _build_failure_record(
+                    data_row=data_row,
+                    pred=pred,
+                    diag=diag,
+                )
+            )
             gold_missing = diag.get("gold_missing")
             if gold_missing is None:
                 gold_missing = diag.get("correct_included") is not True or diag.get("dropped_correct") is True
@@ -1037,10 +1235,29 @@ def main() -> int:
         holdout_name=holdout_name,
         evidence_examples=drift_examples,
     )
+    diagnosis["failure_case_id"] = _pick_failure_case_id(failure_records, diagnosis)
     diagnosis_path = args.out_json.with_name("diagnosis.json")
     diagnosis_mod.write_diagnosis(diagnosis_path, diagnosis)
+    compact_summary = _build_compact_summary(summary, diagnosis, run_dir)
+    compact_fields = [
+        "run_dir",
+        "status",
+        "primary_bottleneck",
+        "failure_case_id",
+        "value_acc",
+        "exact_acc",
+        "cite_f1",
+        "entailment",
+        "selection_rate",
+        "wrong_update_rate",
+        "gold_present_rate",
+        "drift_step_rate",
+    ]
+    compact_json_path = args.out_json.with_name("summary_compact.json")
+    compact_csv_path = args.out_json.with_name("summary_compact.csv")
+    compact_json_path.write_text(json.dumps(compact_summary, indent=2), encoding="utf-8")
+    _write_compact_csv(compact_csv_path, compact_summary, compact_fields)
 
-    run_dir = args.out_json.parent
     if "release_gates" not in run_dir.parts:
         repro_metadata = _build_repro_metadata(rows, input_path=args.input_path, out_json=args.out_json)
         repro_path = run_dir / "repro_commands.json"
@@ -1088,6 +1305,75 @@ def main() -> int:
             authority_mode="filter_on" if authority_enabled else "filter_off",
         )
         compaction_mod.write_compact_state(compact_path, compact_state)
+        thread_path = run_dir / "thread.jsonl"
+        input_ref = _relpath(args.input_path, run_dir)
+        run_id = run_dir.name or str(run_dir)
+        step_counter = 0
+        thread_log_mod.append_event(
+            thread_path,
+            thread_log_mod.build_event(
+                run_id=run_id,
+                step=step_counter,
+                event_type="plan",
+                inputs_ref=_relpath(repro_path, run_dir),
+                notes="start_marker",
+            ),
+        )
+        for payload in decision_payloads:
+            step_counter += 1
+            thread_log_mod.append_event(
+                thread_path,
+                thread_log_mod.build_event(
+                    run_id=run_id,
+                    step=step_counter,
+                    event_type="decision",
+                    why_type="state_update_decision",
+                    inputs_ref=payload.get("inputs_ref"),
+                    outputs_ref=payload.get("outputs_ref"),
+                    notes="case_decision",
+                    case_id=payload.get("case_id"),
+                    step_id=payload.get("step_id"),
+                    candidate_id=payload.get("candidate_id"),
+                    selected_id=payload.get("selected_id"),
+                    gold_id=payload.get("gold_id"),
+                ),
+            )
+        step_counter += 1
+        thread_log_mod.append_event(
+            thread_path,
+            thread_log_mod.build_event(
+                run_id=run_id,
+                step=step_counter,
+                event_type="observation",
+                inputs_ref=input_ref,
+                outputs_ref=_relpath(args.out_json, run_dir),
+                notes="summary written",
+            ),
+        )
+        step_counter += 1
+        thread_log_mod.append_event(
+            thread_path,
+            thread_log_mod.build_event(
+                run_id=run_id,
+                step=step_counter,
+                event_type="tool",
+                inputs_ref=_relpath(args.out_json, run_dir),
+                outputs_ref=_relpath(diagnosis_path, run_dir),
+                notes="diagnosis written",
+            ),
+        )
+        step_counter += 1
+        thread_log_mod.append_event(
+            thread_path,
+            thread_log_mod.build_event(
+                run_id=run_id,
+                step=step_counter,
+                event_type="summary",
+                inputs_ref=_relpath(args.out_json, run_dir),
+                outputs_ref=_relpath(compact_path, run_dir),
+                notes="compact state snapshot",
+            ),
+        )
         reporting_mod.generate_report(
             summary_path=args.out_json,
             diagnosis_path=diagnosis_path,
@@ -1095,67 +1381,24 @@ def main() -> int:
             out_path=report_path,
             thresholds_path=thresholds_path,
         )
-        thread_path = run_dir / "thread.jsonl"
-        input_ref = _relpath(args.input_path, run_dir)
+        step_counter += 1
         thread_log_mod.append_event(
             thread_path,
             thread_log_mod.build_event(
-                run_id=run_dir.name or str(run_dir),
-                step=0,
-                event_type="plan",
-                inputs_ref=_relpath(repro_path, run_dir),
-                notes="start_marker",
-            ),
-        )
-        thread_log_mod.append_event(
-            thread_path,
-            thread_log_mod.build_event(
-                run_id=run_dir.name or str(run_dir),
-                step=1,
-                event_type="observation",
-                inputs_ref=input_ref,
-                outputs_ref=_relpath(args.out_json, run_dir),
-                notes="summary written",
-            ),
-        )
-        thread_log_mod.append_event(
-            thread_path,
-            thread_log_mod.build_event(
-                run_id=run_dir.name or str(run_dir),
-                step=2,
-                event_type="tool",
-                inputs_ref=_relpath(args.out_json, run_dir),
-                outputs_ref=_relpath(diagnosis_path, run_dir),
-                notes="diagnosis written",
-            ),
-        )
-        thread_log_mod.append_event(
-            thread_path,
-            thread_log_mod.build_event(
-                run_id=run_dir.name or str(run_dir),
-                step=3,
-                event_type="summary",
-                inputs_ref=_relpath(args.out_json, run_dir),
-                outputs_ref=_relpath(compact_path, run_dir),
-                notes="compact state snapshot",
-            ),
-        )
-        thread_log_mod.append_event(
-            thread_path,
-            thread_log_mod.build_event(
-                run_id=run_dir.name or str(run_dir),
-                step=4,
+                run_id=run_id,
+                step=step_counter,
                 event_type="summary",
                 inputs_ref=_relpath(compact_path, run_dir),
                 outputs_ref=_relpath(report_path, run_dir),
                 notes="report generated",
             ),
         )
+        step_counter += 1
         thread_log_mod.append_event(
             thread_path,
             thread_log_mod.build_event(
-                run_id=run_dir.name or str(run_dir),
-                step=5,
+                run_id=run_id,
+                step=step_counter,
                 event_type="summary",
                 outputs_ref=_relpath(report_path, run_dir),
                 notes="end_marker",

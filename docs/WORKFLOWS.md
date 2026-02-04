@@ -81,6 +81,10 @@ Release check (runs pinned gates and UI stubs):
 
 Gate threshold sources and artifacts are listed in [docs/GATES.md](docs/GATES.md).
 
+Latest pointers:
+- Release: `runs/latest_release` (manifest inside the run dir).
+- Regression check (if run via `run_regression_check.ps1`): `runs/latest_regression`.
+
 Drift wall signals:
 - Safety wall (default/latest): `runs/drift_wall_latest` (release-relevant).
 - Stress wall (optional): `runs/drift_wall_latest_stress` (diagnostic pressure test).
@@ -117,8 +121,9 @@ Core benchmark (curated fixtures):
 .\scripts\run_core_benchmark.ps1
 ```
 
-Outputs are written under `runs/<run_dir>/` (new folder per run), including `summary.json` and `report.md`, for the curated fixtures in `configs/core_benchmark.json`. 
+Outputs are written under `runs/<run_dir>/` (new folder per run), including `summary_compact.json` / `summary_compact.csv` (readable), plus `summary.json` and `report.md`, for the curated fixtures in `configs/core_benchmark.json`. 
 Defaults come from `configs/core_thresholds.json` (override with `-MinPolicyPass` if needed).
+Latest pointer: `runs/latest_core_benchmark`.
 
 Internal tooling benchmark (state drift + wrong-path workflows):
 
@@ -146,7 +151,8 @@ RAG benchmark (curated long-context datasets):
 python .\scripts\compare_runs.py --latest-pair --print
 ```
 
-This compares the newest two runs under `runs/`.
+This compares the newest two runs under `runs/`. Each run writes `summary_compact.json` / `summary_compact.csv` alongside the full `summary.json` and `report.md`.
+Latest pointers: `runs/latest_rag_lenient` and `runs/latest_rag_strict`.
 
 Bring your own docs (domain pack):
 
@@ -157,7 +163,7 @@ python .\scripts\build_rag_domain_pack.py --in ".\examples\domain_pack_example.j
 
 Note: this overwrites `data/rag_domain_stale.jsonl` and `data/rag_domain_authority.jsonl`.
 
-Defaults live in [configs/rag_thresholds.json](../configs/rag_thresholds.json) (lenient/strict). Adjust per dataset; closed-book strict on the domain pack is expected to fail until retrieval/open-book wiring is in place.
+Defaults live in [configs/rag_thresholds.json](../configs/rag_thresholds.json) (lenient/strict). Thresholds include `value_acc`, `cite_f1`, `answer_correct_given_selected` (answer correctness given selected support), plus `exact_acc` and `entailment` for strict runs. Adjust per dataset; closed-book strict on the domain pack is expected to fail until retrieval/open-book wiring is in place.
 
 The strict preset also includes smaller/harder datasets.
 
@@ -212,7 +218,9 @@ Open-book vs closed-book (what to expect):
   - Open-book demo: `runs/<open_book_run>/rag_open_book_run/report.md`
 - A healthy open-book run will also show a non-zero `retrieval_hit_rate` in the report.
 
-Example signature (illustrative, not guaranteed): an open-book run may show materially higher `value_acc`/`cite_f1` and non-zero `retrieval_hit_rate` compared to closed-book strict on the same family (e.g., `value_acc≈0.58`, `cite_f1≈0.96` on `n=24`).
+Pinned example (open-book, citations good ≠ answers correct): see `docs/sample_artifacts/open_book_citation_gap` (`cite_f1=1.00`, `value_acc=0.60` on `n=5`). This is why strict runs also gate on answer correctness and entailment.
+
+Example signature (illustrative, not guaranteed): an open-book run may show materially higher `value_acc`/`cite_f1` and non-zero `retrieval_hit_rate` compared to closed-book strict on the same family (e.g., `value_acc~0.58`, `cite_f1~0.96` on `n=24`).
 
 Entry format (each row):
 

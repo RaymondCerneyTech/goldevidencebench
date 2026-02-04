@@ -37,4 +37,9 @@ if (-not $?) {
 }
 
 python .\scripts\summarize_results.py --in $combinedPath --out-json (Join-Path $runDir "summary.json")
-exit $LASTEXITCODE
+$exitCode = $LASTEXITCODE
+
+$pointer = if ($Preset -eq "smoke") { "runs\\latest_smoke" } else { "runs\\latest_adapter_baseline" }
+.\scripts\set_latest_pointer.ps1 -RunDir $runDir -PointerPath $pointer | Out-Host
+
+exit $exitCode

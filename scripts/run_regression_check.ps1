@@ -40,4 +40,14 @@ if (-not $RunVariants) {
 
 Write-Host "Running regression check..."
 .\scripts\run_release_check.ps1 @releaseArgs
-exit $LASTEXITCODE
+$exitCode = $LASTEXITCODE
+
+$latestReleaseFile = "runs\\latest_release"
+if (Test-Path $latestReleaseFile) {
+    $latestRelease = (Get-Content -Path $latestReleaseFile -Raw).Trim()
+    if ($latestRelease) {
+        .\scripts\set_latest_pointer.ps1 -RunDir $latestRelease -PointerPath "runs\\latest_regression" | Out-Host
+    }
+}
+
+exit $exitCode

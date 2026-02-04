@@ -4,6 +4,7 @@ This page lists each gate or benchmark, where its thresholds live, and the artif
 Treat the linked config files as the source of truth for PASS/FAIL semantics.
 
 Terminology note: "commit policy" (aka selector/reranker) is the chooser that picks which candidate commits to state. Script and env var names still use "selector".
+Gates are constraint checks: they don’t prevent optimization, they ensure optimization respects the contract.
 
 ## Core gates and benchmarks
 
@@ -26,6 +27,8 @@ Terminology note: "commit policy" (aka selector/reranker) is the chooser that pi
 | UI popup_overlay stub | `.\scripts\run_ui_popup_overlay_stub.ps1` | `configs/usecase_checks.json` (`ui_popup_overlay_gate`) | `runs/ui_popup_overlay_gate.json` |
 
 Bad actor holdout defaults: `prefer_update_latest` rerank + authority filter (set in `scripts/run_bad_actor_holdout_gate.ps1`).
+
+Every gate run writes a compact, human-friendly summary (`summary_compact.json` / `summary_compact.csv`) alongside `summary.json`. Latest pointers live under `runs/latest_*` (e.g., `runs/latest_release`, `runs/latest_regression`, `runs/latest_rag_lenient`).
 
 ## Holdout suite inputs
 

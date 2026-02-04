@@ -37,10 +37,36 @@ param(
 $RequiredVariantsHoldout = "local_optimum_blocking_modal_unmentioned_blocked"
 $DefaultHoldoutList = "local_optimum_section_path,local_optimum_section_path_conflict,local_optimum_blocking_modal_detour,local_optimum_tab_detour,local_optimum_disabled_primary,local_optimum_toolbar_vs_menu,local_optimum_confirm_then_apply,local_optimum_tab_state_reset,local_optimum_context_switch,local_optimum_stale_tab_state,local_optimum_form_validation,local_optimum_window_focus,local_optimum_panel_toggle,local_optimum_accessibility_label,local_optimum_checkbox_gate,local_optimum_blocking_modal_required,local_optimum_blocking_modal_permission,local_optimum_blocking_modal_consent,local_optimum_blocking_modal_unmentioned,local_optimum_blocking_modal_unmentioned_blocked,local_optimum_blocking_modal,local_optimum_overlay,local_optimum_primary,local_optimum_delayed_solvable,local_optimum_role_mismatch,local_optimum_role_conflict,local_optimum_destructive_confirm,local_optimum_unsaved_changes,local_optimum_blocking_modal_unprompted_confirm"
 
+$stamp = Get-Date -Format "yyyyMMdd_HHmmss"
+$ReleaseRunDir = "runs\\release_check_$stamp"
+New-Item -ItemType Directory -Path $ReleaseRunDir -Force | Out-Null
+
 if ($RunSweeps -and -not $ModelPath) {
     Write-Error "Set -ModelPath or GOLDEVIDENCEBENCH_MODEL before running sweeps."
     exit 1
 }
+
+$manifestPath = Join-Path $ReleaseRunDir "release_manifest.json"
+$manifest = [ordered]@{
+    created_at = (Get-Date -Format "s")
+    model_path = $ModelPath
+    artifacts = [ordered]@{
+        release_gates_dir = "runs\\release_gates"
+        drift_holdout_gate = "runs\\release_gates\\drift_holdout_gate.json"
+        drift_holdout_latest = "runs\\drift_holdout_latest"
+        bad_actor_holdout_latest = "runs\\bad_actor_holdout_latest\\summary.json"
+        ui_same_label_gate = "runs\\ui_same_label_gate.json"
+        ui_popup_overlay_gate = "runs\\ui_popup_overlay_gate.json"
+        ui_minipilot_notepad_gate = "runs\\ui_minipilot_notepad_gate.json"
+        instruction_override_gate = "runs\\release_gates\\instruction_override_gate\\summary.json"
+        memory_verify_gate = "runs\\release_gates\\memory_verify.json"
+        update_burst_release_gate = "runs\\release_gates\\update_burst_full_linear_k16_bucket5_rate0.12\\summary.json"
+    }
+}
+$manifest | ConvertTo-Json -Depth 6 | Set-Content -Path $manifestPath -Encoding UTF8
+
+.\scripts\set_latest_pointer.ps1 -RunDir $ReleaseRunDir -PointerPath "runs\\latest_release" | Out-Host
+Write-Host "Release manifest: $manifestPath"
 
 if ($RunSweeps) {
     $stamp = Get-Date -Format "yyyyMMdd_HHmmss"
@@ -218,16 +244,33 @@ if (-not $SkipThresholds) {
 
     Write-Host "Running instruction override gate..."
     .\scripts\run_instruction_override_gate.ps1 -ModelPath $ModelPath
+    $instructionOverrideSummary = "runs\\release_gates\\instruction_override_gate\\summary.json"
+    if (Test-Path $instructionOverrideSummary) {
+        .\scripts\set_latest_pointer.ps1 -RunDir $instructionOverrideSummary -PointerPath "runs\\latest_instruction_override_gate" | Out-Host
+    }
     Write-Host "Running memory verification gate..."
     python .\scripts\verify_memories.py --in .\data\memories\memory_demo.jsonl `
         --out .\runs\release_gates\memory_verify.json `
         --out-details .\runs\release_gates\memory_verify_details.json
+    $memoryVerify = "runs\\release_gates\\memory_verify.json"
+    if (Test-Path $memoryVerify) {
+        .\scripts\set_latest_pointer.ps1 -RunDir $memoryVerify -PointerPath "runs\\latest_memory_verify_gate" | Out-Host
+    }
     Write-Host "Running UI same_label stub..."
     .\scripts\run_ui_same_label_stub.ps1
+    if (Test-Path "runs\\ui_same_label_gate.json") {
+        .\scripts\set_latest_pointer.ps1 -RunDir "runs\\ui_same_label_gate.json" -PointerPath "runs\\latest_ui_same_label_gate" | Out-Host
+    }
     Write-Host "Running UI popup_overlay stub..."
     .\scripts\run_ui_popup_overlay_stub.ps1
+    if (Test-Path "runs\\ui_popup_overlay_gate.json") {
+        .\scripts\set_latest_pointer.ps1 -RunDir "runs\\ui_popup_overlay_gate.json" -PointerPath "runs\\latest_ui_popup_overlay_gate" | Out-Host
+    }
     Write-Host "Running UI minipilot notepad stub..."
     .\scripts\run_ui_minipilot_notepad_stub.ps1
+    if (Test-Path "runs\\ui_minipilot_notepad_gate.json") {
+        .\scripts\set_latest_pointer.ps1 -RunDir "runs\\ui_minipilot_notepad_gate.json" -PointerPath "runs\\latest_ui_minipilot_notepad_gate" | Out-Host
+    }
     Write-Host "Validating demo presets..."
     $demoConfigPath = "configs\\demo_presets.json"
     if (Test-Path $demoConfigPath) {

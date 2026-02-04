@@ -121,6 +121,14 @@ New-Item -ItemType Directory -Path $LatestDir -Force | Out-Null
 if (Test-Path $summaryPath) {
     Copy-Item $summaryPath -Destination (Join-Path $LatestDir "summary.json") -Force
 }
+$compactJsonPath = Join-Path $finalRunsDir "summary_compact.json"
+$compactCsvPath = Join-Path $finalRunsDir "summary_compact.csv"
+if (Test-Path $compactJsonPath) {
+    Copy-Item $compactJsonPath -Destination (Join-Path $LatestDir "summary_compact.json") -Force
+}
+if (Test-Path $compactCsvPath) {
+    Copy-Item $compactCsvPath -Destination (Join-Path $LatestDir "summary_compact.csv") -Force
+}
 $diagnosisPath = Join-Path $finalRunsDir "diagnosis.json"
 if (Test-Path $diagnosisPath) {
     Copy-Item $diagnosisPath -Destination (Join-Path $LatestDir "diagnosis.json") -Force
