@@ -1,8 +1,10 @@
 {
   "lenient": {
-    "min_value_acc": 0.13,
-    "min_cite_f1": 0.12,
-    "min_answer_correct_given_selected": 0.13
+    "min_value_acc": 0.3,
+    "min_exact_acc": 0.3,
+    "min_entailment": 0.3,
+    "min_cite_f1": 0.3,
+    "min_answer_correct_given_selected": 0.3
   },
   "strict": {
     "min_value_acc": 0.6,

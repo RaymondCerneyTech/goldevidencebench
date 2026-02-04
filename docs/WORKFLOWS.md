@@ -163,7 +163,7 @@ python .\scripts\build_rag_domain_pack.py --in ".\examples\domain_pack_example.j
 
 Note: this overwrites `data/rag_domain_stale.jsonl` and `data/rag_domain_authority.jsonl`.
 
-Defaults live in [configs/rag_thresholds.json](../configs/rag_thresholds.json) (lenient/strict). Thresholds include `value_acc`, `cite_f1`, `answer_correct_given_selected` (answer correctness given selected support), plus `exact_acc` and `entailment` for strict runs. Adjust per dataset; closed-book strict on the domain pack is expected to fail until retrieval/open-book wiring is in place.
+Defaults live in [configs/rag_thresholds.json](../configs/rag_thresholds.json) (lenient/strict). Thresholds include `value_acc`, `exact_acc`, `entailment`, `cite_f1`, and `answer_correct_given_selected` (answer correctness given selected support); strict raises the thresholds. Adjust per dataset; closed-book strict on the domain pack is expected to fail until retrieval/open-book wiring is in place.
 
 The strict preset also includes smaller/harder datasets.
 
@@ -219,6 +219,8 @@ Open-book vs closed-book (what to expect):
 - A healthy open-book run will also show a non-zero `retrieval_hit_rate` in the report.
 
 Pinned example (open-book, citations good ≠ answers correct): see `docs/sample_artifacts/open_book_citation_gap` (`cite_f1=1.00`, `value_acc=0.60` on `n=5`). This is why strict runs also gate on answer correctness and entailment.
+
+Reports also include a **citation gap warning** when `cite_f1` is high but `value_acc` is low (to flag “citations look good, answer is wrong” cases).
 
 Example signature (illustrative, not guaranteed): an open-book run may show materially higher `value_acc`/`cite_f1` and non-zero `retrieval_hit_rate` compared to closed-book strict on the same family (e.g., `value_acc~0.58`, `cite_f1~0.96` on `n=24`).
 

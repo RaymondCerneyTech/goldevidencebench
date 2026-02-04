@@ -101,6 +101,7 @@ def summarize_rag_benchmark(config_path: Path, runs_dir: Path) -> dict[str, Any]
     entailment_rates: list[float | None] = []
     answer_corrects: list[float | None] = []
     cite_f1s: list[float | None] = []
+    cite_value_gaps: list[float | None] = []
     instruction_accs: list[float | None] = []
     state_integrity_rates: list[float | None] = []
     retrieval_hit_rates: list[float | None] = []
@@ -168,11 +169,16 @@ def summarize_rag_benchmark(config_path: Path, runs_dir: Path) -> dict[str, Any]
             if total:
                 retrieval_hit_rate = hits / total
 
+        cite_value_gap = None
+        if isinstance(cite_f1, (int, float)) and isinstance(value_acc, (int, float)):
+            cite_value_gap = float(cite_f1) - float(value_acc)
+
         value_accs.append(value_acc)
         exact_accs.append(exact_acc)
         entailment_rates.append(entailment)
         answer_corrects.append(answer_correct_given_selected)
         cite_f1s.append(cite_f1)
+        cite_value_gaps.append(cite_value_gap)
         instruction_accs.append(instruction_acc)
         state_integrity_rates.append(state_integrity_rate)
         retrieval_hit_rates.append(retrieval_hit_rate)
@@ -190,6 +196,7 @@ def summarize_rag_benchmark(config_path: Path, runs_dir: Path) -> dict[str, Any]
                 "entailment": entailment,
                 "answer_correct_given_selected": answer_correct_given_selected,
                 "cite_f1": cite_f1,
+                "cite_value_gap": cite_value_gap,
                 "instruction_acc": instruction_acc,
                 "state_integrity_rate": state_integrity_rate,
                 "instr_override_rate": instr_override_rate,
@@ -216,6 +223,7 @@ def summarize_rag_benchmark(config_path: Path, runs_dir: Path) -> dict[str, Any]
             "entailment": _mean(entailment_rates),
             "answer_correct_given_selected": _mean(answer_corrects),
             "cite_f1": _mean(cite_f1s),
+            "cite_value_gap": _mean(cite_value_gaps),
             "instruction_acc": _mean(instruction_accs),
             "state_integrity_rate": _mean(state_integrity_rates),
             "retrieval_hit_rate": _mean(retrieval_hit_rates),
@@ -281,6 +289,7 @@ def render_rag_benchmark_report(summary: dict[str, Any]) -> str:
     lines.append(f"- entailment: {means.get('entailment', 'n/a')}")
     lines.append(f"- answer_correct_given_selected: {means.get('answer_correct_given_selected', 'n/a')}")
     lines.append(f"- cite_f1: {means.get('cite_f1', 'n/a')}")
+    lines.append(f"- cite_value_gap: {means.get('cite_value_gap', 'n/a')}")
     lines.append(f"- retrieval_hit_rate: {means.get('retrieval_hit_rate', 'n/a')}")
     lines.append(f"- instruction_acc: {means.get('instruction_acc', 'n/a')}")
     lines.append(f"- state_integrity_rate: {means.get('state_integrity_rate', 'n/a')}")
@@ -310,6 +319,41 @@ def render_rag_benchmark_report(summary: dict[str, Any]) -> str:
             )
         )
     lines.append("")
+    gap_min_cite = 0.6
+    gap_min_delta = 0.3
+    gap_warnings = []
+    for entry in summary.get("results", []):
+        if not isinstance(entry, dict):
+            continue
+        cite_f1 = entry.get("cite_f1")
+        value_acc = entry.get("value_acc")
+        if not isinstance(cite_f1, (int, float)) or not isinstance(value_acc, (int, float)):
+            continue
+        gap = float(cite_f1) - float(value_acc)
+        if cite_f1 >= gap_min_cite and gap >= gap_min_delta:
+            gap_warnings.append(
+                {
+                    "id": entry.get("id", ""),
+                    "cite_f1": cite_f1,
+                    "value_acc": value_acc,
+                    "gap": gap,
+                }
+            )
+    if gap_warnings:
+        lines.append("## Citation gap warnings")
+        lines.append(
+            f"Flagged when cite_f1 - value_acc >= {gap_min_delta} with cite_f1 >= {gap_min_cite}."
+        )
+        for entry in gap_warnings:
+            lines.append(
+                "- {id}: cite_f1={cite_f1:.3f}, value_acc={value_acc:.3f}, gap={gap:.3f}".format(
+                    id=entry.get("id", ""),
+                    cite_f1=entry.get("cite_f1", 0.0),
+                    value_acc=entry.get("value_acc", 0.0),
+                    gap=entry.get("gap", 0.0),
+                )
+            )
+        lines.append("")
     missing = summary.get("missing") or []
     if missing:
         lines.append("## Missing results")

@@ -143,7 +143,7 @@ This prints the one-pager path when generated and appends a summary to `docs/RUN
 
 - Passing these commands means the metrics meet thresholds **on the listed fixtures only**.
 - `.\scripts\run_regression_check.ps1` means drift gates pass on the drift wall + holdout fixtures.
-- `.\scripts\run_rag_benchmark.ps1 -Preset lenient/strict` means value_acc/cite_f1 and answer_correct_given_selected meet thresholds on the listed datasets (strict also enforces exact_acc and entailment).
+- `.\scripts\run_rag_benchmark.ps1 -Preset lenient/strict` means value_acc, exact_acc, entailment, cite_f1, and answer_correct_given_selected meet thresholds on the listed datasets (strict raises thresholds).
 - See **Behavioral contract (core)** below for the full list.
 - Gate source-of-truth configs and artifacts: see [docs/GATES.md](docs/GATES.md).
 
@@ -234,7 +234,7 @@ Fixtures and thresholds live in the linked configs below; the drift holdout gate
 - `.\scripts\run_core_benchmark.ps1`: policy task pass rate meets defaults in [`configs/core_thresholds.json`](configs/core_thresholds.json) for [`configs/core_benchmark.json`](configs/core_benchmark.json).
 - `.\scripts\run_core_benchmark.ps1 -ConfigPath "configs/internal_tooling_benchmark.json"`: policy task pass rate meets defaults for the internal tooling set (state drift + wrong-path workflows). See [`configs/internal_tooling_benchmark.json`](configs/internal_tooling_benchmark.json).
 - `.\scripts\run_core_benchmark.ps1 -ConfigPath "configs/compliance_benchmark.json"`: policy task pass rate meets defaults for the compliance set (bad-actor resistance + safety gates). See [`configs/compliance_benchmark.json`](configs/compliance_benchmark.json).
-- `.\scripts\run_rag_benchmark.ps1 -Preset lenient`: value_acc, cite_f1, and answer_correct_given_selected meet the lenient defaults in [`configs/rag_thresholds.json`](configs/rag_thresholds.json) for [`configs/rag_benchmark_lenient.json`](configs/rag_benchmark_lenient.json).
+- `.\scripts\run_rag_benchmark.ps1 -Preset lenient`: value_acc, exact_acc, entailment, cite_f1, and answer_correct_given_selected meet the lenient defaults in [`configs/rag_thresholds.json`](configs/rag_thresholds.json) for [`configs/rag_benchmark_lenient.json`](configs/rag_benchmark_lenient.json).
 - `.\scripts\run_rag_benchmark.ps1 -Preset strict`: value_acc, exact_acc, entailment, cite_f1, and answer_correct_given_selected meet the strict defaults in [`configs/rag_thresholds.json`](configs/rag_thresholds.json) for [`configs/rag_benchmark_strict.json`](configs/rag_benchmark_strict.json) (stricter thresholds + harder datasets, including the domain pack).
 
 Outside these fixtures, behavior is not guaranteed; treat any new family as unknown until you add fixtures and enforce it.

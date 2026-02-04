@@ -164,6 +164,7 @@ def main() -> int:
                 "entailment": entry.get("entailment"),
                 "answer_correct_given_selected": entry.get("answer_correct_given_selected"),
                 "cite_f1": entry.get("cite_f1"),
+                "cite_value_gap": entry.get("cite_value_gap"),
                 "retrieval_hit_rate": entry.get("retrieval_hit_rate"),
                 "status": entry.get("status"),
             }
@@ -192,6 +193,7 @@ def main() -> int:
             "entailment",
             "answer_correct_given_selected",
             "cite_f1",
+            "cite_value_gap",
             "retrieval_hit_rate",
             "status",
         ],
