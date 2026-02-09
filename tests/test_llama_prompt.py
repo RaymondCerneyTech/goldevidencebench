@@ -4,7 +4,7 @@ from goldevidencebench.adapters.llama_prompt import build_prompt, extract_ledger
 
 
 def test_extract_ledger_returns_ledger_section() -> None:
-    book = "Header\n\n## State Ledger\n- [U0001] step=1 SET tag.00 = red\n"
+    book = "Header\n\n## State Ledger\n- [U000001] step=1 SET tag.00 = red\n"
     ledger = extract_ledger(book)
     assert ledger.startswith("## State Ledger")
     assert "Header" not in ledger

@@ -10,6 +10,7 @@ param(
     [int]$MaxSupportK = 3,
     [string]$SupportMetric = "f1",
     [switch]$NoEntailmentCheck,
+    [switch]$NoPreds,
     [int]$MaxBookTokens = 0,
     [int]$MaxRows = 0,
     [double]$MinValueAcc = [double]::NaN,
@@ -108,6 +109,7 @@ foreach ($entry in $config.datasets) {
         $data = $limitedPath
     }
     $outJson = Join-Path $OutRoot ("rag_{0}.json" -f $id)
+    $outPreds = Join-Path $OutRoot ("preds_{0}.jsonl" -f $id)
     $args = @(
         "-m", "goldevidencebench.cli", "model",
         "--data", $data,
@@ -118,6 +120,9 @@ foreach ($entry in $config.datasets) {
         "--max-support-k", "$MaxSupportK",
         "--results-json", $outJson
     )
+    if (-not $NoPreds) {
+        $args += @("--out", $outPreds)
+    }
     if ($NoEntailmentCheck) {
         $args += "--no-entailment-check"
     }

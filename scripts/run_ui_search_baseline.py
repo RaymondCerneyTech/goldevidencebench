@@ -830,6 +830,16 @@ def main() -> int:
         default=0,
         help="Random seed for fuzzing variants.",
     )
+    parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Print a one-line status summary instead of the full JSON payload.",
+    )
+    parser.add_argument(
+        "--print-json",
+        action="store_true",
+        help="Force printing the full JSON payload even when --out is set.",
+    )
     args = parser.parse_args()
 
     fixture_path = Path(args.fixture)
@@ -1146,7 +1156,18 @@ def main() -> int:
         with pref_path.open("w", encoding="utf-8") as handle:
             for entry in preferences:
                 handle.write(json.dumps(entry) + "\n")
-    print(json.dumps(payload, indent=2))
+    print_json = args.print_json or (not args.quiet and out_path is None)
+    if not print_json:
+        strategies = sorted((payload.get("strategy_summary") or {}).keys())
+        print(
+            "ui_search_baseline: "
+            f"rows={payload.get('rows', 0)} "
+            f"seeds={max(1, args.seeds)} "
+            f"strategies={','.join(strategies)} "
+            f"out={out_path if out_path else '<stdout>'}"
+        )
+    else:
+        print(json.dumps(payload, indent=2))
     return 0
 
 

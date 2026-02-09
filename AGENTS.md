@@ -22,6 +22,10 @@ These rules apply to the entire repository.
 - Windows-first repo; prefer PowerShell entrypoints, with Python entrypoints for portability.
 - Keep changes aligned with the regression harness + gate system; avoid scope creep.
 
+## Project north star
+- Use traps to infer and refine explicit behavioral rules (contracts), then use rules + traps to steer model updates and release decisions.
+- Default loop: explore -> drilldown -> minimize -> promote anchors -> gate; avoid shipping decisions based on anecdotal passes.
+
 ## Hygiene
 - Run outputs can be large; use `scripts/cleanup_runs.ps1` when needed.
 

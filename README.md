@@ -13,6 +13,28 @@ Install (editable): `python -m pip install -e .`
 
 On Linux/macOS, run the Python entrypoints directly (see [docs/WORKFLOWS.md](docs/WORKFLOWS.md)); the PowerShell runners are Windows-first.
 
+## Accuracy-first quickstart (closed-book Llama adapters)
+
+Defaults for closed-book Llama adapters are accuracy-first; this block makes them explicit.
+Use this when you want maximum accuracy on commentary-heavy / long-context sets.
+
+PowerShell:
+
+```powershell
+$env:GOLDEVIDENCEBENCH_LEDGER_MODE = "latest_authoritative"
+$env:GOLDEVIDENCEBENCH_LEDGER_KEY_ONLY = "1"
+$env:GOLDEVIDENCEBENCH_NORMALIZE_SUPPORT_IDS = "1"
+goldevidencebench model --data .\data\goldevidencebench.jsonl `
+  --adapter goldevidencebench.adapters.llama_server_adapter:create_adapter `
+  --protocol closed_book --max-book-tokens 800
+```
+
+Windows helper (sets the same env vars in your current session):
+
+```powershell
+.\scripts\set_accuracy_knobs.ps1
+```
+
 Cross-platform front door (presets):
 
 ```bash
@@ -209,12 +231,23 @@ This repo is intentionally narrow: it prioritizes **repeatable regression gating
 
 - Keep drift/holdout gates green and tighten coverage for the core trap families.
 - Improve run ergonomics (reports, diffs, cleanup) without expanding scope.
+- Harden staged families (`observe -> ramp -> target`) before treating them as
+  release-level signals.
+- Enforce promotion discipline: only promote `*_reliability_latest.json` when
+  the candidate checker returns `PASS`; keep pinned rollback baselines.
+- Keep release claims as a measured capability envelope (fixtures/holdouts and
+  thresholds), not a general-intelligence claim.
 
 ## Where this fits (and reliability expectations)
 
 GoldEvidenceBench sits in the **evaluation + safety gating** part of AI systems: it measures failures in long-horizon state tracking (retrieval vs selection vs authority vs answering) and blocks regressions with repeatable artifacts.
 
 Reliability correlates with **how close your real use case is to your fixtures/holdouts**. Expect strong, repeatable behavior on covered families; expect lower reliability and more work outside that coverage. Passing gates is a good signal for the behaviors you explicitly measure, not a guarantee for tasks you haven't modeled.
+
+Practical rule: treat `*_reliability_latest.json` as release evidence only when
+it comes from the approved stage (usually `target` for mature families). Keep
+stage experiments in candidate files until they pass and are explicitly
+promoted.
 
 ## What this project **can't** do
 
@@ -267,6 +300,123 @@ Release check (full suite):
 ```
 
 Includes the bad_actor holdout safety gate (fixtures in `configs/bad_actor_holdout_list.json`, thresholds in `configs/usecase_checks.json`), using `prefer_update_latest` rerank (CLEAR-aware) with authority filtering by default.
+The final release step is the unified reliability signal gate (`scripts/check_reliability_signal.ps1`); its exit code is treated as ship/no-ship.
+The gate now also emits derived `reasoning_score`, `planning_score`, and
+`intelligence_index` fields in `runs\reliability_signal_latest.json` so the
+release signal can explicitly track reasoning-vs-planning balance.
+If needed for diagnostics, bypass with `-SkipReliabilitySignal`.
+
+### Current release snapshot (February 8, 2026)
+
+Current branch signal:
+
+- `runs\reliability_signal_latest.json` -> `status=PASS`
+- strict RAG (`runs\rag_benchmark_20260206_111309_server_strict\summary_compact.json`) -> `status=PASS`
+  - means: `value_acc=0.9971`, `exact_acc=0.9971`, `cite_f1=0.9994`, `instruction_acc=0.9966`, `state_integrity_rate=0.9966`
+
+Required orthogonal reliability files currently passing:
+
+- `runs\compression_reliability_latest.json` -> `PASS`
+- `runs\novel_continuity_reliability_latest.json` -> `PASS` (`cite_stage=target`)
+- `runs\authority_under_interference_reliability_latest.json` -> `PASS`
+- `runs\compression_roundtrip_generalization_reliability_latest.json` -> `PASS` (`stage=target`)
+- `runs\novel_continuity_long_horizon_reliability_latest.json` -> `PASS` (`cite_stage=target`)
+- `runs\myopic_planning_traps_reliability_latest.json` -> `PASS` (`stage=target`)
+- `runs\referential_indexing_suite_reliability_latest.json` -> `PASS` (`stage=target`)
+- `runs\epistemic_calibration_suite_reliability_latest.json` -> `PASS` (`stage=target`)
+- `runs\authority_under_interference_hardening_reliability_latest.json` -> `PASS`
+
+What this means:
+
+- The branch is currently release-green under the configured ship/no-ship gate.
+- The claim is bounded to these trap fixtures and thresholds; it is not a claim of universal general intelligence.
+- Target-stage claims are strongest for families already at `target` (novel continuity base + long-horizon, compression roundtrip generalization, myopic planning traps, referential indexing suite, and epistemic calibration).
+- There are no remaining orthogonal families blocked at `observe` in the current release snapshot.
+- The reliability gate can now enforce derived R/P floors via `--min-reasoning-score`, `--min-planning-score`, and `--min-intelligence-index` (or the PowerShell equivalents) when you want a stricter ship contract.
+
+If you are using a running llama server adapter instead of local GGUF loading:
+
+```powershell
+.\scripts\run_release_check.ps1 -GateAdapter "goldevidencebench.adapters.llama_server_adapter:create_adapter"
+```
+
+Default release behavior now hard-requires these control families in the final unified reliability gate:
+- `rpa_mode_switch`
+- `intent_spec_layer`
+- `noise_escalation`
+
+Diagnostic-only override:
+
+```powershell
+.\scripts\run_release_check.ps1 -SkipRequireControlFamilies
+```
+
+Optional holdout selectors in release check:
+
+- `-DriftHoldoutName stale_tab_state|focus_drift` (used when `-RunDriftHoldoutGate` is set).
+- `-BadActorHoldoutId <id>` with `-BadActorHoldoutListPath <path>` for bad-actor subset selection.
+
+Overnight wrapper (watchdog + retry + orthogonal holdout rotation):
+
+```powershell
+.\scripts\run_release_overnight.ps1 -GateAdapter "goldevidencebench.adapters.llama_server_adapter:create_adapter"
+```
+
+This wrapper:
+
+- preflights llama-server (when using server adapter),
+- detects stalls via log/CPU inactivity and retries,
+- rotates drift + bad-actor holdout selections via `runs\release_gates\overnight_holdout_rotation.json`,
+- writes summary to `runs\release_overnight_latest.json` (pointer: `runs/latest_release_overnight`),
+- enforces `rpa_mode_switch` + `intent_spec_layer` + `noise_escalation` by default through the wrapped release check.
+
+Diagnostic-only overnight override:
+
+```powershell
+.\scripts\run_release_overnight.ps1 -GateAdapter "goldevidencebench.adapters.llama_server_adapter:create_adapter" -SkipRequireControlFamilies
+```
+
+You can run one or many cycles:
+
+```powershell
+# fixed number of cycles
+.\scripts\run_release_overnight.ps1 -GateAdapter "goldevidencebench.adapters.llama_server_adapter:create_adapter" -Cycles 4
+
+# run for a time window (e.g., 8 hours)
+.\scripts\run_release_overnight.ps1 -GateAdapter "goldevidencebench.adapters.llama_server_adapter:create_adapter" -RunHours 8
+```
+
+Robustness campaign (hard mode, tighter jitter + 5-run reliability):
+
+```powershell
+.\scripts\run_robustness_threshold.ps1 `
+  -Adapter "goldevidencebench.adapters.llama_server_adapter:create_adapter" `
+  -Stage target `
+  -RunCount 5 `
+  -MaxJitter 0.02 `
+  -PromoteLatestOnPass $true `
+  -MinReasoningScore 0.90 `
+  -MinPlanningScore 0.90 `
+  -MinIntelligenceIndex 0.90
+```
+
+This wrapper runs staged reliability campaigns across long-horizon critical
+families, promotes only target-stage PASS candidates, re-checks unified
+reliability signal, and writes a summary JSON under `runs\robustness_threshold_*.json`.
+
+Runtime RPA control snapshot (uses latest reliability outputs):
+
+```powershell
+.\scripts\run_rpa_control_snapshot.ps1 -Reversibility reversible
+python .\scripts\build_codex_next_step_report.py
+Get-Content runs\codex_next_step_report.json
+```
+
+This produces:
+
+- `runs/rpa_control_latest.json` (mode/decision/confidence/risk contract)
+- `runs/codex_next_step_report.json` (current blockers and next actions for
+  `rpa_mode_switch`, `intent_spec_layer`, `noise_escalation`)
 
 Core benchmark (curated fixtures):
 
@@ -280,11 +430,40 @@ RAG benchmark (curated long-context datasets):
 .\scripts\run_rag_benchmark.ps1 -Preset lenient -ModelPath "<MODEL_PATH>"
 .\scripts\run_rag_benchmark.ps1 -Preset strict -ModelPath "<MODEL_PATH>"
 python .\scripts\compare_runs.py --latest-pair --print
+python .\scripts\compare_runs.py --latest-pair --benchmark rag_benchmark_strict --run-name-prefix rag_benchmark_ --allow-missing-diagnosis --print
 ```
+
+When `--benchmark rag_benchmark_strict` is used, the compare report also includes a `RAG mean deltas` section for key means (value/exact/entailment/cite_f1/instruction/state-integrity).
 
 Case pack: see **If you want the one-pager case pack (model + PDF)** above.
 
 Details for RAG domain packs, open-book vs closed-book, and dataset formats live in [docs/WORKFLOWS.md](docs/WORKFLOWS.md).
+
+## Accuracy knobs (closed_book Llama adapters)
+
+Defaults are accuracy-first for closed-book Llama adapters; set these explicitly if you want to pin behavior.
+
+- `GOLDEVIDENCEBENCH_LEDGER_MODE=latest_authoritative`: keep only the latest SET/CLEAR per key (drops NOTE).
+- `GOLDEVIDENCEBENCH_LEDGER_KEY_ONLY=1`: when using `LEDGER_MODE=latest_authoritative`, keep only the asked key.
+- `GOLDEVIDENCEBENCH_NORMALIZE_SUPPORT_IDS=1`: uppercase support IDs from HTTP/CLI adapters.
+- Direct-query value canonicalization (closed-book server/HTTP adapters): when a support ID is selected, the returned value is aligned to that ledger entry (for example, `30` -> `retention_days_eu=30`).
+- Citation fallback for malformed/null outputs (closed-book server adapter): when JSON parsing fails, support IDs are backfilled to the latest authoritative entry for the asked key (if available).
+
+Example (PowerShell, defaults shown explicitly):
+
+```powershell
+$env:GOLDEVIDENCEBENCH_LEDGER_MODE = "latest_authoritative"
+$env:GOLDEVIDENCEBENCH_LEDGER_KEY_ONLY = "1"
+$env:GOLDEVIDENCEBENCH_NORMALIZE_SUPPORT_IDS = "1"
+```
+
+To revert to the full ledger and raw support IDs:
+
+```powershell
+$env:GOLDEVIDENCEBENCH_LEDGER_MODE = "full"
+$env:GOLDEVIDENCEBENCH_LEDGER_KEY_ONLY = "0"
+$env:GOLDEVIDENCEBENCH_NORMALIZE_SUPPORT_IDS = "0"
+```
 
 ## State-update decisions (DecisionPoints, state-update commits)
 
@@ -316,6 +495,7 @@ Long tasks are modeled as chains of state-update decisions (DecisionPoints): eac
 - `report.md`: human-readable summary.
 - `repro_commands.json`: reproducibility bundle.
 - `health_check.json`: health check result (when run).
+- `preds_<dataset>.jsonl`: per-question predictions (RAG benchmark runs).
 
 Schemas live under `schemas\` and artifacts include `artifact_version` for validation.
 
@@ -328,7 +508,105 @@ python .\scripts\generate_report.py --latest
 .\scripts\resume_run.ps1 -Latest
 .\scripts\resume_run.ps1 -Latest -RunDriftGate -ModelPath "<MODEL_PATH>"
 python .\scripts\compare_runs.py --latest-pair --require-compact-state --print
+python .\scripts\compare_runs.py --latest-pair --benchmark rag_benchmark_strict --run-name-prefix rag_benchmark_ --allow-missing-diagnosis --print
+python .\scripts\check_rag_acceptance_bands.py --stage fast --base "<FULL_STRICT_RUN_OR_SUMMARY>" --other "<STRICT_FAST256_RUN_OR_SUMMARY>" --strict-benchmark-name
+python .\scripts\check_rag_acceptance_bands.py --stage full --base "<PREVIOUS_FULL_STRICT_RUN_OR_SUMMARY>" --other "<NEW_FULL_STRICT_RUN_OR_SUMMARY>" --strict-benchmark-name
+python .\scripts\append_run_log_summary.py --base-dir "<BASE_RUN_DIR>" --run-dir "<NEW_RUN_DIR>"
+.\scripts\append_run_log_summary.ps1 -BaseDir "<BASE_RUN_DIR>" -RunDir "<NEW_RUN_DIR>"
 ```
+
+Trap workflow helpers:
+
+```powershell
+.\scripts\trap_cycle.ps1 -Mode explore -Preset strict -DatasetId domain_stale -ModelPath "<MODEL_PATH>"
+.\scripts\trap_cycle.ps1 -Mode enforce -Preset strict -DatasetId domain_stale -RunDir "<RUN_DIR>" -Family domain_stale
+python .\scripts\generate_compression_loss_bounded_family.py --overwrite
+python .\scripts\score_compression_loss_bounded.py --data "data\compression_loss_bounded\compression_loss_bounded_anchors.jsonl" --preds "<PREDS_JSONL>" --rows-out "<ROWS_JSONL>"
+python .\scripts\generate_compression_recoverability_family.py --overwrite
+python .\scripts\score_compression_recoverability.py --data "data\compression_recoverability\compression_recoverability_anchors.jsonl" --preds "<PREDS_JSONL>" --rows-out "<ROWS_JSONL>"
+.\scripts\run_compression_families.ps1 -Adapter "goldevidencebench.adapters.llama_server_adapter:create_adapter" -OverwriteFixtures
+python .\scripts\check_compression_reliability.py --run-dirs "<RUN_A>" "<RUN_B>" "<RUN_C>"
+python .\scripts\generate_compression_roundtrip_generalization_family.py --overwrite
+python .\scripts\score_compression_roundtrip_generalization.py --data "data\compression_roundtrip_generalization\compression_roundtrip_generalization_anchors.jsonl" --preds "<PREDS_JSONL>" --rows-out "<ROWS_JSONL>"
+.\scripts\run_compression_roundtrip_generalization_family.ps1 -Adapter "goldevidencebench.adapters.llama_server_adapter:create_adapter" -Stage observe -OverwriteFixtures
+.\scripts\run_compression_roundtrip_generalization_family.ps1 -Adapter "goldevidencebench.adapters.llama_server_adapter:create_adapter" -Stage target
+python .\scripts\check_compression_roundtrip_generalization_reliability.py --run-dirs "<RUN_A>" "<RUN_B>" "<RUN_C>" --stage target --out "runs\compression_roundtrip_generalization_reliability_latest.json"
+python .\scripts\generate_novel_continuity_family.py --overwrite
+python .\scripts\score_novel_continuity.py --data "data\novel_continuity\novel_continuity_anchors.jsonl" --preds "<PREDS_JSONL>" --rows-out "<ROWS_JSONL>"
+.\scripts\run_novel_continuity_family.ps1 -Adapter "goldevidencebench.adapters.llama_server_adapter:create_adapter" -OverwriteFixtures
+python .\scripts\check_novel_continuity_reliability.py --run-dirs "<RUN_A>" "<RUN_B>" "<RUN_C>"
+python .\scripts\generate_novel_continuity_long_horizon_family.py --overwrite
+python .\scripts\score_novel_continuity_long_horizon.py --data "data\novel_continuity_long_horizon\novel_continuity_long_horizon_anchors.jsonl" --preds "<PREDS_JSONL>" --rows-out "<ROWS_JSONL>"
+.\scripts\run_novel_continuity_long_horizon_family.ps1 -Adapter "goldevidencebench.adapters.llama_server_adapter:create_adapter" -OverwriteFixtures
+python .\scripts\check_novel_continuity_long_horizon_reliability.py --run-dirs "<RUN_A>" "<RUN_B>" "<RUN_C>"
+# staged cite floor rollout for novel continuity:
+.\scripts\run_novel_continuity_family.ps1 -Adapter "goldevidencebench.adapters.llama_server_adapter:create_adapter" -CiteStage observe
+.\scripts\run_novel_continuity_family.ps1 -Adapter "goldevidencebench.adapters.llama_server_adapter:create_adapter" -CiteStage ramp
+.\scripts\run_novel_continuity_family.ps1 -Adapter "goldevidencebench.adapters.llama_server_adapter:create_adapter" -CiteStage target
+python .\scripts\check_novel_continuity_reliability.py --run-dirs "<RUN_A>" "<RUN_B>" "<RUN_C>" --cite-stage observe
+python .\scripts\check_novel_continuity_reliability.py --run-dirs "<RUN_A>" "<RUN_B>" "<RUN_C>" --cite-stage ramp
+python .\scripts\check_novel_continuity_reliability.py --run-dirs "<RUN_A>" "<RUN_B>" "<RUN_C>" --cite-stage target
+.\scripts\run_novel_continuity_long_horizon_family.ps1 -Adapter "goldevidencebench.adapters.llama_server_adapter:create_adapter" -CiteStage observe
+.\scripts\run_novel_continuity_long_horizon_family.ps1 -Adapter "goldevidencebench.adapters.llama_server_adapter:create_adapter" -CiteStage ramp
+.\scripts\run_novel_continuity_long_horizon_family.ps1 -Adapter "goldevidencebench.adapters.llama_server_adapter:create_adapter" -CiteStage target
+python .\scripts\check_novel_continuity_long_horizon_reliability.py --run-dirs "<RUN_A>" "<RUN_B>" "<RUN_C>" --cite-stage target
+python .\scripts\generate_authority_under_interference_family.py --overwrite
+python .\scripts\score_authority_under_interference.py --data "data\authority_under_interference\authority_under_interference_anchors.jsonl" --preds "<PREDS_JSONL>" --rows-out "<ROWS_JSONL>"
+.\scripts\run_authority_under_interference_family.ps1 -Adapter "goldevidencebench.adapters.llama_server_adapter:create_adapter" -OverwriteFixtures
+python .\scripts\check_authority_under_interference_reliability.py --run-dirs "<RUN_A>" "<RUN_B>" "<RUN_C>"
+python .\scripts\generate_authority_under_interference_hardening_family.py --overwrite
+python .\scripts\score_authority_under_interference_hardening.py --data "data\authority_under_interference_hardening\authority_under_interference_hardening_anchors.jsonl" --preds "<PREDS_JSONL>" --rows-out "<ROWS_JSONL>"
+.\scripts\run_authority_under_interference_hardening_family.ps1 -Adapter "goldevidencebench.adapters.llama_server_adapter:create_adapter" -Stage observe -OverwriteFixtures
+.\scripts\run_authority_under_interference_hardening_family.ps1 -Adapter "goldevidencebench.adapters.llama_server_adapter:create_adapter" -Stage target
+python .\scripts\check_authority_under_interference_hardening_reliability.py --run-dirs "<RUN_A>" "<RUN_B>" "<RUN_C>" --stage target --out "runs\authority_under_interference_hardening_reliability_latest.json"
+python .\scripts\generate_myopic_planning_traps_family.py --overwrite
+python .\scripts\score_myopic_planning_traps.py --data "data\myopic_planning_traps\myopic_planning_traps_anchors.jsonl" --preds "<PREDS_JSONL>" --rows-out "<ROWS_JSONL>"
+.\scripts\run_myopic_planning_traps_family.ps1 -Adapter "goldevidencebench.adapters.llama_server_adapter:create_adapter" -Stage observe -OverwriteFixtures
+.\scripts\run_myopic_planning_traps_family.ps1 -Adapter "goldevidencebench.adapters.llama_server_adapter:create_adapter" -Stage target
+python .\scripts\check_myopic_planning_traps_reliability.py --run-dirs "<RUN_A>" "<RUN_B>" "<RUN_C>" --stage target --out "runs\myopic_planning_traps_reliability_latest.json"
+python .\scripts\generate_referential_indexing_suite_family.py --overwrite
+python .\scripts\score_referential_indexing_suite.py --data "data\referential_indexing_suite\referential_indexing_suite_anchors.jsonl" --preds "<PREDS_JSONL>" --rows-out "<ROWS_JSONL>"
+.\scripts\run_referential_indexing_suite_family.ps1 -Adapter "goldevidencebench.adapters.llama_server_adapter:create_adapter" -Stage observe -OverwriteFixtures
+.\scripts\run_referential_indexing_suite_family.ps1 -Adapter "goldevidencebench.adapters.llama_server_adapter:create_adapter" -Stage target
+python .\scripts\check_referential_indexing_suite_reliability.py --run-dirs "<RUN_A>" "<RUN_B>" "<RUN_C>" --stage target --out "runs\referential_indexing_suite_reliability_latest.json"
+python .\scripts\generate_epistemic_calibration_suite_family.py --overwrite
+python .\scripts\score_epistemic_calibration_suite.py --data "data\epistemic_calibration_suite\epistemic_calibration_suite_anchors.jsonl" --preds "<PREDS_JSONL>" --rows-out "<ROWS_JSONL>"
+.\scripts\run_epistemic_calibration_suite_family.ps1 -Adapter "goldevidencebench.adapters.llama_server_adapter:create_adapter" -Stage observe -OverwriteFixtures
+.\scripts\run_epistemic_calibration_suite_family.ps1 -Adapter "goldevidencebench.adapters.llama_server_adapter:create_adapter" -Stage target
+python .\scripts\check_epistemic_calibration_suite_reliability.py --run-dirs "<RUN_A>" "<RUN_B>" "<RUN_C>" --stage target --out "runs\epistemic_calibration_suite_reliability_latest.json"
+python .\scripts\check_reliability_signal.py --strict "runs\latest_rag_strict" --compression-reliability "runs\compression_reliability_latest.json" --novel-reliability "runs\novel_continuity_reliability_latest.json" --authority-interference-reliability "runs\authority_under_interference_reliability_latest.json"
+python .\scripts\check_reliability_signal.py --strict "runs\latest_rag_strict" --compression-reliability "runs\compression_reliability_latest.json" --novel-reliability "runs\novel_continuity_reliability_latest.json" --authority-interference-reliability "runs\authority_under_interference_reliability_latest.json" --compression-roundtrip-reliability "runs\compression_roundtrip_generalization_reliability_latest.json" --require-compression-roundtrip --novel-long-horizon-reliability "runs\novel_continuity_long_horizon_reliability_latest.json" --require-novel-long-horizon --myopic-planning-reliability "runs\myopic_planning_traps_reliability_latest.json" --require-myopic-planning --referential-indexing-reliability "runs\referential_indexing_suite_reliability_latest.json" --require-referential-indexing --epistemic-reliability "runs\epistemic_calibration_suite_reliability_latest.json" --require-epistemic --authority-hardening-reliability "runs\authority_under_interference_hardening_reliability_latest.json" --require-authority-hardening
+python .\scripts\check_reliability_signal.py --strict "runs\latest_rag_strict" --compression-reliability "runs\compression_reliability_latest.json" --novel-reliability "runs\novel_continuity_reliability_latest.json" --authority-interference-reliability "runs\authority_under_interference_reliability_latest.json" --compression-roundtrip-reliability "runs\compression_roundtrip_generalization_reliability_latest.json" --require-compression-roundtrip --novel-long-horizon-reliability "runs\novel_continuity_long_horizon_reliability_latest.json" --require-novel-long-horizon --myopic-planning-reliability "runs\myopic_planning_traps_reliability_latest.json" --require-myopic-planning --referential-indexing-reliability "runs\referential_indexing_suite_reliability_latest.json" --require-referential-indexing --epistemic-reliability "runs\epistemic_calibration_suite_reliability_latest.json" --require-epistemic --authority-hardening-reliability "runs\authority_under_interference_hardening_reliability_latest.json" --require-authority-hardening --min-reasoning-score 0.90 --min-planning-score 0.90 --min-intelligence-index 0.90
+.\scripts\run_family_stage_triplet.ps1 -Family myopic_planning_traps -Stage target -RunCount 5 -MaxJitter 0.02 -Adapter "goldevidencebench.adapters.llama_server_adapter:create_adapter" -PromoteLatestOnPass
+.\scripts\run_robustness_threshold.ps1 -Adapter "goldevidencebench.adapters.llama_server_adapter:create_adapter" -Stage target -RunCount 5 -MaxJitter 0.02 -PromoteLatestOnPass $true
+python .\scripts\build_codex_compat_report.py
+Get-Content "runs\codex_compat\scaffold_backlog.json"
+.\scripts\check_reliability_signal.ps1
+python .\scripts\minimize_counterexample.py --drilldown "<DRILLDOWN_JSONL>" --out "<MIN_JSONL>" --max-rows 8 --cover-by both
+python .\scripts\promote_failures_to_anchors.py --data "<DATA_JSONL>" --drilldown "<DRILLDOWN_JSONL>" --out "<ANCHORS_JSONL>" --max-anchors 8 --cover-by both
+```
+
+Note: novel continuity (base + long-horizon) citation floors are stage-driven:
+- `observe` -> `min_cite_f1=0.00`
+- `ramp` -> `min_cite_f1=0.60`
+- `target` -> `min_cite_f1=0.85`
+- `custom` -> use explicit cite-floor args
+
+Note: compression roundtrip generalization floors are stage-driven:
+- `observe` -> low floors for initial signal shaping
+- `ramp` -> intermediate floors for hardening
+- `target` -> strict floors (`value/exact/cite_f1 >= 0.85`, subset floors `>= 0.80`)
+- `custom` -> use explicit min-* args
+
+Note: myopic planning trap floors are stage-driven:
+- `observe` -> planning bootstrap floors (`value/exact >= 0.45`, `horizon_success >= 0.60`) with non-blocking `cite_f1`/`recovery_rate`
+- `ramp` -> intermediate hardening (`value/exact >= 0.65`, `cite_f1 >= 0.30`, `recovery_rate >= 0.30`)
+- `target` -> strict release floors (`value/exact >= 0.85`, `cite_f1 >= 0.80`, `recovery_rate >= 0.80`)
+- `custom` -> use explicit min/max args
+
+UI search/distillation logging is concise by default when `--out` is set.
+Use `--print-json` on `run_ui_search_baseline.py` or
+`build_ui_sa_distillation_report.py` when you want full JSON printed to stdout.
 
 Drift wall + drift holdout gate:
 
@@ -364,7 +642,11 @@ To add a new holdout: create fixtures under `data/`, register the family in `doc
 
 - `docs/WORKFLOWS.md` - primary flows and demos.
 - `docs/ADAPTERS.md` - adapter contract.
+- `docs/TRAP_PLAN.md` - why trap families exist and how to scale them.
 - `docs/TRAP_FAMILIES.md` - trap family catalog.
+- `docs/RPA_CONTROL_SPEC.md` - runtime reason/plan/act switching contract.
+- `docs/INTENT_SPEC_LAYER.md` - bounded clarification layer for underspecified requests.
+- `docs/NOISE_BUDGET_METRICS.md` - noise accumulation model and control triggers.
 - `docs/THREAD_ARTIFACTS.md` - thread/compaction artifacts.
 
 ## Docs (deep dives and logs)

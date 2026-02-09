@@ -41,3 +41,33 @@ def test_builder_helpers_match_latest_updates() -> None:
         assert entry["step"] == last["step"]
         assert entry["op"] == last["op"]
         assert entry["value"] == last["value"]
+
+
+def test_parse_book_ledger_supports_generic_keys() -> None:
+    book = """# Example
+
+## State Ledger
+- [UABC123] step=1 SET policy.cache_ttl_minutes = 60
+- [UDEF456] step=2 NOTE policy.cache_ttl_minutes = 15
+- [U13579B] step=3 SET policy.cache_ttl_minutes = 120
+"""
+    entries = parse_book_ledger(book)
+    assert len(entries) == 3
+    assert entries[-1]["key"] == "policy.cache_ttl_minutes"
+    assert entries[-1]["op"] == "SET"
+    assert entries[-1]["value"] == "120"
+
+
+def test_parse_updates_supports_generic_keys() -> None:
+    document = """# Episode
+
+## Episode Log
+- [UABC123] UPDATE step=1 SET policy.export_window_days = 30
+- [UDEF456] UPDATE step=2 NOTE policy.export_window_days = 21
+- [U13579B] UPDATE step=3 CLEAR policy.export_window_days
+"""
+    updates = parse_updates(document)
+    assert len(updates) == 3
+    assert updates[0]["key"] == "policy.export_window_days"
+    assert updates[1]["op"] == "NOTE"
+    assert updates[2]["op"] == "CLEAR"

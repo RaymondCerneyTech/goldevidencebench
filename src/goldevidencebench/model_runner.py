@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+import json
 from dataclasses import dataclass
 from typing import Any, Protocol
 
@@ -53,6 +54,8 @@ class AdapterOutput(BaseModel):
     def coerce_value(cls, v):
         if v is None:
             return None
+        if isinstance(v, (dict, list)):
+            return json.dumps(v, ensure_ascii=True, sort_keys=True)
         if isinstance(v, (int, float, bool)):
             return str(v)
         return v

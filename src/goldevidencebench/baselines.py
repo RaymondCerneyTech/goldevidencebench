@@ -7,21 +7,22 @@ from dataclasses import dataclass
 from typing import Any
 
 _ID = r"U[A-F0-9]{6}"
+_KEY = r"[A-Za-z][A-Za-z0-9_.:-]*"
 _UPDATE_SET_RE = re.compile(
-    rf"^- \[(?P<uid>{_ID})\] UPDATE step=(?P<step>\d+) SET (?P<key>tag\.\d{{2}}) = (?P<value>.+)$"
+    rf"^- \[(?P<uid>{_ID})\] UPDATE step=(?P<step>\d+) SET (?P<key>{_KEY}) = (?P<value>.+)$"
 )
 _UPDATE_CLEAR_RE = re.compile(
-    rf"^- \[(?P<uid>{_ID})\] UPDATE step=(?P<step>\d+) CLEAR (?P<key>tag\.\d{{2}})$"
+    rf"^- \[(?P<uid>{_ID})\] UPDATE step=(?P<step>\d+) CLEAR (?P<key>{_KEY})$"
 )
 _UPDATE_NOTE_RE = re.compile(
-    rf"^- \[(?P<uid>{_ID})\] UPDATE step=(?P<step>\d+) NOTE (?P<key>tag\.\d{{2}}) = (?P<value>.+)$"
+    rf"^- \[(?P<uid>{_ID})\] UPDATE step=(?P<step>\d+) NOTE (?P<key>{_KEY}) = (?P<value>.+)$"
 )
 _BOOK_SET_RE = re.compile(
-    rf"^- \[(?P<uid>{_ID})\] step=(?P<step>\d+) SET (?P<key>tag\.\d{{2}}) = (?P<value>.+)$"
+    rf"^- \[(?P<uid>{_ID})\] step=(?P<step>\d+) SET (?P<key>{_KEY}) = (?P<value>.+)$"
 )
-_BOOK_CLEAR_RE = re.compile(rf"^- \[(?P<uid>{_ID})\] step=(?P<step>\d+) CLEAR (?P<key>tag\.\d{{2}})$")
+_BOOK_CLEAR_RE = re.compile(rf"^- \[(?P<uid>{_ID})\] step=(?P<step>\d+) CLEAR (?P<key>{_KEY})$")
 _BOOK_NOTE_RE = re.compile(
-    rf"^- \[(?P<uid>{_ID})\] step=(?P<step>\d+) NOTE (?P<key>tag\.\d{{2}}) = (?P<value>.+)$"
+    rf"^- \[(?P<uid>{_ID})\] step=(?P<step>\d+) NOTE (?P<key>{_KEY}) = (?P<value>.+)$"
 )
 _BOOK_TITLE_RE = re.compile(r"^# .+")
 _BOOK_GLOSSARY_RE = re.compile(r"^- (tag\.\d{2}): .+")

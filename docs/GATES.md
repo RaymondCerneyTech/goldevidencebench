@@ -25,6 +25,14 @@ Gates are constraint checks: they don’t prevent optimization, they ensure opti
 | Bad actor holdout gate | `.\scripts\run_bad_actor_holdout_gate.ps1` | `configs/bad_actor_holdout_list.json` + `configs/usecase_checks.json` (`bad_actor_holdout_gate`) | `runs/bad_actor_holdout_latest/summary.json` |
 | UI same_label stub | `.\scripts\run_ui_same_label_stub.ps1` | `configs/usecase_checks.json` (`ui_same_label_gate`) | `runs/ui_same_label_gate.json` |
 | UI popup_overlay stub | `.\scripts\run_ui_popup_overlay_stub.ps1` | `configs/usecase_checks.json` (`ui_popup_overlay_gate`) | `runs/ui_popup_overlay_gate.json` |
+| Unified reliability signal | `.\scripts\check_reliability_signal.ps1` (invoked by `.\scripts\run_release_check.ps1`) | strict + family reliability summaries; default requires `rpa_mode_switch`, `intent_spec_layer`, `noise_escalation` | `runs/reliability_signal_latest.json` |
+
+Default release/nightly contract:
+
+- `run_release_check.ps1` now requires `rpa_mode_switch`, `intent_spec_layer`,
+  and `noise_escalation` by default in the unified reliability gate.
+- `run_release_overnight.ps1` inherits the same default behavior.
+- Diagnostic-only override: `-SkipRequireControlFamilies`.
 
 Bad actor holdout defaults: `prefer_update_latest` rerank + authority filter (set in `scripts/run_bad_actor_holdout_gate.ps1`).
 

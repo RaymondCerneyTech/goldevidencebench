@@ -947,7 +947,16 @@
       "metrics": [
         {
           "path": "retrieval.wrong_update_rate",
-          "max": 0.05
+          "max": 0.05,
+          "allow_missing": true
+        },
+        {
+          "path": "overall.exact_acc_mean",
+          "min": 0.95
+        },
+        {
+          "path": "overall.cite_f1_mean",
+          "min": 0.95
         }
       ]
     },

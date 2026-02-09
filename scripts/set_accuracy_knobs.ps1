@@ -1,0 +1,7 @@
+$env:GOLDEVIDENCEBENCH_LEDGER_MODE = "latest_authoritative"
+$env:GOLDEVIDENCEBENCH_LEDGER_KEY_ONLY = "1"
+$env:GOLDEVIDENCEBENCH_NORMALIZE_SUPPORT_IDS = "1"
+Write-Host "Set accuracy-first knobs for this session:"
+Write-Host "  GOLDEVIDENCEBENCH_LEDGER_MODE=latest_authoritative"
+Write-Host "  GOLDEVIDENCEBENCH_LEDGER_KEY_ONLY=1"
+Write-Host "  GOLDEVIDENCEBENCH_NORMALIZE_SUPPORT_IDS=1"

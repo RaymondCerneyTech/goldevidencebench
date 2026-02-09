@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from goldevidencebench.baselines import parse_book_ledger
@@ -64,6 +66,19 @@ def test_adapter_output_coerces_numeric_value() -> None:
         max_support_k=3,
     )
     assert parsed == {"value": "2887", "support_ids": []}
+
+
+def test_adapter_output_coerces_object_value_to_json_string() -> None:
+    cfg = EpisodeConfig(steps=6, keys=2, queries=2, twins=False, distractor_profile="standard")
+    row = generate_dataset(seed=17, episodes=1, cfg=cfg)[0]
+    payload = {"compact_state": {"tag.00": "amber-0001", "tag.01": None}}
+    parsed = validate_adapter_output(
+        row=row,
+        raw={"value": payload, "support_ids": []},
+        protocol="open_book",
+        max_support_k=3,
+    )
+    assert parsed == {"value": json.dumps(payload, ensure_ascii=True, sort_keys=True), "support_ids": []}
 
 
 def test_adapter_output_validation_accepts_doc_id_supports() -> None:

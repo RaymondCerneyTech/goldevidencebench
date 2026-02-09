@@ -3,7 +3,8 @@ param(
     [int]$Seeds = 10,
     [string]$HoldoutName = "local_optimum_blocking_modal_unmentioned_blocked",
     [int]$FuzzVariants = 0,
-    [int]$FuzzSeed = 0
+    [int]$FuzzSeed = 0,
+    [switch]$VerboseJson
 )
 
 if (-not $OutRoot) {
@@ -182,7 +183,7 @@ foreach ($variant in $variants) {
     if ($FuzzVariants -gt 0) {
         $fuzzArgs = @("--fuzz-variants", "$FuzzVariants", "--fuzz-seed", "$FuzzSeed")
     }
-    python .\scripts\run_ui_search_baseline.py --fixture $fixture --observed $observed --out $outPath --seeds $Seeds @fuzzArgs
+    python .\scripts\run_ui_search_baseline.py --fixture $fixture --observed $observed --out $outPath --seeds $Seeds --quiet @fuzzArgs
 
     if (Test-Path $outPath) {
         $payload = Get-Content $outPath -Raw | ConvertFrom-Json
@@ -220,8 +221,11 @@ $summary | ConvertTo-Json -Depth 6 | Set-Content -Path $summaryPath -Encoding UT
 
 Write-Host ("Building distillation report (holdout: {0})..." -f $HoldoutName)
 python .\scripts\build_ui_sa_distillation_report.py --variants-dir $OutRoot `
-    --holdout-name $HoldoutName --out $distillationPath
+    --holdout-name $HoldoutName --out $distillationPath --quiet
 
 Write-Host ("Summary: {0}" -f $summaryPath)
 Write-Host ("Distillation report: {0}" -f $distillationPath)
-Write-Host ($summary | ConvertTo-Json -Depth 5)
+Write-Host ("Variants complete: {0} (seeds={1}, holdout={2})" -f $results.Count, $Seeds, $HoldoutName)
+if ($VerboseJson) {
+    Write-Host ($summary | ConvertTo-Json -Depth 5)
+}

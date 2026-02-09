@@ -12,8 +12,8 @@ param(
     [int]$MaxBookTokens = 400
 )
 
-if (-not $ModelPath) {
-    Write-Error "Set -ModelPath or GOLDEVIDENCEBENCH_MODEL before running."
+if ($ModelPath -eq "<MODEL_PATH>") {
+    Write-Error "Replace placeholder <MODEL_PATH> with a real path, or omit -ModelPath when using llama_server_adapter."
     exit 1
 }
 
@@ -78,7 +78,13 @@ if (-not $finalRunsDir) {
 }
 New-Item -ItemType Directory -Path $finalRunsDir -Force | Out-Null
 
-$env:GOLDEVIDENCEBENCH_MODEL = $ModelPath
+if (-not ($Adapter -like "*llama_server_adapter*")) {
+    if (-not $ModelPath) {
+        Write-Error "Set -ModelPath or GOLDEVIDENCEBENCH_MODEL before running."
+        exit 1
+    }
+    $env:GOLDEVIDENCEBENCH_MODEL = $ModelPath
+}
 $env:GOLDEVIDENCEBENCH_RETRIEVAL_RERANK = $Rerank
 $env:GOLDEVIDENCEBENCH_RETRIEVAL_WRONG_TYPE = "same_key"
 $env:GOLDEVIDENCEBENCH_RETRIEVAL_ORDER = "shuffle"

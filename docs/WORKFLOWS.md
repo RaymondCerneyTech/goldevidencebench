@@ -79,6 +79,27 @@ Release check (runs pinned gates and UI stubs):
 .\scripts\run_release_check.ps1 -ModelPath "<MODEL_PATH>"
 ```
 
+`run_release_check.ps1` now executes `scripts/check_reliability_signal.ps1` as
+its final gate. The script exit code is the ship/no-ship signal. Use
+`-SkipReliabilitySignal` only for diagnostics.
+
+By default, the final gate now requires these control families:
+- `rpa_mode_switch`
+- `intent_spec_layer`
+- `noise_escalation`
+
+Diagnostic-only override:
+
+```powershell
+.\scripts\run_release_check.ps1 -SkipRequireControlFamilies
+```
+
+Server-adapter variant (no local model-path loading):
+
+```powershell
+.\scripts\run_release_check.ps1 -GateAdapter "goldevidencebench.adapters.llama_server_adapter:create_adapter"
+```
+
 Gate threshold sources and artifacts are listed in [docs/GATES.md](docs/GATES.md).
 
 Latest pointers:
@@ -149,9 +170,10 @@ RAG benchmark (curated long-context datasets):
 .\scripts\run_rag_benchmark.ps1 -Preset lenient -ModelPath "<MODEL_PATH>"
 .\scripts\run_rag_benchmark.ps1 -Preset strict -ModelPath "<MODEL_PATH>"
 python .\scripts\compare_runs.py --latest-pair --print
+python .\scripts\compare_runs.py --latest-pair --benchmark rag_benchmark_strict --run-name-prefix rag_benchmark_ --print
 ```
 
-This compares the newest two runs under `runs/`. Each run writes `summary_compact.json` / `summary_compact.csv` alongside the full `summary.json` and `report.md`.
+This compares the newest two runs under `runs/`. Use `--benchmark` and `--run-name-prefix` when you want to avoid cross-family comparisons. Each run writes `summary_compact.json` / `summary_compact.csv` alongside the full `summary.json` and `report.md`.
 Latest pointers: `runs/latest_rag_lenient` and `runs/latest_rag_strict`.
 
 Bring your own docs (domain pack):
@@ -208,6 +230,14 @@ Runtime knobs:
 
 - `-MaxRows <N>` on `run_rag_benchmark.ps1` limits each dataset to N rows.
 - `-MaxRows <N>` on `run_rag_open_book_demo.ps1` limits the generated dataset size.
+- `run_rag_benchmark.ps1` now writes `preds_<dataset>.jsonl` by default for direct drilldown.
+
+Trap cycle helpers:
+
+```powershell
+.\scripts\trap_cycle.ps1 -Mode explore -Preset strict -DatasetId domain_stale -ModelPath "<MODEL_PATH>"
+.\scripts\trap_cycle.ps1 -Mode enforce -Preset strict -DatasetId domain_stale -RunDir "<RUN_DIR>" -Family domain_stale
+```
 
 Open-book vs closed-book (what to expect):
 

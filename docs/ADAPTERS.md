@@ -11,6 +11,9 @@ Supported adapters (quick list):
 - Reference adapter (wraps the ledger baseline): `goldevidencebench.adapters.ledger_adapter:create_adapter`.
 - Two-phase adapter example (build book once, answer many): `goldevidencebench.adapters.log_to_book_adapter:create_adapter` implements `build_artifact(document, episode_id, protocol)` then answers closed-book.
 - Closed-book Llama example (uses `llama-cpp-python`, set `GOLDEVIDENCEBENCH_MODEL` to a GGUF path): `goldevidencebench.adapters.llama_cpp_adapter:create_adapter`.
+- External CLI adapter (for Vulkan/llama.cpp builds or any local binary): `goldevidencebench.adapters.external_cli_adapter:create_adapter`
+  or the Vulkan alias `goldevidencebench.adapters.vulkan_cli_adapter:create_adapter`.
+- Llama-server adapter (HTTP, keep model hot): `goldevidencebench.adapters.llama_server_adapter:create_adapter`.
 - Streaming state-builder (chunked log -> compact ledger, then Llama answers): `goldevidencebench.adapters.streaming_llama_cpp_adapter:create_adapter`.
 - Teacher book-builder (LLM builds artifacts, answerer stays fixed): `goldevidencebench.adapters.llm_book_builder_adapter:create_adapter`.
 - Retrieval-first answerer (use only the latest ledger entry for the key): `goldevidencebench.adapters.retrieval_llama_cpp_adapter:create_adapter`.
@@ -20,11 +23,71 @@ Supported adapters (quick list):
 Notes:
 
 - The Llama adapter extracts the `## State Ledger` section and keeps the most recent ledger tokens to fit context.
+- Accuracy-first defaults (closed-book Llama adapters):
+  - `GOLDEVIDENCEBENCH_LEDGER_MODE=latest_authoritative` keeps only the latest SET/CLEAR per key (drops NOTE).
+  - `GOLDEVIDENCEBENCH_LEDGER_KEY_ONLY=1` (with `LEDGER_MODE=latest_authoritative`) keeps only the asked key.
+  - `GOLDEVIDENCEBENCH_NORMALIZE_SUPPORT_IDS=1` uppercases support IDs from HTTP/CLI adapters.
+  - To revert: `GOLDEVIDENCEBENCH_LEDGER_MODE=full`, `GOLDEVIDENCEBENCH_LEDGER_KEY_ONLY=0`, `GOLDEVIDENCEBENCH_NORMALIZE_SUPPORT_IDS=0`.
 - Set `GOLDEVIDENCEBENCH_STREAM_CHUNK_TOKENS` (default 512) to control chunk size. Set `GOLDEVIDENCEBENCH_STREAM_MODE=llm` (default) to let the model extract updates per chunk, or `GOLDEVIDENCEBENCH_STREAM_MODE=parse` for a deterministic parser.
 - Set `GOLDEVIDENCEBENCH_BUILDER_MODEL` to use a stronger model for artifact construction (defaults to `GOLDEVIDENCEBENCH_MODEL`).
 - Set `GOLDEVIDENCEBENCH_BUILDER_CHUNK_TOKENS` to control builder chunk size.
 - Set `GOLDEVIDENCEBENCH_BUILDER_MODE` to `heuristic`, `llm_fullscan` (default), or `llm_perkey`.
 - Set `GOLDEVIDENCEBENCH_BUILDER_PER_KEY_LLM=0` to disable per-key LLM calls (deterministic fallback).
+
+### External CLI / Vulkan adapter (optional)
+
+Use this when you want to drive an external CLI (e.g., a Vulkan build of llama.cpp) without
+binding it tightly into the Python code. The adapter just executes a command template and
+parses JSON from stdout.
+
+Set one of:
+
+- `GOLDEVIDENCEBENCH_EXTERNAL_LLM_CMD` (generic adapter)
+- `GOLDEVIDENCEBENCH_VULKAN_CMD` (Vulkan alias)
+
+Templates use `{placeholders}`:
+
+- `{prompt}` (inline prompt text — quote carefully)
+- `{prompt_file}` (path to a temp file containing the prompt)
+- `{model_path}` (from `GOLDEVIDENCEBENCH_MODEL`)
+- `{max_tokens}`, `{n_ctx}`, `{require_citations}`
+
+Example (PowerShell — adjust flags to your llama.cpp build):
+
+```powershell
+$env:GOLDEVIDENCEBENCH_MODEL = "C:\models\your-model.gguf"
+$env:GOLDEVIDENCEBENCH_VULKAN_CMD = 'C:\llama.cpp\llama-cli.exe -m "{model_path}" -f "{prompt_file}" -n {max_tokens} --ctx-size {n_ctx}'
+```
+
+Contract: the command must print a single JSON object with keys `value` and `support_ids`
+to stdout. If citations are disabled, `support_ids` should be an empty list.
+
+### Llama-server adapter (optional)
+
+Use this when you run `llama-server` (or any compatible HTTP endpoint) and want the model
+to stay loaded. Default endpoint is `http://localhost:8080/completion`.
+
+Minimal setup:
+
+```powershell
+$env:GOLDEVIDENCEBENCH_LLAMA_SERVER_URL = "http://localhost:8080/completion"
+```
+
+Optional overrides:
+
+- `GOLDEVIDENCEBENCH_LLAMA_SERVER_BASE_URL` + `GOLDEVIDENCEBENCH_LLAMA_SERVER_ENDPOINT`
+- `GOLDEVIDENCEBENCH_LLAMA_SERVER_REQUEST_JSON` (JSON template with `{prompt}`, `{max_tokens}`, `{n_ctx}`, `{stop}`)
+- `GOLDEVIDENCEBENCH_LLAMA_SERVER_TIMEOUT_S`
+- `GOLDEVIDENCEBENCH_LLAMA_SERVER_MAX_TOKENS`
+- `GOLDEVIDENCEBENCH_NORMALIZE_SUPPORT_IDS=1` (uppercases support IDs)
+
+Example (default /completion payload):
+
+```powershell
+$env:GOLDEVIDENCEBENCH_MODEL = "C:\AI\models\your-model.gguf"
+$env:GOLDEVIDENCEBENCH_LLAMA_SERVER_URL = "http://localhost:8080/completion"
+goldevidencebench model --data .\data\goldevidencebench.jsonl --adapter goldevidencebench.adapters.llama_server_adapter:create_adapter --protocol closed_book
+```
 
 ### Retrieval knobs (quick list)
 

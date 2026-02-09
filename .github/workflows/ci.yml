@@ -27,3 +27,19 @@ jobs:
       - name: Mock adapter baseline
         shell: pwsh
         run: .\scripts\run_adapter_baseline.ps1 -Preset smoke
+
+      - name: Reliability signal gate (if artifacts present)
+        shell: pwsh
+        run: |
+          $required = @(
+            "runs\latest_rag_strict",
+            "runs\compression_reliability_latest.json",
+            "runs\novel_continuity_reliability_latest.json"
+          )
+          $missing = $required | Where-Object { -not (Test-Path $_) }
+          if ($missing.Count -gt 0) {
+            Write-Host "Skipping reliability signal gate in CI; missing artifacts:"
+            $missing | ForEach-Object { Write-Host " - $_" }
+            exit 0
+          }
+          .\scripts\check_reliability_signal.ps1

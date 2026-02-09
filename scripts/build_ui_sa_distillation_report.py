@@ -51,6 +51,16 @@ def main() -> int:
         default="",
         help="Optional output path for distillation_report.json.",
     )
+    parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Print a one-line status summary instead of the full JSON report.",
+    )
+    parser.add_argument(
+        "--print-json",
+        action="store_true",
+        help="Force printing the full JSON report even when --out is set.",
+    )
     args = parser.parse_args()
 
     variants_dir = Path(args.variants_dir)
@@ -339,7 +349,17 @@ def main() -> int:
 
     out_path = Path(args.out) if args.out else variants_dir / "distillation_report.json"
     out_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
-    print(json.dumps(report, indent=2))
+    print_json = args.print_json or (not args.quiet and not args.out)
+    if not print_json:
+        print(
+            "ui_sa_distillation_report: "
+            f"included={len(included_variants)} "
+            f"skipped={len(skipped_variants)} "
+            f"sa_beats_greedy_rate={report.get('sa_beats_greedy_rate', 0.0):.3f} "
+            f"out={out_path}"
+        )
+    else:
+        print(json.dumps(report, indent=2))
     return 0
 
 

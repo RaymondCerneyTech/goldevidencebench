@@ -11,7 +11,12 @@ try:
 except ImportError as exc:  # pragma: no cover - optional dependency
     raise ImportError("llama_cpp not installed; install via `pip install llama-cpp-python`") from exc
 
-from goldevidencebench.adapters.llama_prompt import build_prompt, extract_ledger, truncate_tokens
+from goldevidencebench.adapters.llama_prompt import (
+    build_prompt,
+    extract_ledger,
+    ledger_key_for_row,
+    truncate_tokens,
+)
 from goldevidencebench.baselines import parse_book_ledger
 from goldevidencebench.util import get_env
 
@@ -91,7 +96,7 @@ class LlamaCppAdapter:
         book = row.get("book") or row.get("artifact")
         if not book:
             raise ValueError("book/artifact required for closed_book inference.")
-        ledger = extract_ledger(book)
+        ledger = extract_ledger(book, key=ledger_key_for_row(row))
         ledger = truncate_tokens(
             ledger,
             self.max_book_tokens,
@@ -259,10 +264,13 @@ def _select_support_id(book: str, row: dict[str, Any], value: Any) -> str | None
     if not key:
         return None
     entries = parse_book_ledger(book)
+    ignore_notes = _is_latest_authoritative()
     last_for_key = None
     match_for_value = None
     value_str = None if value is None else str(value)
     for entry in entries:
+        if ignore_notes and entry.get("op") == "NOTE":
+            continue
         if entry.get("key") != key:
             continue
         last_for_key = entry
@@ -273,6 +281,11 @@ def _select_support_id(book: str, row: dict[str, Any], value: Any) -> str | None
     if last_for_key:
         return last_for_key.get("uid")
     return None
+
+
+def _is_latest_authoritative() -> bool:
+    mode = (get_env("LEDGER_MODE", "latest_authoritative") or "latest_authoritative").strip().lower()
+    return mode == "latest_authoritative"
 
 
 def _ctx_ptr(llm: Any) -> Any:

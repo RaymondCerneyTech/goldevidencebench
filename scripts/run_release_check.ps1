@@ -14,11 +14,18 @@ local_optimum_blocking_modal_unmentioned_blocked).
 .PARAMETER RunDriftHoldoutGate
 Runs the drift holdout canary + fixes gate and fails the release on FAIL.
 
+.PARAMETER SkipRequireControlFamilies
+Diagnostic-only override: do not require rpa_mode_switch, intent_spec_layer,
+and noise_escalation in the unified reliability gate.
+
 #>
 param(
     [string]$ModelPath = $env:GOLDEVIDENCEBENCH_MODEL,
+    [string]$GateAdapter = "goldevidencebench.adapters.retrieval_llama_cpp_adapter:create_adapter",
     [switch]$RunSweeps,
     [switch]$SkipThresholds,
+    [switch]$SkipReliabilitySignal,
+    [switch]$SkipRequireControlFamilies,
     [switch]$RunDriftHoldoutGate,
     [int]$VariantsSeeds = 10,
     [string]$VariantsHoldoutName = "local_optimum_blocking_modal_unmentioned_blocked",
@@ -31,8 +38,27 @@ param(
     [string]$AutoCurriculumStatePath = "runs\\release_gates\\ui_holdout_autocurriculum.json",
     [string]$HoldoutList = "",
     [string]$HoldoutListPath = "configs\\ui_holdout_list.json",
+    [ValidateSet("stale_tab_state", "focus_drift")]
+    [string]$DriftHoldoutName = "stale_tab_state",
+    [string]$BadActorHoldoutId = "",
+    [string]$BadActorHoldoutListPath = "configs\\bad_actor_holdout_list.json",
     [switch]$SkipVariants
 )
+
+$gateUsesServerAdapter = $GateAdapter -like "*llama_server_adapter*"
+if ($ModelPath -eq "<MODEL_PATH>") {
+    if ($PSBoundParameters.ContainsKey("ModelPath")) {
+        Write-Error "Replace placeholder <MODEL_PATH> with a real path, or omit -ModelPath when using llama_server_adapter."
+        exit 1
+    }
+    if ($gateUsesServerAdapter) {
+        # Ignore placeholder inherited from environment for server-adapter runs.
+        $ModelPath = ""
+    } else {
+        Write-Error "Replace placeholder <MODEL_PATH> with a real path, or set GOLDEVIDENCEBENCH_MODEL."
+        exit 1
+    }
+}
 
 $RequiredVariantsHoldout = "local_optimum_blocking_modal_unmentioned_blocked"
 $DefaultHoldoutList = "local_optimum_section_path,local_optimum_section_path_conflict,local_optimum_blocking_modal_detour,local_optimum_tab_detour,local_optimum_disabled_primary,local_optimum_toolbar_vs_menu,local_optimum_confirm_then_apply,local_optimum_tab_state_reset,local_optimum_context_switch,local_optimum_stale_tab_state,local_optimum_form_validation,local_optimum_window_focus,local_optimum_panel_toggle,local_optimum_accessibility_label,local_optimum_checkbox_gate,local_optimum_blocking_modal_required,local_optimum_blocking_modal_permission,local_optimum_blocking_modal_consent,local_optimum_blocking_modal_unmentioned,local_optimum_blocking_modal_unmentioned_blocked,local_optimum_blocking_modal,local_optimum_overlay,local_optimum_primary,local_optimum_delayed_solvable,local_optimum_role_mismatch,local_optimum_role_conflict,local_optimum_destructive_confirm,local_optimum_unsaved_changes,local_optimum_blocking_modal_unprompted_confirm"
@@ -47,9 +73,16 @@ if ($RunSweeps -and -not $ModelPath) {
 }
 
 $manifestPath = Join-Path $ReleaseRunDir "release_manifest.json"
+$releaseLogsDir = Join-Path $ReleaseRunDir "logs"
+New-Item -ItemType Directory -Path $releaseLogsDir -Force | Out-Null
 $manifest = [ordered]@{
     created_at = (Get-Date -Format "s")
     model_path = $ModelPath
+    gate_adapter = $GateAdapter
+    selected_holdouts = [ordered]@{
+        drift = $DriftHoldoutName
+        bad_actor = $BadActorHoldoutId
+    }
     artifacts = [ordered]@{
         release_gates_dir = "runs\\release_gates"
         drift_holdout_gate = "runs\\release_gates\\drift_holdout_gate.json"
@@ -61,6 +94,13 @@ $manifest = [ordered]@{
         instruction_override_gate = "runs\\release_gates\\instruction_override_gate\\summary.json"
         memory_verify_gate = "runs\\release_gates\\memory_verify.json"
         update_burst_release_gate = "runs\\release_gates\\update_burst_full_linear_k16_bucket5_rate0.12\\summary.json"
+        reliability_signal = "runs\\reliability_signal_latest.json"
+        compression_reliability = "runs\\compression_reliability_latest.json"
+        novel_continuity_reliability = "runs\\novel_continuity_reliability_latest.json"
+        authority_under_interference_reliability = "runs\\authority_under_interference_reliability_latest.json"
+        rpa_mode_switch_reliability = "runs\\rpa_mode_switch_reliability_latest.json"
+        intent_spec_layer_reliability = "runs\\intent_spec_layer_reliability_latest.json"
+        noise_escalation_reliability = "runs\\noise_escalation_reliability_latest.json"
     }
 }
 $manifest | ConvertTo-Json -Depth 6 | Set-Content -Path $manifestPath -Encoding UTF8
@@ -243,8 +283,16 @@ if (-not $SkipThresholds) {
     }
 
     Write-Host "Running instruction override gate..."
-    .\scripts\run_instruction_override_gate.ps1 -ModelPath $ModelPath
+    .\scripts\run_instruction_override_gate.ps1 -ModelPath $ModelPath -Adapter $GateAdapter
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "Instruction override gate failed."
+        exit 1
+    }
     $instructionOverrideSummary = "runs\\release_gates\\instruction_override_gate\\summary.json"
+    if (-not (Test-Path $instructionOverrideSummary)) {
+        Write-Error "Instruction override gate did not produce summary.json."
+        exit 1
+    }
     if (Test-Path $instructionOverrideSummary) {
         .\scripts\set_latest_pointer.ps1 -RunDir $instructionOverrideSummary -PointerPath "runs\\latest_instruction_override_gate" | Out-Host
     }
@@ -257,17 +305,38 @@ if (-not $SkipThresholds) {
         .\scripts\set_latest_pointer.ps1 -RunDir $memoryVerify -PointerPath "runs\\latest_memory_verify_gate" | Out-Host
     }
     Write-Host "Running UI same_label stub..."
-    .\scripts\run_ui_same_label_stub.ps1
+    $uiSameLog = Join-Path $releaseLogsDir "ui_same_label_stub.log"
+    .\scripts\run_ui_same_label_stub.ps1 *> $uiSameLog
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "UI same_label stub failed. See $uiSameLog"
+        if (Test-Path $uiSameLog) { Get-Content $uiSameLog -Tail 40 | Out-Host }
+        exit $LASTEXITCODE
+    }
+    Write-Host "UI same_label stub complete (log: $uiSameLog)"
     if (Test-Path "runs\\ui_same_label_gate.json") {
         .\scripts\set_latest_pointer.ps1 -RunDir "runs\\ui_same_label_gate.json" -PointerPath "runs\\latest_ui_same_label_gate" | Out-Host
     }
     Write-Host "Running UI popup_overlay stub..."
-    .\scripts\run_ui_popup_overlay_stub.ps1
+    $uiPopupLog = Join-Path $releaseLogsDir "ui_popup_overlay_stub.log"
+    .\scripts\run_ui_popup_overlay_stub.ps1 *> $uiPopupLog
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "UI popup_overlay stub failed. See $uiPopupLog"
+        if (Test-Path $uiPopupLog) { Get-Content $uiPopupLog -Tail 40 | Out-Host }
+        exit $LASTEXITCODE
+    }
+    Write-Host "UI popup_overlay stub complete (log: $uiPopupLog)"
     if (Test-Path "runs\\ui_popup_overlay_gate.json") {
         .\scripts\set_latest_pointer.ps1 -RunDir "runs\\ui_popup_overlay_gate.json" -PointerPath "runs\\latest_ui_popup_overlay_gate" | Out-Host
     }
     Write-Host "Running UI minipilot notepad stub..."
-    .\scripts\run_ui_minipilot_notepad_stub.ps1
+    $uiNotepadLog = Join-Path $releaseLogsDir "ui_minipilot_notepad_stub.log"
+    .\scripts\run_ui_minipilot_notepad_stub.ps1 *> $uiNotepadLog
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "UI minipilot notepad stub failed. See $uiNotepadLog"
+        if (Test-Path $uiNotepadLog) { Get-Content $uiNotepadLog -Tail 40 | Out-Host }
+        exit $LASTEXITCODE
+    }
+    Write-Host "UI minipilot notepad stub complete (log: $uiNotepadLog)"
     if (Test-Path "runs\\ui_minipilot_notepad_gate.json") {
         .\scripts\set_latest_pointer.ps1 -RunDir "runs\\ui_minipilot_notepad_gate.json" -PointerPath "runs\\latest_ui_minipilot_notepad_gate" | Out-Host
     }
@@ -437,12 +506,19 @@ if (-not $SkipThresholds) {
     if (-not $SkipVariants) {
         $variantsOutRoot = "runs\\ui_local_optimum_variants_$stamp"
         Write-Host "Running UI local-optimum variants + distillation report..."
+        $variantsLog = Join-Path $releaseLogsDir "ui_local_optimum_variants.log"
         .\scripts\run_ui_local_optimum_variants.ps1 `
             -OutRoot $variantsOutRoot `
             -Seeds $VariantsSeeds `
             -HoldoutName $resolvedHoldout `
             -FuzzVariants $VariantsFuzzVariants `
-            -FuzzSeed $VariantsFuzzSeed
+            -FuzzSeed $VariantsFuzzSeed *> $variantsLog
+        if ($LASTEXITCODE -ne 0) {
+            Write-Error "UI local-optimum variants failed. See $variantsLog"
+            if (Test-Path $variantsLog) { Get-Content $variantsLog -Tail 60 | Out-Host }
+            exit $LASTEXITCODE
+        }
+        Write-Host "UI local-optimum variants complete (log: $variantsLog)"
         $distillationPath = Join-Path $variantsOutRoot "distillation_report.json"
         if (Test-Path $distillationPath) {
             $releaseDir = "runs\\release_gates"
@@ -494,24 +570,33 @@ if (-not $SkipThresholds) {
             Write-Error "Set -ModelPath or GOLDEVIDENCEBENCH_MODEL before running the drift holdout gate."
             exit 1
         }
-        Write-Host "Running drift holdout gate..."
-        .\scripts\run_drift_holdout_gate.ps1 -ModelPath $ModelPath
+        Write-Host ("Running drift holdout gate (holdout={0})..." -f $DriftHoldoutName)
+        .\scripts\run_drift_holdout_gate.ps1 -ModelPath $ModelPath -HoldoutName $DriftHoldoutName
         if ($LASTEXITCODE -ne 0) {
             Write-Error "Drift holdout gate failed."
             exit 1
         }
     }
-    if (-not $ModelPath) {
-        Write-Error "Set -ModelPath or GOLDEVIDENCEBENCH_MODEL before running the bad actor holdout gate."
+    $gateRequiresModelPath = -not ($GateAdapter -like "*llama_server_adapter*")
+    if ($gateRequiresModelPath -and -not $ModelPath) {
+        Write-Error ("Set -ModelPath or GOLDEVIDENCEBENCH_MODEL before running the bad actor holdout gate with adapter '{0}'." -f $GateAdapter)
         exit 1
     }
-    Write-Host "Running bad actor holdout gate..."
-    .\scripts\run_bad_actor_holdout_gate.ps1 -ModelPath $ModelPath
+    if ($BadActorHoldoutId) {
+        Write-Host ("Running bad actor holdout gate (holdout={0})..." -f $BadActorHoldoutId)
+    } else {
+        Write-Host "Running bad actor holdout gate..."
+    }
+    .\scripts\run_bad_actor_holdout_gate.ps1 `
+        -ModelPath $ModelPath `
+        -Adapter $GateAdapter `
+        -HoldoutListPath $BadActorHoldoutListPath `
+        -HoldoutId $BadActorHoldoutId
     if ($LASTEXITCODE -ne 0) {
         Write-Error "Bad actor holdout gate failed."
         exit 1
     }
-    python .\scripts\check_thresholds.py --config .\configs\usecase_checks.json
+    python .\scripts\check_thresholds.py --config .\configs\usecase_checks.json --quiet-passes
     $exitCode = $LASTEXITCODE
     if ($exitCode -ne 0) {
         $stamp = Get-Date -Format "yyyyMMdd_HHmmss"
@@ -645,5 +730,32 @@ if (-not $SkipThresholds) {
                 --baseline $pair.Baseline `
                 --out-dir $outDir
         }
+    }
+    if ($exitCode -ne 0) {
+        Write-Error "Release threshold checks failed."
+        exit 1
+    }
+    if (-not $SkipReliabilitySignal) {
+        Write-Host "Running unified reliability signal gate..."
+        $reliabilityArgs = @()
+        if (-not $SkipRequireControlFamilies) {
+            $reliabilityArgs += @(
+                "-RequireRPAModeSwitch",
+                "-RequireIntentSpec",
+                "-RequireNoiseEscalation"
+            )
+        } else {
+            Write-Warning "SkipRequireControlFamilies enabled: unified reliability gate will not require RPA/intent/noise families."
+        }
+        .\scripts\check_reliability_signal.ps1 @reliabilityArgs
+        if ($LASTEXITCODE -ne 0) {
+            Write-Error "Unified reliability signal gate failed."
+            exit 1
+        }
+        if (Test-Path "runs\\reliability_signal_latest.json") {
+            .\scripts\set_latest_pointer.ps1 -RunDir "runs\\reliability_signal_latest.json" -PointerPath "runs\\latest_reliability_signal" | Out-Host
+        }
+    } else {
+        Write-Host "Skipping unified reliability signal gate (-SkipReliabilitySignal)."
     }
 }
