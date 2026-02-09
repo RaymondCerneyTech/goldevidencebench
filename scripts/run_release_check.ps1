@@ -737,17 +737,15 @@ if (-not $SkipThresholds) {
     }
     if (-not $SkipReliabilitySignal) {
         Write-Host "Running unified reliability signal gate..."
-        $reliabilityArgs = @()
+        $reliabilityParams = @{}
         if (-not $SkipRequireControlFamilies) {
-            $reliabilityArgs += @(
-                "-RequireRPAModeSwitch",
-                "-RequireIntentSpec",
-                "-RequireNoiseEscalation"
-            )
+            $reliabilityParams.RequireRPAModeSwitch = $true
+            $reliabilityParams.RequireIntentSpec = $true
+            $reliabilityParams.RequireNoiseEscalation = $true
         } else {
             Write-Warning "SkipRequireControlFamilies enabled: unified reliability gate will not require RPA/intent/noise families."
         }
-        .\scripts\check_reliability_signal.ps1 @reliabilityArgs
+        .\scripts\check_reliability_signal.ps1 @reliabilityParams
         if ($LASTEXITCODE -ne 0) {
             Write-Error "Unified reliability signal gate failed."
             exit 1
