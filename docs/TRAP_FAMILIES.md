@@ -6,6 +6,9 @@ Use `.\scripts\next_trap_family.ps1` to pick the next backlog item to implement.
 
 ## Implemented
 
+- iwc_v1 (Indexed Window Chaining, frozen v1.0.0; see `configs/families/iwc_v1.lock.json`)
+- persona_invariance_v1 (holdout-only persona prompt perturbations with row-level contract invariance hard gate; scorer `scripts/score_persona_invariance.py`, generator `scripts/generate_persona_perturbations.py`, release aggregate `scripts/check_persona_invariance_gate.py`)
+
 - local_optimum_base
 - local_optimum_role_mismatch
 - local_optimum_blocking_modal
@@ -87,3 +90,9 @@ These are the next high-leverage sets in execution order.
 - [x] rpa_mode_switch: wrong-mode detection (`reason` vs `plan` vs `act`) under horizon/uncertainty/reversibility pressure. Scaffolded via `scripts/generate_rpa_mode_switch_family.py` + `scripts/score_rpa_mode_switch.py`, wrapper `scripts/run_rpa_mode_switch_family.ps1`, and checker `scripts/check_rpa_mode_switch_reliability.py`.
 - [x] intent_spec_layer: underspecified-request disambiguation with bounded clarification burden and downstream-error reduction. Scaffolded via `scripts/generate_intent_spec_family.py` + `scripts/score_intent_spec.py`, wrapper `scripts/run_intent_spec_family.ps1`, and checker `scripts/check_intent_spec_reliability.py`.
 - [x] noise_escalation: long-chain noise accumulation with correction checkpoints and recovery-latency scoring. Scaffolded via `scripts/generate_noise_escalation_family.py` + `scripts/score_noise_escalation.py`, wrapper `scripts/run_noise_escalation_family.ps1`, and checker `scripts/check_noise_escalation_reliability.py`.
+- [x] implication_coherence: consequence-chain stability under dependency, contradiction-repair, causal-vs-correlative discrimination, and propagation latency pressure. Scaffolded via `scripts/generate_implication_coherence_family.py` + `scripts/score_implication_coherence.py`, wrapper `scripts/run_implication_coherence_family.ps1`, and checker `scripts/check_implication_coherence_reliability.py`.
+- [x] agency_preserving_substitution: no-silent-substitution under reduced agency (transparency, authorization, intent preservation, and recovery). Scaffolded via `scripts/generate_agency_preserving_substitution_family.py` + `scripts/score_agency_preserving_substitution.py`, wrapper `scripts/run_agency_preserving_substitution_family.ps1`, and checker `scripts/check_agency_preserving_substitution_reliability.py`.
+
+All trap-family runners now execute persona invariance by default on holdout rows (`-RunPersonaTrap`).
+
+Reference specs: `docs/IMPLICATION_COHERENCE.md`, `docs/AGENCY_PRESERVING_SUBSTITUTION.md`.

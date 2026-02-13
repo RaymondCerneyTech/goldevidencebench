@@ -1,5 +1,5 @@
 param(
-    [ValidateSet("rpa_mode_switch", "intent_spec_layer", "noise_escalation")]
+    [ValidateSet("rpa_mode_switch", "intent_spec_layer", "noise_escalation", "implication_coherence", "agency_preserving_substitution")]
     [string]$Family,
     [string]$OutRoot = "",
     [string]$ModelPath = $env:GOLDEVIDENCEBENCH_MODEL,
@@ -7,9 +7,13 @@ param(
     [string]$Protocol = "closed_book",
     [int]$MaxSupportK = 16,
     [switch]$OverwriteFixtures,
+    [switch]$UseRealPublicFixtures,
     [ValidateSet("observe", "ramp", "target", "custom")]
     [string]$Stage = "observe",
-    [double]$CanaryAlertExactRate = 0.90
+    [double]$CanaryAlertExactRate = 0.90,
+    [switch]$FailOnCanaryWarn,
+    [bool]$RunPersonaTrap = $true,
+    [string]$PersonaProfiles = "persona_confident_expert,persona_creative_writer,persona_ultra_brief,persona_overly_helpful"
 )
 
 $ErrorActionPreference = "Stop"
@@ -131,6 +135,76 @@ function Get-ThresholdMap {
                 max_irrecoverable_drift_rate = 0.10
             }
         }
+        "implication_coherence" = @{
+            "observe" = @{
+                min_value_acc = 0.55
+                min_exact_acc = 0.55
+                min_cite_f1 = 0.35
+                min_implication_consistency_rate = 0.55
+                min_dependency_coverage = 0.55
+                min_contradiction_repair_rate = 0.55
+                min_causal_precision = 0.55
+                max_propagation_latency_steps = 5.00
+                max_implication_break_rate = 0.45
+                min_ic_score = 0.55
+            }
+            "ramp" = @{
+                min_value_acc = 0.75
+                min_exact_acc = 0.75
+                min_cite_f1 = 0.55
+                min_implication_consistency_rate = 0.75
+                min_dependency_coverage = 0.70
+                min_contradiction_repair_rate = 0.70
+                min_causal_precision = 0.70
+                max_propagation_latency_steps = 3.50
+                max_implication_break_rate = 0.25
+                min_ic_score = 0.70
+            }
+            "target" = @{
+                min_value_acc = 0.90
+                min_exact_acc = 0.90
+                min_cite_f1 = 0.80
+                min_implication_consistency_rate = 0.85
+                min_dependency_coverage = 0.85
+                min_contradiction_repair_rate = 0.80
+                min_causal_precision = 0.85
+                max_propagation_latency_steps = 2.00
+                max_implication_break_rate = 0.10
+                min_ic_score = 0.75
+            }
+        }
+        "agency_preserving_substitution" = @{
+            "observe" = @{
+                min_value_acc = 0.55
+                min_exact_acc = 0.55
+                min_cite_f1 = 0.35
+                min_substitution_transparency_rate = 0.55
+                max_unauthorized_substitution_rate = 0.45
+                min_intent_preservation_score = 0.55
+                max_agency_loss_error_rate = 0.45
+                min_recovery_success_rate = 0.50
+            }
+            "ramp" = @{
+                min_value_acc = 0.75
+                min_exact_acc = 0.75
+                min_cite_f1 = 0.55
+                min_substitution_transparency_rate = 0.75
+                max_unauthorized_substitution_rate = 0.25
+                min_intent_preservation_score = 0.75
+                max_agency_loss_error_rate = 0.25
+                min_recovery_success_rate = 0.70
+            }
+            "target" = @{
+                min_value_acc = 0.90
+                min_exact_acc = 0.90
+                min_cite_f1 = 0.80
+                min_substitution_transparency_rate = 0.90
+                max_unauthorized_substitution_rate = 0.10
+                min_intent_preservation_score = 0.90
+                max_agency_loss_error_rate = 0.10
+                min_recovery_success_rate = 0.85
+            }
+        }
     }
 
     if ($StageId -eq "custom") {
@@ -176,6 +250,32 @@ function Get-ThresholdArgs {
                 "--max-irrecoverable-drift-rate", "$($Floors.max_irrecoverable_drift_rate)"
             )
         }
+        "implication_coherence" {
+            return @(
+                "--min-value-acc", "$($Floors.min_value_acc)",
+                "--min-exact-acc", "$($Floors.min_exact_acc)",
+                "--min-cite-f1", "$($Floors.min_cite_f1)",
+                "--min-implication-consistency-rate", "$($Floors.min_implication_consistency_rate)",
+                "--min-dependency-coverage", "$($Floors.min_dependency_coverage)",
+                "--min-contradiction-repair-rate", "$($Floors.min_contradiction_repair_rate)",
+                "--min-causal-precision", "$($Floors.min_causal_precision)",
+                "--max-propagation-latency-steps", "$($Floors.max_propagation_latency_steps)",
+                "--max-implication-break-rate", "$($Floors.max_implication_break_rate)",
+                "--min-ic-score", "$($Floors.min_ic_score)"
+            )
+        }
+        "agency_preserving_substitution" {
+            return @(
+                "--min-value-acc", "$($Floors.min_value_acc)",
+                "--min-exact-acc", "$($Floors.min_exact_acc)",
+                "--min-cite-f1", "$($Floors.min_cite_f1)",
+                "--min-substitution-transparency-rate", "$($Floors.min_substitution_transparency_rate)",
+                "--max-unauthorized-substitution-rate", "$($Floors.max_unauthorized_substitution_rate)",
+                "--min-intent-preservation-score", "$($Floors.min_intent_preservation_score)",
+                "--max-agency-loss-error-rate", "$($Floors.max_agency_loss_error_rate)",
+                "--min-recovery-success-rate", "$($Floors.min_recovery_success_rate)"
+            )
+        }
     }
     throw "Unsupported family for thresholds: $FamilyId"
 }
@@ -204,6 +304,14 @@ switch ($Family) {
         $generatorScript = ".\scripts\generate_noise_escalation_family.py"
         $scorerScript = ".\scripts\score_noise_escalation.py"
     }
+    "implication_coherence" {
+        $generatorScript = ".\scripts\generate_implication_coherence_family.py"
+        $scorerScript = ".\scripts\score_implication_coherence.py"
+    }
+    "agency_preserving_substitution" {
+        $generatorScript = ".\scripts\generate_agency_preserving_substitution_family.py"
+        $scorerScript = ".\scripts\score_agency_preserving_substitution.py"
+    }
 }
 
 $anchorsData = "data\$Family\${Family}_anchors.jsonl"
@@ -229,6 +337,18 @@ if ($needGenerate) {
     Invoke-PythonChecked -StepName "generate_family" -CommandArgs $genArgs
 } else {
     Write-Host "Using existing $Family fixtures."
+}
+
+if ($UseRealPublicFixtures) {
+    Invoke-PythonChecked -StepName "generate_real_public_fixtures" -CommandArgs @(
+        ".\scripts\generate_real_public_family_fixtures.py",
+        "--family", $Family,
+        "--overwrite"
+    )
+    $anchorsData = "data\$Family\${Family}_anchors_real_public.jsonl"
+    $holdoutData = "data\$Family\${Family}_holdout_real_public.jsonl"
+    $canaryData = "data\$Family\${Family}_canary_real_public.jsonl"
+    Write-Host "Data mode: real_public"
 }
 
 $anchorsPreds = Join-Path $OutRoot "anchors_preds.jsonl"
@@ -276,6 +396,31 @@ $holdoutScoreArgs = @(
 $holdoutScoreArgs += $thresholdArgs
 $scoreHoldoutExit = Invoke-PythonSoftFail -StepName "score_holdout" -CommandArgs $holdoutScoreArgs
 
+$personaObj = $null
+$personaGatePass = $true
+if ($RunPersonaTrap) {
+    $personaSummaryPath = Join-Path $OutRoot "persona_invariance_summary.json"
+    $personaRowsPath = Join-Path $OutRoot "persona_invariance_rows.jsonl"
+    & .\scripts\run_persona_invariance_trap.ps1 `
+        -CanonicalData $holdoutData `
+        -CanonicalPreds $holdoutPreds `
+        -OutRoot $OutRoot `
+        -Adapter $Adapter `
+        -Protocol $Protocol `
+        -MaxSupportK $MaxSupportK `
+        -PersonaProfiles $PersonaProfiles `
+        -Prefix "holdout" `
+        -SummaryPath $personaSummaryPath `
+        -RowsPath $personaRowsPath
+    if (-not (Test-Path $personaSummaryPath)) {
+        $personaGatePass = $false
+    } else {
+        $personaObj = Read-JsonFile -Path $personaSummaryPath
+        $personaRate = [double]$personaObj.row_invariance_rate
+        $personaGatePass = $personaRate -ge 1.0
+    }
+}
+
 Invoke-PythonChecked -StepName "model_canary" -CommandArgs @(
     "-m", "goldevidencebench.cli", "model",
     "--data", $canaryData,
@@ -306,6 +451,10 @@ $canaryExact = [double]$canaryObj.means.exact_acc
 $canaryAlert = $canaryExact -ge $CanaryAlertExactRate
 $canaryStatus = if ($canaryAlert) { "WARN" } else { "OK" }
 $releaseStageApproved = $Stage -eq "target"
+$enforceCanaryGate = [bool]$FailOnCanaryWarn -or $releaseStageApproved
+$canaryGatePass = -not $canaryAlert
+$hardGatePass = $hardGatePass -and ((-not $enforceCanaryGate) -or $canaryGatePass)
+$hardGatePass = $hardGatePass -and $personaGatePass
 
 $combined = [ordered]@{
     benchmark = $Family
@@ -317,14 +466,37 @@ $combined = [ordered]@{
     provenance = [ordered]@{
         release_stage_required = "target"
         release_stage_approved = $releaseStageApproved
+        canary_gate_enforced = $enforceCanaryGate
     }
     effective_holdout_floors = $floors
     hard_gate_status = if ($hardGatePass) { "PASS" } else { "FAIL" }
+    canary_gate_enforced = $enforceCanaryGate
     canary_status = $canaryStatus
     canary_alert_exact_rate = $CanaryAlertExactRate
     anchors = $anchorsObj
     holdout = $holdoutObj
     canary = $canaryObj
+    persona_invariance = if ($RunPersonaTrap) {
+        if ($personaObj) {
+            $personaObj
+        } else {
+            [ordered]@{
+                status = "FAIL"
+                row_invariance_rate = 0.0
+                rows_total = 0
+                rows_changed = 0
+                failure_category = "persona_contract_drift"
+            }
+        }
+    } else {
+        [ordered]@{
+            status = "SKIP"
+            row_invariance_rate = $null
+            rows_total = 0
+            rows_changed = 0
+            enabled = $false
+        }
+    }
     canary_exact_rate = $canaryExact
     canary_alert = $canaryAlert
 }
@@ -332,7 +504,7 @@ $combined = [ordered]@{
 $combinedPath = Join-Path $OutRoot "${Family}_summary.json"
 $combined | ConvertTo-Json -Depth 16 | Set-Content -Path $combinedPath -Encoding UTF8
 Write-Host "Wrote $combinedPath"
-Write-Host ("hard_gate_status={0} canary_status={1}" -f $combined.hard_gate_status, $combined.canary_status)
+Write-Host ("hard_gate_status={0} canary_status={1} canary_gate_enforced={2}" -f $combined.hard_gate_status, $combined.canary_status, $combined.canary_gate_enforced)
 
 if (-not $hardGatePass) {
     exit 1

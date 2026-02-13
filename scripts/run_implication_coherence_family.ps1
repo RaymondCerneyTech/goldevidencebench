@@ -15,7 +15,7 @@ param(
 )
 
 & .\scripts\run_control_family_scaffold.ps1 `
-    -Family "noise_escalation" `
+    -Family "implication_coherence" `
     -OutRoot $OutRoot `
     -ModelPath $ModelPath `
     -Adapter $Adapter `

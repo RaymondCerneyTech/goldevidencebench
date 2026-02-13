@@ -912,6 +912,8 @@ def test_check_novel_continuity_reliability_pass(tmp_path: Path) -> None:
 
     payload_a = {
         "benchmark": "novel_continuity",
+        "cite_stage": "observe",
+        "canary_status": "OK",
         "hard_gate_status": "PASS",
         "anchors": {"status": "PASS", "means": {"value_acc": 0.9, "exact_acc": 0.9, "cite_f1": 0.9}},
         "holdout": {
@@ -928,6 +930,8 @@ def test_check_novel_continuity_reliability_pass(tmp_path: Path) -> None:
     }
     payload_b = {
         "benchmark": "novel_continuity",
+        "cite_stage": "observe",
+        "canary_status": "OK",
         "hard_gate_status": "PASS",
         "anchors": {"status": "PASS", "means": {"value_acc": 0.91, "exact_acc": 0.91, "cite_f1": 0.91}},
         "holdout": {
@@ -965,6 +969,8 @@ def test_check_novel_continuity_reliability_default_ignores_cite_floor(tmp_path:
 
     payload = {
         "benchmark": "novel_continuity",
+        "cite_stage": "observe",
+        "canary_status": "WARN",
         "hard_gate_status": "PASS",
         "anchors": {"status": "PASS", "means": {"value_acc": 1.0, "exact_acc": 1.0, "cite_f1": 0.0}},
         "holdout": {
@@ -1002,6 +1008,8 @@ def test_check_novel_continuity_reliability_target_stage_enforces_cite_floor(tmp
 
     payload = {
         "benchmark": "novel_continuity",
+        "cite_stage": "target",
+        "canary_status": "OK",
         "hard_gate_status": "PASS",
         "anchors": {"status": "PASS", "means": {"value_acc": 1.0, "exact_acc": 1.0, "cite_f1": 0.0}},
         "holdout": {
@@ -1959,6 +1967,8 @@ def test_check_novel_continuity_long_horizon_reliability_pass(tmp_path: Path) ->
 
     payload = {
         "benchmark": "novel_continuity_long_horizon",
+        "cite_stage": "target",
+        "canary_status": "OK",
         "hard_gate_status": "PASS",
         "anchors": {"status": "PASS", "means": {"value_acc": 1.0, "exact_acc": 1.0, "cite_f1": 1.0}},
         "holdout": {

@@ -83,16 +83,52 @@ Release check (runs pinned gates and UI stubs):
 its final gate. The script exit code is the ship/no-ship signal. Use
 `-SkipReliabilitySignal` only for diagnostics.
 
+Release check also runs persona invariance aggregation before threshold checks:
+- `runs/release_gates/persona_invariance/summary.json`
+- hard fail on `overall.min_row_invariance_rate < 1.0`
+- failure category: `persona_contract_drift`
+
 By default, the final gate now requires these control families:
 - `rpa_mode_switch`
 - `intent_spec_layer`
 - `noise_escalation`
+- `implication_coherence`
+- `agency_preserving_substitution`
+
+By default, the final gate also enforces:
+- `derived.reasoning_score >= 0.98`
+- `derived.planning_score >= 0.98`
+- `derived.intelligence_index >= 0.98`
+- `derived.implication_coherence_core >= 0.945`
+- `derived.agency_preservation_core >= 0.92`
+- real-world utility A/B eval `status=PASS` (`runs/real_world_utility_eval_latest.json`)
 
 Diagnostic-only override:
 
 ```powershell
 .\scripts\run_release_check.ps1 -SkipRequireControlFamilies
+.\scripts\run_release_check.ps1 -SkipDerivedScoreFloors
+.\scripts\run_release_check.ps1 -SkipRealWorldUtilityEval
 ```
+
+Trap-family runner knobs (default on):
+- `-RunPersonaTrap $true|$false`
+- `-PersonaProfiles "persona_confident_expert,persona_creative_writer,persona_ultra_brief,persona_overly_helpful"`
+
+On unified reliability PASS, release check now also rebuilds Codex compatibility
+artifacts and refreshes latest pointers:
+- `runs/latest_codex_compat_family_matrix`
+- `runs/latest_codex_compat_orthogonality_matrix`
+- `runs/latest_codex_compat_rpa_ablation_report`
+- `runs/latest_codex_compat_scaffold_backlog`
+- `runs/latest_codex_compat_report`
+- `runs/latest_codex_next_step_report`
+
+Instruction override soft-fail normalization:
+- `run_instruction_override_gate.ps1` writes `runs/release_gates/instruction_override_gate/sweep_status.json`.
+- Non-zero sweep exits with complete artifacts are normalized as soft-fail and do not block release by default.
+- Use `-FailOnSweepSoftFail` to make that condition blocking.
+- From release/nightly wrappers, use `-FailOnInstructionOverrideSoftFail` to escalate normalized soft-fails to hard release failure.
 
 Server-adapter variant (no local model-path loading):
 
@@ -102,6 +138,16 @@ Server-adapter variant (no local model-path loading):
 
 Gate threshold sources and artifacts are listed in [docs/GATES.md](docs/GATES.md).
 
+Real-world utility A/B evaluation (baseline vs controlled):
+
+```powershell
+.\scripts\run_real_world_utility_eval.ps1 `
+  -Adapter "goldevidencebench.adapters.llama_server_adapter:create_adapter"
+```
+
+Writes `runs/real_world_utility_eval_latest.json` and updates
+`runs/latest_real_world_utility_eval`.
+
 Latest pointers:
 - Release: `runs/latest_release` (manifest inside the run dir).
 - Regression check (if run via `run_regression_check.ps1`): `runs/latest_regression`.
@@ -109,6 +155,22 @@ Latest pointers:
 Drift wall signals:
 - Safety wall (default/latest): `runs/drift_wall_latest` (release-relevant).
 - Stress wall (optional): `runs/drift_wall_latest_stress` (diagnostic pressure test).
+
+## Manuscript Continuity Mode (retired)
+
+The manuscript/novel longform pipeline has been removed from this repository.
+
+Removed entrypoints:
+
+- `scripts/run_manuscript_mode.ps1`
+- `scripts/run_autonomous_novel_mode.ps1`
+- `scripts/run_intrinsic_fast_lane.ps1`
+- `scripts/run_longform_intrinsic_eval.ps1`
+- `scripts/evaluate_longform_intrinsic.py`
+- `scripts/generate_longform_intrinsic_tasks.py`
+- `scripts/score_longform_intrinsic.py`
+
+If you need reliability evaluation, use the active trap-family and release workflows on this page.
 
 ## Drift holdout gate
 

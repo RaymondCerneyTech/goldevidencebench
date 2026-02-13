@@ -4,7 +4,7 @@ This page lists each gate or benchmark, where its thresholds live, and the artif
 Treat the linked config files as the source of truth for PASS/FAIL semantics.
 
 Terminology note: "commit policy" (aka selector/reranker) is the chooser that picks which candidate commits to state. Script and env var names still use "selector".
-Gates are constraint checks: they don’t prevent optimization, they ensure optimization respects the contract.
+Gates are constraint checks: they don't prevent optimization, they ensure optimization respects the contract.
 
 ## Core gates and benchmarks
 
@@ -21,18 +21,46 @@ Gates are constraint checks: they don’t prevent optimization, they ensure opti
 | --- | --- | --- | --- |
 | Instruction override | `.\scripts\run_instruction_override_gate.ps1` | `configs/usecase_checks.json` (`instruction_override`) | `runs/release_gates/instruction_override_gate/summary.json` |
 | Memory verify | `python .\scripts\verify_memories.py ...` | `configs/usecase_checks.json` (`memory_verify_gate`) | `runs/release_gates/memory_verify.json` |
+| Persona invariance | `python .\scripts\check_persona_invariance_gate.py` (invoked by `.\scripts\run_release_check.ps1`) | `configs/usecase_checks.json` (`persona_invariance_gate`, `overall.min_row_invariance_rate >= 1.0`) | `runs/release_gates/persona_invariance/summary.json` |
 | Update burst release gate | `.\scripts\run_update_burst_full_linear_bucket10.ps1` (via release check) | `configs/usecase_checks.json` (`update_burst_release_gate`) | `runs/release_gates/update_burst_full_linear_k16_bucket5_rate0.12/summary.json` |
 | Bad actor holdout gate | `.\scripts\run_bad_actor_holdout_gate.ps1` | `configs/bad_actor_holdout_list.json` + `configs/usecase_checks.json` (`bad_actor_holdout_gate`) | `runs/bad_actor_holdout_latest/summary.json` |
 | UI same_label stub | `.\scripts\run_ui_same_label_stub.ps1` | `configs/usecase_checks.json` (`ui_same_label_gate`) | `runs/ui_same_label_gate.json` |
 | UI popup_overlay stub | `.\scripts\run_ui_popup_overlay_stub.ps1` | `configs/usecase_checks.json` (`ui_popup_overlay_gate`) | `runs/ui_popup_overlay_gate.json` |
-| Unified reliability signal | `.\scripts\check_reliability_signal.ps1` (invoked by `.\scripts\run_release_check.ps1`) | strict + family reliability summaries; default requires `rpa_mode_switch`, `intent_spec_layer`, `noise_escalation` | `runs/reliability_signal_latest.json` |
+| Unified reliability signal | `.\scripts\check_reliability_signal.ps1` (invoked by `.\scripts\run_release_check.ps1`) | strict + family reliability summaries; default requires `rpa_mode_switch`, `intent_spec_layer`, `noise_escalation`, `implication_coherence`, `agency_preserving_substitution`, and enforces `derived.reasoning/planning/intelligence >= 0.98` plus implication/agency component floors | `runs/reliability_signal_latest.json` |
+| Codex compatibility artifacts | `python .\scripts\build_codex_compat_report.py` (invoked by `.\scripts\run_release_check.ps1` after reliability PASS) | consistency across family scaffolds/docs + orthogonality export from latest reliability files | `runs/codex_compat/family_matrix.json`, `runs/codex_compat/orthogonality_matrix.json`, `runs/codex_compat/rpa_ablation_report.json` |
+| Codex next-step report | `python .\scripts\build_codex_next_step_report.py` (invoked by `.\scripts\run_release_check.ps1` after reliability PASS) | control readiness snapshot from reliability + RPA control contract | `runs/codex_next_step_report.json` |
+| Real-world utility eval (A/B) | `.\scripts\run_real_world_utility_eval.ps1` (invoked by `.\scripts\run_release_check.ps1` unless `-SkipRealWorldUtilityEval`) | baseline vs controlled task-pack delta (`false_commit`, `correction_turns`, `clarification_burden`) | `runs/real_world_utility_eval_latest.json` |
 
 Default release/nightly contract:
 
 - `run_release_check.ps1` now requires `rpa_mode_switch`, `intent_spec_layer`,
-  and `noise_escalation` by default in the unified reliability gate.
+  `noise_escalation`, `implication_coherence`, and
+  `agency_preserving_substitution` by default in the unified reliability gate.
+- `run_release_check.ps1` now also enforces default derived-score floors:
+  `reasoning_score >= 0.98`, `planning_score >= 0.98`,
+  `intelligence_index >= 0.98`, `implication_coherence_core >= 0.945`,
+  `agency_preservation_core >= 0.92`.
+- `run_release_check.ps1` now runs the real-world utility A/B gate by default
+  (`runs/real_world_utility_eval_latest.json` must be `PASS`).
+- `run_release_check.ps1` now hard-fails on persona contract drift using the
+  consolidated persona invariance gate (`row_invariance_rate == 1.0`).
+- On unified reliability PASS, `run_release_check.ps1` also rebuilds Codex
+  compatibility outputs and updates `runs/latest_codex_compat_*` pointers.
 - `run_release_overnight.ps1` inherits the same default behavior.
-- Diagnostic-only override: `-SkipRequireControlFamilies`.
+- Diagnostic-only overrides: `-SkipRequireControlFamilies`,
+  `-SkipDerivedScoreFloors`, `-SkipRealWorldUtilityEval`.
+
+Instruction override normalization contract:
+
+- `run_instruction_override_gate.ps1` now emits `runs/release_gates/instruction_override_gate/sweep_status.json`.
+- If sweep exits non-zero but all expected artifacts exist, outcome is normalized to `soft_fail_artifacts_complete` and the gate continues.
+- Use `-FailOnSweepSoftFail` to escalate normalized soft-fail to hard fail.
+- Use `-FailOnInstructionOverrideSoftFail` on release/nightly wrappers to enforce strict behavior without calling the gate directly.
+
+Optional metric semantics:
+
+- In `configs/usecase_checks.json`, optional checks should prefer explicit `allow_missing` + `skip_if`.
+- Threshold evaluation now reports these as `N/A` (`status=not_applicable`) instead of implicit missing/skip ambiguity.
 
 Bad actor holdout defaults: `prefer_update_latest` rerank + authority filter (set in `scripts/run_bad_actor_holdout_gate.ps1`).
 

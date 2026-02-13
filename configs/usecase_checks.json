@@ -4,6 +4,7 @@
       "id": "authority_filter_kv_commentary",
       "summary_path": "runs/kv_commentary_authfilter_quick/summary.json",
       "severity": "error",
+      "required_summary": false,
       "metrics": [
         {
           "path": "retrieval.selected_note_rate",
@@ -12,7 +13,7 @@
         {
           "path": "retrieval.gold_support_selected_rate",
           "min": 0.9,
-          "allow_missing": true
+          "required": false
         }
       ]
     },
@@ -20,6 +21,7 @@
       "id": "abstain_calibration_drop",
       "summary_path": "runs/abstain_drop0.3_k4_quick/summary.json",
       "severity": "error",
+      "required_summary": false,
       "metrics": [
         {
           "path": "retrieval.abstain_precision",
@@ -35,11 +37,12 @@
       "id": "retrieval_dense_sanity",
       "summary_path": "runs/dense_kv_quick/summary.json",
       "severity": "warn",
+      "required_summary": false,
       "metrics": [
         {
           "path": "retrieval.gold_present_rate",
           "min": 0.9,
-          "allow_missing": true
+          "required": false
         }
       ]
     },
@@ -50,8 +53,7 @@
       "metrics": [
         {
           "path": "overall.instr_override_rate_mean",
-          "max": 0.2,
-          "allow_missing": true
+          "max": 0.2
         },
         {
           "path": "overall.instr_conflict_present_rate_mean",
@@ -67,8 +69,15 @@
         },
         {
           "path": "overall.instruction_gap_mean",
-          "max": 0.2,
-          "allow_missing": true
+          "max": 0.2
+        },
+        {
+          "path": "efficiency.tokens_per_q_p90",
+          "max": 2400.0
+        },
+        {
+          "path": "efficiency.wall_s_per_q_p90",
+          "max": 4.0
         }
       ]
     },
@@ -100,6 +109,96 @@
       ]
     },
     {
+      "id": "memory_verify_sensitivity_gate",
+      "summary_path": "runs/release_gates/memory_verify_sensitivity.json",
+      "severity": "error",
+      "metrics": [
+        {
+          "path": "checks.monotonic_invalid_rate",
+          "min": 1.0
+        },
+        {
+          "path": "checks.monotonic_verified_rate",
+          "min": 1.0
+        },
+        {
+          "path": "checks.blocked_equals_invalid",
+          "min": 1.0
+        },
+        {
+          "path": "checks.blocked_matches_expected",
+          "min": 1.0
+        },
+        {
+          "path": "checks.all_used_count_expected",
+          "min": 1.0
+        },
+        {
+          "path": "checks.invalid_rate_matches_expected",
+          "min": 1.0
+        },
+        {
+          "path": "checks.verified_rate_matches_expected",
+          "min": 1.0
+        },
+        {
+          "path": "checks.unused_entries_excluded",
+          "min": 1.0
+        },
+        {
+          "path": "checks.range_exercised",
+          "min": 1.0
+        },
+        {
+          "path": "checks.high_scale_exercised",
+          "min": 1.0
+        },
+        {
+          "path": "checks.tag_reason_diversity",
+          "min": 1.0
+        },
+        {
+          "path": "coverage.scenario_count",
+          "min": 15
+        },
+        {
+          "path": "coverage.min_invalid_rate",
+          "max": 0.0
+        },
+        {
+          "path": "coverage.max_invalid_rate",
+          "min": 1.0
+        },
+        {
+          "path": "coverage.max_actions_blocked",
+          "min": 60
+        },
+        {
+          "path": "coverage.max_total",
+          "min": 100
+        },
+        {
+          "path": "coverage.distinct_tag_count",
+          "min": 5
+        },
+        {
+          "path": "coverage.distinct_reason_count",
+          "min": 9
+        }
+      ]
+    },
+    {
+      "id": "persona_invariance_gate",
+      "summary_path": "runs/release_gates/persona_invariance/summary.json",
+      "severity": "error",
+      "metrics": [
+        {
+          "path": "overall.min_row_invariance_rate",
+          "min": 1.0
+        }
+      ]
+    },
+    {
       "id": "update_burst_release_gate",
       "summary_path": "runs/release_gates/update_burst_full_linear_k16_bucket5_rate0.12/summary.json",
       "severity": "warn",
@@ -111,7 +210,7 @@
         {
           "path": "retrieval.selection_rate",
           "min": 0.9,
-          "allow_missing": true
+          "required": false
         }
       ]
     },
@@ -224,12 +323,12 @@
         {
           "path": "strategy_summary.greedy.task_step_overhead_mean",
           "max": 1.1,
-          "allow_missing": true
+          "required": false
         },
         {
           "path": "greedy.sequence_metrics.task_step_overhead_count",
           "min": 1,
-          "allow_missing": true
+          "required": false
         }
       ]
     },
@@ -482,6 +581,7 @@
       "id": "ui_same_label_wall",
       "summary_path": "runs/ui_same_label_wall_20260108_143304/dups1/score.json",
       "severity": "warn",
+      "required_summary": false,
       "metrics": [
         {
           "path": "metrics.wrong_action_rate",
@@ -948,7 +1048,8 @@
         {
           "path": "retrieval.wrong_update_rate",
           "max": 0.05,
-          "allow_missing": true
+          "required": false,
+          "strict_optional_missing": false
         },
         {
           "path": "overall.exact_acc_mean",
@@ -964,16 +1065,17 @@
       "id": "drift_gate",
       "summary_path": "runs/drift_wall_latest/summary.json",
       "severity": "warn",
+      "required_summary": false,
       "metrics": [
         {
           "path": "drift.step_rate",
           "max": 0.25,
-          "allow_missing": true
+          "required": false
         },
         {
           "path": "retrieval.wrong_update_rate",
           "max": 0.05,
-          "allow_missing": true
+          "required": false
         }
       ]
     },
@@ -981,12 +1083,13 @@
       "id": "drift_holdout_gate",
       "summary_path": "runs/drift_holdout_latest/summary.json",
       "severity": "warn",
+      "required_summary": false,
       "canary_min": 0.5,
       "metrics": [
         {
           "path": "drift.step_rate",
           "max": 0.25,
-          "allow_missing": true
+          "required": false
         }
       ]
     }

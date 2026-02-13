@@ -73,6 +73,7 @@ Optional latest pointers (written by release check):
 
 - `runs/latest_instruction_override_gate`
 - `runs/latest_memory_verify_gate`
+- `runs/latest_persona_invariance_gate`
 - `runs/latest_ui_same_label_gate`
 - `runs/latest_ui_popup_overlay_gate`
 - `runs/latest_ui_minipilot_notepad_gate`
@@ -330,7 +331,7 @@ What this means:
 
 - The branch is currently release-green under the configured ship/no-ship gate.
 - The claim is bounded to these trap fixtures and thresholds; it is not a claim of universal general intelligence.
-- Target-stage claims are strongest for families already at `target` (novel continuity base + long-horizon, compression roundtrip generalization, myopic planning traps, referential indexing suite, and epistemic calibration).
+- Target-stage claims are strongest for families already at `target` (novel continuity base + long-horizon, compression roundtrip generalization, myopic planning traps, referential indexing suite, epistemic calibration, implication coherence, and agency-preserving substitution).
 - There are no remaining orthogonal families blocked at `observe` in the current release snapshot.
 - The reliability gate can now enforce derived R/P floors via `--min-reasoning-score`, `--min-planning-score`, and `--min-intelligence-index` (or the PowerShell equivalents) when you want a stricter ship contract.
 
@@ -344,12 +345,52 @@ Default release behavior now hard-requires these control families in the final u
 - `rpa_mode_switch`
 - `intent_spec_layer`
 - `noise_escalation`
+- `implication_coherence`
+- `agency_preserving_substitution`
+
+Default release behavior now also enforces derived score floors in the unified
+reliability gate:
+- `reasoning_score >= 0.98`
+- `planning_score >= 0.98`
+- `intelligence_index >= 0.98`
+- `implication_coherence_core >= 0.945`
+- `agency_preservation_core >= 0.92`
+
+Release check also runs the real-world utility A/B gate by default:
+- `.\scripts\run_real_world_utility_eval.ps1` (through the release wrapper)
+- requires `runs/real_world_utility_eval_latest.json` to report `status=PASS`
+
+Release check now also enforces persona contract invariance across trap families:
+- consolidated gate artifact: `runs/release_gates/persona_invariance/summary.json`
+- failure category: `persona_contract_drift`
+- hard threshold: `overall.min_row_invariance_rate == 1.0`
 
 Diagnostic-only override:
 
 ```powershell
 .\scripts\run_release_check.ps1 -SkipRequireControlFamilies
+.\scripts\run_release_check.ps1 -SkipDerivedScoreFloors
+.\scripts\run_release_check.ps1 -SkipRealWorldUtilityEval
 ```
+
+On unified reliability PASS, release check now also rebuilds Codex
+compatibility artifacts and refreshes latest pointers:
+- `runs/latest_codex_compat_family_matrix`
+- `runs/latest_codex_compat_orthogonality_matrix`
+- `runs/latest_codex_compat_rpa_ablation_report`
+- `runs/latest_codex_compat_scaffold_backlog`
+- `runs/latest_codex_compat_report`
+- `runs/latest_codex_next_step_report`
+
+Trap-family runners now include persona trap controls (enabled by default):
+- `-RunPersonaTrap $true|$false`
+- `-PersonaProfiles "persona_confident_expert,persona_creative_writer,persona_ultra_brief,persona_overly_helpful"`
+
+Instruction override sweep normalization:
+- `run_instruction_override_gate.ps1` writes `runs/release_gates/instruction_override_gate/sweep_status.json`.
+- A non-zero sweep with complete artifacts is normalized as `soft_fail_artifacts_complete` and does not block release by default.
+- Use `-FailOnSweepSoftFail` to escalate this to a hard failure.
+- Use `-FailOnInstructionOverrideSoftFail` on `run_release_check.ps1` / `run_release_overnight.ps1` to enforce that strict behavior at wrapper level.
 
 Optional holdout selectors in release check:
 
@@ -368,12 +409,19 @@ This wrapper:
 - detects stalls via log/CPU inactivity and retries,
 - rotates drift + bad-actor holdout selections via `runs\release_gates\overnight_holdout_rotation.json`,
 - writes summary to `runs\release_overnight_latest.json` (pointer: `runs/latest_release_overnight`),
-- enforces `rpa_mode_switch` + `intent_spec_layer` + `noise_escalation` by default through the wrapped release check.
+- enforces `rpa_mode_switch` + `intent_spec_layer` + `noise_escalation` + `implication_coherence` + `agency_preserving_substitution` by default through the wrapped release check.
+- enforces derived score floors (`reasoning/planning/intelligence >= 0.98`) plus
+  `implication_coherence_core >= 0.945` and
+  `agency_preservation_core >= 0.92` by
+  default through the wrapped release check.
+- runs the real-world utility A/B gate by default through the wrapped release check.
 
 Diagnostic-only overnight override:
 
 ```powershell
 .\scripts\run_release_overnight.ps1 -GateAdapter "goldevidencebench.adapters.llama_server_adapter:create_adapter" -SkipRequireControlFamilies
+.\scripts\run_release_overnight.ps1 -GateAdapter "goldevidencebench.adapters.llama_server_adapter:create_adapter" -SkipDerivedScoreFloors
+.\scripts\run_release_overnight.ps1 -GateAdapter "goldevidencebench.adapters.llama_server_adapter:create_adapter" -SkipRealWorldUtilityEval
 ```
 
 You can run one or many cycles:
@@ -395,14 +443,30 @@ Robustness campaign (hard mode, tighter jitter + 5-run reliability):
   -RunCount 5 `
   -MaxJitter 0.02 `
   -PromoteLatestOnPass $true `
-  -MinReasoningScore 0.90 `
-  -MinPlanningScore 0.90 `
-  -MinIntelligenceIndex 0.90
+  -MinReasoningScore 0.98 `
+  -MinPlanningScore 0.98 `
+  -MinIntelligenceIndex 0.98 `
+  -MinImplicationCoherenceCore 0.945 `
+  -MinAgencyPreservationCore 0.92
 ```
 
 This wrapper runs staged reliability campaigns across long-horizon critical
-families, promotes only target-stage PASS candidates, re-checks unified
-reliability signal, and writes a summary JSON under `runs\robustness_threshold_*.json`.
+families (including `rpa_mode_switch`, `intent_spec_layer`,
+`noise_escalation`, `implication_coherence`, and
+`agency_preserving_substitution`), promotes only target-stage
+PASS candidates, enforces no-regression against the previous unified reliability
+signal, re-checks unified reliability signal, refreshes Codex compatibility
+artifacts, and writes a summary JSON under `runs\robustness_threshold_*.json`.
+
+Real-world utility A/B evaluation (baseline vs controlled on non-fixture tasks):
+
+```powershell
+.\scripts\run_real_world_utility_eval.ps1 `
+  -Adapter "goldevidencebench.adapters.llama_server_adapter:create_adapter"
+```
+
+This writes `runs/real_world_utility_eval_latest.json` and updates
+`runs/latest_real_world_utility_eval`.
 
 Runtime RPA control snapshot (uses latest reliability outputs):
 
@@ -416,7 +480,8 @@ This produces:
 
 - `runs/rpa_control_latest.json` (mode/decision/confidence/risk contract)
 - `runs/codex_next_step_report.json` (current blockers and next actions for
-  `rpa_mode_switch`, `intent_spec_layer`, `noise_escalation`)
+  `rpa_mode_switch`, `intent_spec_layer`, `noise_escalation`,
+  `implication_coherence`, `agency_preserving_substitution`)
 
 Core benchmark (curated fixtures):
 
@@ -576,9 +641,9 @@ python .\scripts\score_epistemic_calibration_suite.py --data "data\epistemic_cal
 python .\scripts\check_epistemic_calibration_suite_reliability.py --run-dirs "<RUN_A>" "<RUN_B>" "<RUN_C>" --stage target --out "runs\epistemic_calibration_suite_reliability_latest.json"
 python .\scripts\check_reliability_signal.py --strict "runs\latest_rag_strict" --compression-reliability "runs\compression_reliability_latest.json" --novel-reliability "runs\novel_continuity_reliability_latest.json" --authority-interference-reliability "runs\authority_under_interference_reliability_latest.json"
 python .\scripts\check_reliability_signal.py --strict "runs\latest_rag_strict" --compression-reliability "runs\compression_reliability_latest.json" --novel-reliability "runs\novel_continuity_reliability_latest.json" --authority-interference-reliability "runs\authority_under_interference_reliability_latest.json" --compression-roundtrip-reliability "runs\compression_roundtrip_generalization_reliability_latest.json" --require-compression-roundtrip --novel-long-horizon-reliability "runs\novel_continuity_long_horizon_reliability_latest.json" --require-novel-long-horizon --myopic-planning-reliability "runs\myopic_planning_traps_reliability_latest.json" --require-myopic-planning --referential-indexing-reliability "runs\referential_indexing_suite_reliability_latest.json" --require-referential-indexing --epistemic-reliability "runs\epistemic_calibration_suite_reliability_latest.json" --require-epistemic --authority-hardening-reliability "runs\authority_under_interference_hardening_reliability_latest.json" --require-authority-hardening
-python .\scripts\check_reliability_signal.py --strict "runs\latest_rag_strict" --compression-reliability "runs\compression_reliability_latest.json" --novel-reliability "runs\novel_continuity_reliability_latest.json" --authority-interference-reliability "runs\authority_under_interference_reliability_latest.json" --compression-roundtrip-reliability "runs\compression_roundtrip_generalization_reliability_latest.json" --require-compression-roundtrip --novel-long-horizon-reliability "runs\novel_continuity_long_horizon_reliability_latest.json" --require-novel-long-horizon --myopic-planning-reliability "runs\myopic_planning_traps_reliability_latest.json" --require-myopic-planning --referential-indexing-reliability "runs\referential_indexing_suite_reliability_latest.json" --require-referential-indexing --epistemic-reliability "runs\epistemic_calibration_suite_reliability_latest.json" --require-epistemic --authority-hardening-reliability "runs\authority_under_interference_hardening_reliability_latest.json" --require-authority-hardening --min-reasoning-score 0.90 --min-planning-score 0.90 --min-intelligence-index 0.90
+python .\scripts\check_reliability_signal.py --strict "runs\latest_rag_strict" --compression-reliability "runs\compression_reliability_latest.json" --novel-reliability "runs\novel_continuity_reliability_latest.json" --authority-interference-reliability "runs\authority_under_interference_reliability_latest.json" --compression-roundtrip-reliability "runs\compression_roundtrip_generalization_reliability_latest.json" --require-compression-roundtrip --novel-long-horizon-reliability "runs\novel_continuity_long_horizon_reliability_latest.json" --require-novel-long-horizon --myopic-planning-reliability "runs\myopic_planning_traps_reliability_latest.json" --require-myopic-planning --referential-indexing-reliability "runs\referential_indexing_suite_reliability_latest.json" --require-referential-indexing --epistemic-reliability "runs\epistemic_calibration_suite_reliability_latest.json" --require-epistemic --authority-hardening-reliability "runs\authority_under_interference_hardening_reliability_latest.json" --require-authority-hardening --min-reasoning-score 0.98 --min-planning-score 0.98 --min-intelligence-index 0.98
 .\scripts\run_family_stage_triplet.ps1 -Family myopic_planning_traps -Stage target -RunCount 5 -MaxJitter 0.02 -Adapter "goldevidencebench.adapters.llama_server_adapter:create_adapter" -PromoteLatestOnPass
-.\scripts\run_robustness_threshold.ps1 -Adapter "goldevidencebench.adapters.llama_server_adapter:create_adapter" -Stage target -RunCount 5 -MaxJitter 0.02 -PromoteLatestOnPass $true
+.\scripts\run_robustness_threshold.ps1 -Adapter "goldevidencebench.adapters.llama_server_adapter:create_adapter" -Stage target -RunCount 5 -MaxJitter 0.02 -PromoteLatestOnPass $true -MinReasoningScore 0.98 -MinPlanningScore 0.98 -MinIntelligenceIndex 0.98
 python .\scripts\build_codex_compat_report.py
 Get-Content "runs\codex_compat\scaffold_backlog.json"
 .\scripts\check_reliability_signal.ps1

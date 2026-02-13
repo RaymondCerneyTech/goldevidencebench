@@ -10,7 +10,9 @@ param(
         "authority_under_interference_hardening",
         "rpa_mode_switch",
         "intent_spec_layer",
-        "noise_escalation"
+        "noise_escalation",
+        "implication_coherence",
+        "agency_preserving_substitution"
     )]
     [string]$Family,
     [ValidateSet("observe", "ramp", "target", "custom")]
@@ -19,7 +21,10 @@ param(
     [int]$RunCount = 3,
     [int]$SleepSeconds = 2,
     [switch]$OverwriteFirstRun = $true,
+    [switch]$UseRealPublicFixtures,
     [double]$MaxJitter = -1.0,
+    [bool]$RunPersonaTrap = $true,
+    [string]$PersonaProfiles = "persona_confident_expert,persona_creative_writer,persona_ultra_brief,persona_overly_helpful",
     [string[]]$CheckerExtraArgs = @(),
     [switch]$ContinueOnRunFailure,
     [string]$Out = "",
@@ -40,6 +45,8 @@ $runScriptMap = @{
     "rpa_mode_switch" = ".\scripts\run_rpa_mode_switch_family.ps1"
     "intent_spec_layer" = ".\scripts\run_intent_spec_family.ps1"
     "noise_escalation" = ".\scripts\run_noise_escalation_family.ps1"
+    "implication_coherence" = ".\scripts\run_implication_coherence_family.ps1"
+    "agency_preserving_substitution" = ".\scripts\run_agency_preserving_substitution_family.ps1"
 }
 
 $checkerMap = @{
@@ -54,6 +61,8 @@ $checkerMap = @{
     "rpa_mode_switch" = ".\scripts\check_rpa_mode_switch_reliability.py"
     "intent_spec_layer" = ".\scripts\check_intent_spec_reliability.py"
     "noise_escalation" = ".\scripts\check_noise_escalation_reliability.py"
+    "implication_coherence" = ".\scripts\check_implication_coherence_reliability.py"
+    "agency_preserving_substitution" = ".\scripts\check_agency_preserving_substitution_reliability.py"
 }
 
 $latestMap = @{
@@ -68,6 +77,8 @@ $latestMap = @{
     "rpa_mode_switch" = "runs\rpa_mode_switch_reliability_latest.json"
     "intent_spec_layer" = "runs\intent_spec_layer_reliability_latest.json"
     "noise_escalation" = "runs\noise_escalation_reliability_latest.json"
+    "implication_coherence" = "runs\implication_coherence_reliability_latest.json"
+    "agency_preserving_substitution" = "runs\agency_preserving_substitution_reliability_latest.json"
 }
 
 $stageModeMap = @{
@@ -82,6 +93,8 @@ $stageModeMap = @{
     "rpa_mode_switch" = "stage"
     "intent_spec_layer" = "stage"
     "noise_escalation" = "stage"
+    "implication_coherence" = "stage"
+    "agency_preserving_substitution" = "stage"
 }
 
 $runner = $runScriptMap[$Family]
@@ -118,6 +131,13 @@ for ($i = 1; $i -le $RunCount; $i++) {
     if (($i -eq 1) -and $OverwriteFirstRun) {
         $runArgs.OverwriteFixtures = $true
     }
+    if ($UseRealPublicFixtures) {
+        $runArgs.UseRealPublicFixtures = $true
+    }
+    $runArgs.RunPersonaTrap = $RunPersonaTrap
+    if (-not [string]::IsNullOrWhiteSpace($PersonaProfiles)) {
+        $runArgs.PersonaProfiles = $PersonaProfiles
+    }
 
     & $runner @runArgs
     $runExit = $LASTEXITCODE
@@ -143,9 +163,25 @@ if ($stageMode -eq "stage") {
     $checkerArgs += @("--cite-stage", $Stage)
 }
 if ($MaxJitter -ge 0.0) {
-    $checkerArgs += @("--max-value-acc-jitter", "$MaxJitter")
-    $checkerArgs += @("--max-exact-acc-jitter", "$MaxJitter")
-    $checkerArgs += @("--max-cite-f1-jitter", "$MaxJitter")
+    $baseJitterFamilies = @(
+        "compression_roundtrip_generalization",
+        "myopic_planning_traps",
+        "referential_indexing_suite",
+        "novel_continuity",
+        "novel_continuity_long_horizon",
+        "authority_under_interference",
+        "authority_under_interference_hardening",
+        "rpa_mode_switch",
+        "intent_spec_layer",
+        "noise_escalation",
+        "implication_coherence",
+        "agency_preserving_substitution"
+    )
+    if ($baseJitterFamilies -contains $Family) {
+        $checkerArgs += @("--max-value-acc-jitter", "$MaxJitter")
+        $checkerArgs += @("--max-exact-acc-jitter", "$MaxJitter")
+        $checkerArgs += @("--max-cite-f1-jitter", "$MaxJitter")
+    }
     if ($Family -eq "myopic_planning_traps") {
         $checkerArgs += @("--max-horizon-success-jitter", "$MaxJitter")
         $checkerArgs += @("--max-recovery-rate-jitter", "$MaxJitter")
@@ -169,12 +205,30 @@ if ($MaxJitter -ge 0.0) {
         $checkerArgs += @("--max-noise-slope-jitter", "$MaxJitter")
         $checkerArgs += @("--max-recovery-latency-jitter", "$MaxJitter")
         $checkerArgs += @("--max-irrecoverable-drift-jitter", "$MaxJitter")
+    } elseif ($Family -eq "implication_coherence") {
+        $checkerArgs += @("--max-implication-consistency-jitter", "$MaxJitter")
+        $checkerArgs += @("--max-dependency-coverage-jitter", "$MaxJitter")
+        $checkerArgs += @("--max-contradiction-repair-jitter", "$MaxJitter")
+        $checkerArgs += @("--max-causal-precision-jitter", "$MaxJitter")
+        $checkerArgs += @("--max-propagation-latency-jitter", "$MaxJitter")
+        $checkerArgs += @("--max-implication-break-jitter", "$MaxJitter")
+        $checkerArgs += @("--max-ic-score-jitter", "$MaxJitter")
+    } elseif ($Family -eq "agency_preserving_substitution") {
+        $checkerArgs += @("--max-substitution-transparency-jitter", "$MaxJitter")
+        $checkerArgs += @("--max-unauthorized-substitution-jitter", "$MaxJitter")
+        $checkerArgs += @("--max-intent-preservation-jitter", "$MaxJitter")
+        $checkerArgs += @("--max-agency-loss-error-jitter", "$MaxJitter")
+        $checkerArgs += @("--max-recovery-success-jitter", "$MaxJitter")
     }
 }
 if ($CheckerExtraArgs.Count -gt 0) {
     $checkerArgs += $CheckerExtraArgs
 }
 $checkerArgs += @("--out", $Out)
+
+if (Test-Path $Out) {
+    Remove-Item -Path $Out -Force
+}
 
 python @checkerArgs | Out-Host
 $checkerExit = $LASTEXITCODE
@@ -187,8 +241,19 @@ if ($checkerExit -ne 0) {
 }
 
 $status = "MISSING"
-if (Test-Path $Out) {
-    $status = (Get-Content -Raw -Path $Out | ConvertFrom-Json).status
+if (($checkerExit -eq 0) -or (Test-Path $Out)) {
+    if (Test-Path $Out) {
+        try {
+            $status = (Get-Content -Raw -Path $Out | ConvertFrom-Json).status
+        } catch {
+            $status = "INVALID"
+        }
+    } else {
+        $status = "MISSING"
+    }
+}
+if (($checkerExit -ne 0) -and ($status -eq "MISSING")) {
+    $status = "CHECKER_ERROR"
 }
 Write-Host "$Family stage=$Stage candidate status: $status"
 Write-Host "Candidate: $Out"
@@ -197,9 +262,11 @@ if ($PromoteLatestOnPass) {
     $promotionAllowed = ($stageMode -eq "none") -or ($Stage -eq "target")
     if (-not $promotionAllowed) {
         Write-Warning "Promotion skipped: only target stage can be promoted to *_latest for staged families."
-    } elseif ($status -eq "PASS") {
+    } elseif (($status -eq "PASS") -and ($checkerExit -eq 0)) {
         Copy-Item -Path $Out -Destination $latestPath -Force
         Write-Host "PROMOTED -> $latestPath"
+    } elseif ($status -eq "PASS") {
+        Write-Warning "Promotion skipped: checker exited non-zero."
     } else {
         Write-Warning "Target candidate failed; latest not updated."
     }

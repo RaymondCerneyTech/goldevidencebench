@@ -5,6 +5,7 @@ param(
     [string]$Protocol = "closed_book",
     [int]$MaxSupportK = 16,
     [switch]$OverwriteFixtures,
+    [switch]$UseRealPublicFixtures,
     [ValidateSet("observe","ramp","target","custom")]
     [string]$CiteStage = "observe",
     [double]$AnchorsMinValueAcc = 0.80,
@@ -27,7 +28,10 @@ param(
     [double]$HoldoutMinHighContradictionAcc = 0.80,
     [double]$HoldoutMinDelayedDependencyAcc = 0.80,
     [double]$HoldoutMinRepairTransitionAcc = 0.80,
-    [double]$CanaryAlertExactRate = 0.90
+    [double]$CanaryAlertExactRate = 0.90,
+    [switch]$FailOnCanaryWarn,
+    [bool]$RunPersonaTrap = $true,
+    [string]$PersonaProfiles = "persona_confident_expert,persona_creative_writer,persona_ultra_brief,persona_overly_helpful"
 )
 
 $ErrorActionPreference = "Stop"
@@ -88,6 +92,18 @@ if ($needGenerate) {
     Write-Host "Using existing novel_continuity_long_horizon fixtures."
 }
 
+if ($UseRealPublicFixtures) {
+    Invoke-PythonChecked -StepName "generate_real_public_fixtures" -CommandArgs @(
+        ".\scripts\generate_real_public_family_fixtures.py",
+        "--family", "novel_continuity_long_horizon",
+        "--overwrite"
+    )
+    $anchorsData = "data\novel_continuity_long_horizon\novel_continuity_long_horizon_anchors_real_public.jsonl"
+    $holdoutData = "data\novel_continuity_long_horizon\novel_continuity_long_horizon_holdout_real_public.jsonl"
+    $canaryData = "data\novel_continuity_long_horizon\novel_continuity_long_horizon_canary_real_public.jsonl"
+    Write-Host "Data mode: real_public"
+}
+
 $anchorsPreds = Join-Path $OutRoot "anchors_preds.jsonl"
 $holdoutPreds = Join-Path $OutRoot "holdout_preds.jsonl"
 $canaryPreds = Join-Path $OutRoot "canary_preds.jsonl"
@@ -111,7 +127,7 @@ Invoke-PythonChecked -StepName "score_anchors" -CommandArgs @(
     "--out", $anchorsSummary,
     "--rows-out", (Join-Path $OutRoot "anchors_rows.jsonl"),
     "--min-value-acc", "$AnchorsMinValueAcc",
-    "--min-exact-acc", "$AnchorsMinExactAcc",
+    "--min-value-exact-acc", "$AnchorsMinExactAcc",
     "--min-cite-f1", "$effectiveAnchorsMinCiteF1",
     "--min-identity-acc", "$AnchorsMinIdentityAcc",
     "--min-timeline-acc", "$AnchorsMinTimelineAcc",
@@ -138,7 +154,7 @@ Invoke-PythonChecked -StepName "score_holdout" -CommandArgs @(
     "--out", $holdoutSummary,
     "--rows-out", (Join-Path $OutRoot "holdout_rows.jsonl"),
     "--min-value-acc", "$HoldoutMinValueAcc",
-    "--min-exact-acc", "$HoldoutMinExactAcc",
+    "--min-value-exact-acc", "$HoldoutMinExactAcc",
     "--min-cite-f1", "$effectiveHoldoutMinCiteF1",
     "--min-identity-acc", "$HoldoutMinIdentityAcc",
     "--min-timeline-acc", "$HoldoutMinTimelineAcc",
@@ -148,6 +164,31 @@ Invoke-PythonChecked -StepName "score_holdout" -CommandArgs @(
     "--min-delayed-dependency-acc", "$HoldoutMinDelayedDependencyAcc",
     "--min-repair-transition-acc", "$HoldoutMinRepairTransitionAcc"
 )
+
+$personaObj = $null
+$personaGatePass = $true
+if ($RunPersonaTrap) {
+    $personaSummaryPath = Join-Path $OutRoot "persona_invariance_summary.json"
+    $personaRowsPath = Join-Path $OutRoot "persona_invariance_rows.jsonl"
+    & .\scripts\run_persona_invariance_trap.ps1 `
+        -CanonicalData $holdoutData `
+        -CanonicalPreds $holdoutPreds `
+        -OutRoot $OutRoot `
+        -Adapter $Adapter `
+        -Protocol $Protocol `
+        -MaxSupportK $MaxSupportK `
+        -PersonaProfiles $PersonaProfiles `
+        -Prefix "holdout" `
+        -SummaryPath $personaSummaryPath `
+        -RowsPath $personaRowsPath
+    if (-not (Test-Path $personaSummaryPath)) {
+        $personaGatePass = $false
+    } else {
+        $personaObj = Read-JsonFile -Path $personaSummaryPath
+        $personaRate = [double]$personaObj.row_invariance_rate
+        $personaGatePass = $personaRate -ge 1.0
+    }
+}
 
 Invoke-PythonChecked -StepName "model_canary" -CommandArgs @(
     "-m", "goldevidencebench.cli", "model",
@@ -170,10 +211,18 @@ $anchorsObj = Read-JsonFile -Path $anchorsSummary
 $holdoutObj = Read-JsonFile -Path $holdoutSummary
 $canaryObj = Read-JsonFile -Path $canarySummary
 
-$hardGatePass = ($anchorsObj.status -eq "PASS") -and ($holdoutObj.status -eq "PASS")
-$canaryExact = [double]$canaryObj.means.exact_acc
+$anchorsHoldoutPass = ($anchorsObj.status -eq "PASS") -and ($holdoutObj.status -eq "PASS")
+$canaryExact = if ($canaryObj.means.PSObject.Properties.Name -contains "value_exact_acc") {
+    [double]$canaryObj.means.value_exact_acc
+} else {
+    [double]$canaryObj.means.exact_acc
+}
 $canaryAlert = $canaryExact -ge $CanaryAlertExactRate
 $canaryStatus = if ($canaryAlert) { "WARN" } else { "OK" }
+$enforceCanaryGate = [bool]$FailOnCanaryWarn -or ($CiteStage -eq "target")
+$canaryGatePass = -not $canaryAlert
+$hardGatePass = $anchorsHoldoutPass -and ((-not $enforceCanaryGate) -or $canaryGatePass)
+$hardGatePass = $hardGatePass -and $personaGatePass
 $releaseStageApproved = $CiteStage -eq "target"
 
 $combined = [ordered]@{
@@ -183,18 +232,43 @@ $combined = [ordered]@{
     adapter = $Adapter
     protocol = $Protocol
     hard_gate_status = if ($hardGatePass) { "PASS" } else { "FAIL" }
+    anchors_holdout_status = if ($anchorsHoldoutPass) { "PASS" } else { "FAIL" }
+    canary_gate_enforced = $enforceCanaryGate
+    canary_gate_status = if ($canaryGatePass) { "PASS" } else { "FAIL" }
     canary_status = $canaryStatus
     canary_alert_exact_rate = $CanaryAlertExactRate
     cite_stage = $CiteStage
     provenance = [ordered]@{
         release_stage_required = "target"
         release_stage_approved = $releaseStageApproved
+        canary_gate_enforced = $enforceCanaryGate
     }
     effective_anchors_min_cite_f1 = $effectiveAnchorsMinCiteF1
     effective_holdout_min_cite_f1 = $effectiveHoldoutMinCiteF1
     anchors = $anchorsObj
     holdout = $holdoutObj
     canary = $canaryObj
+    persona_invariance = if ($RunPersonaTrap) {
+        if ($personaObj) {
+            $personaObj
+        } else {
+            [ordered]@{
+                status = "FAIL"
+                row_invariance_rate = 0.0
+                rows_total = 0
+                rows_changed = 0
+                failure_category = "persona_contract_drift"
+            }
+        }
+    } else {
+        [ordered]@{
+            status = "SKIP"
+            row_invariance_rate = $null
+            rows_total = 0
+            rows_changed = 0
+            enabled = $false
+        }
+    }
     canary_exact_rate = $canaryExact
     canary_alert = $canaryAlert
 }
@@ -202,7 +276,7 @@ $combined = [ordered]@{
 $combinedPath = Join-Path $OutRoot "novel_continuity_long_horizon_summary.json"
 $combined | ConvertTo-Json -Depth 12 | Set-Content -Path $combinedPath -Encoding UTF8
 Write-Host "Wrote $combinedPath"
-Write-Host ("hard_gate_status={0} canary_status={1}" -f $combined.hard_gate_status, $combined.canary_status)
+Write-Host ("hard_gate_status={0} canary_status={1} canary_gate_enforced={2}" -f $combined.hard_gate_status, $combined.canary_status, $combined.canary_gate_enforced)
 
 if (-not $hardGatePass) {
     exit 1

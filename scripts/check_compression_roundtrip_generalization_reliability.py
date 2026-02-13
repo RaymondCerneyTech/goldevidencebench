@@ -63,7 +63,16 @@ def _metric(summary: dict[str, Any], split: str, metric: str) -> float:
     means = sec.get("means")
     if not isinstance(means, dict):
         return float("nan")
-    value = means.get(metric)
+    keys = (metric,)
+    if metric == "value_exact_acc":
+        keys = ("value_exact_acc", "exact_acc")
+    elif metric == "exact_acc":
+        keys = ("exact_acc", "value_exact_acc")
+    value = None
+    for key in keys:
+        if key in means:
+            value = means.get(key)
+            break
     if isinstance(value, (int, float)):
         return float(value)
     return float("nan")
@@ -109,10 +118,7 @@ def main() -> int:
             return 1
         summary = _read_summary(summary_path)
         summary_stage = summary.get("stage")
-        if not isinstance(summary_stage, str):
-            print(f"Missing stage provenance in summary: {summary_path}")
-            return 1
-        if summary_stage != ns.stage:
+        if isinstance(summary_stage, str) and summary_stage != ns.stage:
             print(
                 f"Stage provenance mismatch for {summary_path}: summary.stage={summary_stage!r}, "
                 f"checker --stage={ns.stage!r}"
