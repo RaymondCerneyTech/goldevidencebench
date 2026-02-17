@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -21,6 +22,24 @@ def _parse_args() -> argparse.Namespace:
         help=(
             "Strict run selector: latest pointer file, strict run directory, or "
             "summary JSON path. Default: runs/latest_rag_strict"
+        ),
+    )
+    parser.add_argument(
+        "--profile",
+        choices=("fastlocal", "release"),
+        default="release",
+        help=(
+            "Reliability policy profile. "
+            "`release` enforces full family matrix when require flags are set by wrapper; "
+            "`fastlocal` allows partial matrix for iteration."
+        ),
+    )
+    parser.add_argument(
+        "--allow-mock-canary-soft-fail",
+        action="store_true",
+        help=(
+            "Downgrade canary-only family reliability FAIL statuses to WARN. "
+            "Intended for fastlocal iteration with mock adapters."
         ),
     )
     parser.add_argument(
@@ -139,6 +158,28 @@ def _parse_args() -> argparse.Namespace:
         "--require-noise-escalation",
         action="store_true",
         help="Require noise-escalation reliability summary to exist and PASS.",
+    )
+    parser.add_argument(
+        "--implication-coherence-reliability",
+        type=Path,
+        default=Path("runs/implication_coherence_reliability_latest.json"),
+        help="Path to implication-coherence reliability summary JSON.",
+    )
+    parser.add_argument(
+        "--require-implication-coherence",
+        action="store_true",
+        help="Require implication-coherence reliability summary to exist and PASS.",
+    )
+    parser.add_argument(
+        "--agency-preserving-substitution-reliability",
+        type=Path,
+        default=Path("runs/agency_preserving_substitution_reliability_latest.json"),
+        help="Path to agency-preserving-substitution reliability summary JSON.",
+    )
+    parser.add_argument(
+        "--require-agency-preserving-substitution",
+        action="store_true",
+        help="Require agency-preserving-substitution reliability summary to exist and PASS.",
     )
     parser.add_argument("--min-value-acc", type=float, default=0.95)
     parser.add_argument("--min-exact-acc", type=float, default=0.95)
@@ -333,6 +374,59 @@ def _holdout_means_from_family_reliability(
     return holdout_means, None
 
 
+def _canary_only_reliability_failure(reliability_summary: dict[str, Any]) -> bool:
+    status = str(reliability_summary.get("status", "")).upper()
+    if status != "FAIL":
+        return False
+    raw_failures = reliability_summary.get("failures")
+    if not isinstance(raw_failures, list) or not raw_failures:
+        return False
+    failures = [str(item).strip().lower() for item in raw_failures if str(item).strip()]
+    if not failures:
+        return False
+    only_canary_or_hard_gate_fail = True
+    has_canary_marker = False
+    has_hard_gate_marker = False
+    for message in failures:
+        if "canary.exact_rate" in message:
+            has_canary_marker = True
+            continue
+        if "hard_gate_status" in message and "!= pass" in message:
+            has_hard_gate_marker = True
+            continue
+        only_canary_or_hard_gate_fail = False
+        break
+    if not only_canary_or_hard_gate_fail or (not has_canary_marker and not has_hard_gate_marker):
+        return False
+
+    runs = reliability_summary.get("runs")
+    family_id = _reliability_benchmark_to_family(reliability_summary)
+    if not isinstance(runs, list) or not runs or not family_id:
+        return has_canary_marker
+    latest_run = runs[-1]
+    if not isinstance(latest_run, str) or not latest_run.strip():
+        return has_canary_marker
+
+    summary_path = Path(latest_run) / f"{family_id}_summary.json"
+    if not summary_path.exists():
+        return has_canary_marker
+    try:
+        run_summary = _read_json(summary_path)
+    except Exception:  # noqa: BLE001
+        return has_canary_marker
+
+    anchors_status = str(run_summary.get("anchors", {}).get("status", "")).upper()
+    holdout_status = str(run_summary.get("holdout", {}).get("status", "")).upper()
+    hard_gate_status = str(run_summary.get("hard_gate_status", "")).upper()
+    canary_status = str(run_summary.get("canary_status", "")).upper()
+    if anchors_status == "PASS" and holdout_status == "PASS":
+        if canary_status in {"WARN", "FAIL"}:
+            return True
+        if hard_gate_status == "FAIL" and canary_status in {"", "OK"}:
+            return True
+    return has_canary_marker
+
+
 def _metric_check(
     *,
     name: str,
@@ -361,6 +455,8 @@ def _derive_scores(
     epistemic_means: dict[str, float] | None,
     authority_means: dict[str, float] | None,
     compression_roundtrip_means: dict[str, float] | None,
+    implication_coherence_means: dict[str, float] | None,
+    agency_preservation_means: dict[str, float] | None,
 ) -> dict[str, Any]:
     strict_core = _average(
         [
@@ -428,6 +524,33 @@ def _derive_scores(
             if value is not None
         ]
     )
+    implication_coherence_core = _average(
+        [
+            value
+            for value in [
+                _normalized_metric(implication_coherence_means, "ic_score"),
+                _normalized_metric(implication_coherence_means, "implication_consistency_rate"),
+                _normalized_metric(implication_coherence_means, "dependency_coverage"),
+                _normalized_metric(implication_coherence_means, "contradiction_repair_rate"),
+                _normalized_metric(implication_coherence_means, "causal_precision"),
+                _normalized_metric(implication_coherence_means, "implication_break_rate", invert=True),
+            ]
+            if value is not None
+        ]
+    )
+    agency_preservation_core = _average(
+        [
+            value
+            for value in [
+                _normalized_metric(agency_preservation_means, "substitution_transparency_rate"),
+                _normalized_metric(agency_preservation_means, "unauthorized_substitution_rate", invert=True),
+                _normalized_metric(agency_preservation_means, "intent_preservation_score"),
+                _normalized_metric(agency_preservation_means, "agency_loss_error_rate", invert=True),
+                _normalized_metric(agency_preservation_means, "recovery_success_rate"),
+            ]
+            if value is not None
+        ]
+    )
 
     reasoning_components = {
         "strict_core": strict_core,
@@ -435,6 +558,8 @@ def _derive_scores(
         "authority_core": authority_core,
         "referential_core": referential_core,
         "compression_roundtrip_core": compression_roundtrip_core,
+        "implication_coherence_core": implication_coherence_core,
+        "agency_preservation_core": agency_preservation_core,
     }
     reasoning_score = _average([v for v in reasoning_components.values() if v is not None])
 
@@ -505,7 +630,12 @@ def _derive_scores(
 def main() -> int:
     ns = _parse_args()
     lines: list[str] = ["Reliability signal check"]
+    lines.append(f"Profile: {ns.profile}")
     failures: list[str] = []
+    cli_args = set(sys.argv[1:])
+
+    def _arg_provided(flag: str) -> bool:
+        return flag in cli_args
 
     try:
         strict_summary_path, strict_summary = _resolve_strict_summary(ns.strict)
@@ -533,7 +663,10 @@ def main() -> int:
 
     compression_roundtrip_summary: dict[str, Any] | None = None
     compression_roundtrip_read_error = ""
-    if ns.compression_roundtrip_reliability.exists():
+    probe_compression_roundtrip = ns.require_compression_roundtrip or _arg_provided(
+        "--compression-roundtrip-reliability"
+    )
+    if probe_compression_roundtrip and ns.compression_roundtrip_reliability.exists():
         try:
             compression_roundtrip_summary = _read_json(ns.compression_roundtrip_reliability)
         except Exception as exc:  # noqa: BLE001
@@ -543,7 +676,10 @@ def main() -> int:
 
     long_horizon_summary: dict[str, Any] | None = None
     long_horizon_read_error = ""
-    if ns.novel_long_horizon_reliability.exists():
+    probe_novel_long_horizon = ns.require_novel_long_horizon or _arg_provided(
+        "--novel-long-horizon-reliability"
+    )
+    if probe_novel_long_horizon and ns.novel_long_horizon_reliability.exists():
         try:
             long_horizon_summary = _read_json(ns.novel_long_horizon_reliability)
         except Exception as exc:  # noqa: BLE001
@@ -553,7 +689,8 @@ def main() -> int:
 
     myopic_planning_summary: dict[str, Any] | None = None
     myopic_planning_read_error = ""
-    if ns.myopic_planning_reliability.exists():
+    probe_myopic_planning = ns.require_myopic_planning or _arg_provided("--myopic-planning-reliability")
+    if probe_myopic_planning and ns.myopic_planning_reliability.exists():
         try:
             myopic_planning_summary = _read_json(ns.myopic_planning_reliability)
         except Exception as exc:  # noqa: BLE001
@@ -563,7 +700,10 @@ def main() -> int:
 
     referential_summary: dict[str, Any] | None = None
     referential_read_error = ""
-    if ns.referential_indexing_reliability.exists():
+    probe_referential_indexing = ns.require_referential_indexing or _arg_provided(
+        "--referential-indexing-reliability"
+    )
+    if probe_referential_indexing and ns.referential_indexing_reliability.exists():
         try:
             referential_summary = _read_json(ns.referential_indexing_reliability)
         except Exception as exc:  # noqa: BLE001
@@ -573,7 +713,8 @@ def main() -> int:
 
     epistemic_summary: dict[str, Any] | None = None
     epistemic_read_error = ""
-    if ns.epistemic_reliability.exists():
+    probe_epistemic = ns.require_epistemic or _arg_provided("--epistemic-reliability")
+    if probe_epistemic and ns.epistemic_reliability.exists():
         try:
             epistemic_summary = _read_json(ns.epistemic_reliability)
         except Exception as exc:  # noqa: BLE001
@@ -583,7 +724,10 @@ def main() -> int:
 
     authority_hardening_summary: dict[str, Any] | None = None
     authority_hardening_read_error = ""
-    if ns.authority_hardening_reliability.exists():
+    probe_authority_hardening = ns.require_authority_hardening or _arg_provided(
+        "--authority-hardening-reliability"
+    )
+    if probe_authority_hardening and ns.authority_hardening_reliability.exists():
         try:
             authority_hardening_summary = _read_json(ns.authority_hardening_reliability)
         except Exception as exc:  # noqa: BLE001
@@ -593,7 +737,8 @@ def main() -> int:
 
     rpa_mode_switch_summary: dict[str, Any] | None = None
     rpa_mode_switch_read_error = ""
-    if ns.rpa_mode_switch_reliability.exists():
+    probe_rpa_mode_switch = ns.require_rpa_mode_switch or _arg_provided("--rpa-mode-switch-reliability")
+    if probe_rpa_mode_switch and ns.rpa_mode_switch_reliability.exists():
         try:
             rpa_mode_switch_summary = _read_json(ns.rpa_mode_switch_reliability)
         except Exception as exc:  # noqa: BLE001
@@ -603,7 +748,8 @@ def main() -> int:
 
     intent_spec_summary: dict[str, Any] | None = None
     intent_spec_read_error = ""
-    if ns.intent_spec_reliability.exists():
+    probe_intent_spec = ns.require_intent_spec or _arg_provided("--intent-spec-reliability")
+    if probe_intent_spec and ns.intent_spec_reliability.exists():
         try:
             intent_spec_summary = _read_json(ns.intent_spec_reliability)
         except Exception as exc:  # noqa: BLE001
@@ -613,13 +759,42 @@ def main() -> int:
 
     noise_escalation_summary: dict[str, Any] | None = None
     noise_escalation_read_error = ""
-    if ns.noise_escalation_reliability.exists():
+    probe_noise_escalation = ns.require_noise_escalation or _arg_provided("--noise-escalation-reliability")
+    if probe_noise_escalation and ns.noise_escalation_reliability.exists():
         try:
             noise_escalation_summary = _read_json(ns.noise_escalation_reliability)
         except Exception as exc:  # noqa: BLE001
             noise_escalation_read_error = str(exc)
     elif ns.require_noise_escalation:
         noise_escalation_read_error = f"missing file: {ns.noise_escalation_reliability}"
+
+    implication_coherence_summary: dict[str, Any] | None = None
+    implication_coherence_read_error = ""
+    probe_implication_coherence = ns.require_implication_coherence or _arg_provided(
+        "--implication-coherence-reliability"
+    )
+    if probe_implication_coherence and ns.implication_coherence_reliability.exists():
+        try:
+            implication_coherence_summary = _read_json(ns.implication_coherence_reliability)
+        except Exception as exc:  # noqa: BLE001
+            implication_coherence_read_error = str(exc)
+    elif ns.require_implication_coherence:
+        implication_coherence_read_error = f"missing file: {ns.implication_coherence_reliability}"
+
+    agency_preserving_substitution_summary: dict[str, Any] | None = None
+    agency_preserving_substitution_read_error = ""
+    probe_agency_preserving_substitution = ns.require_agency_preserving_substitution or _arg_provided(
+        "--agency-preserving-substitution-reliability"
+    )
+    if probe_agency_preserving_substitution and ns.agency_preserving_substitution_reliability.exists():
+        try:
+            agency_preserving_substitution_summary = _read_json(ns.agency_preserving_substitution_reliability)
+        except Exception as exc:  # noqa: BLE001
+            agency_preserving_substitution_read_error = str(exc)
+    elif ns.require_agency_preserving_substitution:
+        agency_preserving_substitution_read_error = (
+            f"missing file: {ns.agency_preserving_substitution_reliability}"
+        )
 
     lines.append(f"Strict summary: {strict_summary_path}")
     lines.append(f"Compression reliability: {ns.compression_reliability}")
@@ -634,6 +809,43 @@ def main() -> int:
     lines.append(f"RPA mode-switch reliability: {ns.rpa_mode_switch_reliability}")
     lines.append(f"Intent-spec reliability: {ns.intent_spec_reliability}")
     lines.append(f"Noise-escalation reliability: {ns.noise_escalation_reliability}")
+    lines.append(f"Implication-coherence reliability: {ns.implication_coherence_reliability}")
+    lines.append(
+        "Agency-preserving-substitution reliability: "
+        f"{ns.agency_preserving_substitution_reliability}"
+    )
+
+    def _append_family_status(
+        label: str,
+        summary: dict[str, Any] | None,
+        *,
+        failure_key: str,
+        required: bool,
+        read_error: str = "",
+    ) -> None:
+        if summary is not None:
+            status = str(summary.get("status", ""))
+            ok = status == "PASS"
+            if (
+                not ok
+                and ns.profile == "fastlocal"
+                and ns.allow_mock_canary_soft_fail
+                and _canary_only_reliability_failure(summary)
+            ):
+                lines.append(f"[WARN] {label}.status={status} (canary-only soft-fail in fastlocal profile)")
+                return
+            lines.append(f"[{'PASS' if ok else 'FAIL'}] {label}.status={status}")
+            if not ok:
+                failures.append(failure_key)
+            return
+        if required:
+            lines.append(f"[FAIL] {label}.status=<missing> ({read_error})")
+            failures.append(f"{failure_key} missing")
+            return
+        if read_error:
+            lines.append(f"[SKIP] {label}.status - unreadable optional artifact ({read_error})")
+        else:
+            lines.append(f"[SKIP] {label}.status - optional artifact missing")
 
     strict_status = strict_summary.get("status")
     strict_ok = strict_status == "PASS"
@@ -698,207 +910,101 @@ def main() -> int:
                 if not ok:
                     failures.append(f"strict.{dataset_id}.exact_acc != 1.0")
 
-    comp_status = compression_summary.get("status")
-    comp_ok = comp_status == "PASS"
-    lines.append(f"[{'PASS' if comp_ok else 'FAIL'}] compression.status={comp_status}")
-    if not comp_ok:
-        failures.append("compression_reliability.status != PASS")
-
-    novel_status = novel_summary.get("status")
-    novel_ok = novel_status == "PASS"
-    lines.append(f"[{'PASS' if novel_ok else 'FAIL'}] novel_continuity.status={novel_status}")
-    if not novel_ok:
-        failures.append("novel_continuity_reliability.status != PASS")
-
-    authority_status = authority_summary.get("status")
-    authority_ok = authority_status == "PASS"
-    lines.append(
-        f"[{'PASS' if authority_ok else 'FAIL'}] authority_under_interference.status={authority_status}"
+    _append_family_status(
+        "compression",
+        compression_summary,
+        failure_key="compression_reliability.status != PASS",
+        required=True,
     )
-    if not authority_ok:
-        failures.append("authority_under_interference_reliability.status != PASS")
-
-    if compression_roundtrip_summary is not None:
-        compression_roundtrip_status = compression_roundtrip_summary.get("status")
-        compression_roundtrip_ok = compression_roundtrip_status == "PASS"
-        lines.append(
-            f"[{'PASS' if compression_roundtrip_ok else 'FAIL'}] compression_roundtrip_generalization.status={compression_roundtrip_status}"
-        )
-        if not compression_roundtrip_ok:
-            failures.append("compression_roundtrip_generalization_reliability.status != PASS")
-    elif ns.require_compression_roundtrip:
-        lines.append(
-            f"[FAIL] compression_roundtrip_generalization.status=<missing> ({compression_roundtrip_read_error})"
-        )
-        failures.append("compression_roundtrip_generalization_reliability missing")
-    else:
-        if compression_roundtrip_read_error:
-            lines.append(
-                "[SKIP] compression_roundtrip_generalization.status - "
-                f"unreadable optional artifact ({compression_roundtrip_read_error})"
-            )
-        else:
-            lines.append("[SKIP] compression_roundtrip_generalization.status - optional artifact missing")
-
-    if long_horizon_summary is not None:
-        long_horizon_status = long_horizon_summary.get("status")
-        long_horizon_ok = long_horizon_status == "PASS"
-        lines.append(
-            f"[{'PASS' if long_horizon_ok else 'FAIL'}] novel_continuity_long_horizon.status={long_horizon_status}"
-        )
-        if not long_horizon_ok:
-            failures.append("novel_continuity_long_horizon_reliability.status != PASS")
-    elif ns.require_novel_long_horizon:
-        lines.append(
-            f"[FAIL] novel_continuity_long_horizon.status=<missing> ({long_horizon_read_error})"
-        )
-        failures.append("novel_continuity_long_horizon_reliability missing")
-    else:
-        if long_horizon_read_error:
-            lines.append(
-                f"[SKIP] novel_continuity_long_horizon.status - unreadable optional artifact ({long_horizon_read_error})"
-            )
-        else:
-            lines.append("[SKIP] novel_continuity_long_horizon.status - optional artifact missing")
-
-    if myopic_planning_summary is not None:
-        myopic_planning_status = myopic_planning_summary.get("status")
-        myopic_planning_ok = myopic_planning_status == "PASS"
-        lines.append(
-            f"[{'PASS' if myopic_planning_ok else 'FAIL'}] myopic_planning_traps.status={myopic_planning_status}"
-        )
-        if not myopic_planning_ok:
-            failures.append("myopic_planning_traps_reliability.status != PASS")
-    elif ns.require_myopic_planning:
-        lines.append(
-            f"[FAIL] myopic_planning_traps.status=<missing> ({myopic_planning_read_error})"
-        )
-        failures.append("myopic_planning_traps_reliability missing")
-    else:
-        if myopic_planning_read_error:
-            lines.append(
-                f"[SKIP] myopic_planning_traps.status - unreadable optional artifact ({myopic_planning_read_error})"
-            )
-        else:
-            lines.append("[SKIP] myopic_planning_traps.status - optional artifact missing")
-
-    if referential_summary is not None:
-        referential_status = referential_summary.get("status")
-        referential_ok = referential_status == "PASS"
-        lines.append(
-            f"[{'PASS' if referential_ok else 'FAIL'}] referential_indexing_suite.status={referential_status}"
-        )
-        if not referential_ok:
-            failures.append("referential_indexing_suite_reliability.status != PASS")
-    elif ns.require_referential_indexing:
-        lines.append(
-            f"[FAIL] referential_indexing_suite.status=<missing> ({referential_read_error})"
-        )
-        failures.append("referential_indexing_suite_reliability missing")
-    else:
-        if referential_read_error:
-            lines.append(
-                f"[SKIP] referential_indexing_suite.status - unreadable optional artifact ({referential_read_error})"
-            )
-        else:
-            lines.append("[SKIP] referential_indexing_suite.status - optional artifact missing")
-
-    if epistemic_summary is not None:
-        epistemic_status = epistemic_summary.get("status")
-        epistemic_ok = epistemic_status == "PASS"
-        lines.append(
-            f"[{'PASS' if epistemic_ok else 'FAIL'}] epistemic_calibration_suite.status={epistemic_status}"
-        )
-        if not epistemic_ok:
-            failures.append("epistemic_calibration_suite_reliability.status != PASS")
-    elif ns.require_epistemic:
-        lines.append(
-            f"[FAIL] epistemic_calibration_suite.status=<missing> ({epistemic_read_error})"
-        )
-        failures.append("epistemic_calibration_suite_reliability missing")
-    else:
-        if epistemic_read_error:
-            lines.append(
-                f"[SKIP] epistemic_calibration_suite.status - unreadable optional artifact ({epistemic_read_error})"
-            )
-        else:
-            lines.append("[SKIP] epistemic_calibration_suite.status - optional artifact missing")
-
-    if authority_hardening_summary is not None:
-        authority_hardening_status = authority_hardening_summary.get("status")
-        authority_hardening_ok = authority_hardening_status == "PASS"
-        lines.append(
-            f"[{'PASS' if authority_hardening_ok else 'FAIL'}] authority_under_interference_hardening.status={authority_hardening_status}"
-        )
-        if not authority_hardening_ok:
-            failures.append("authority_under_interference_hardening_reliability.status != PASS")
-    elif ns.require_authority_hardening:
-        lines.append(
-            f"[FAIL] authority_under_interference_hardening.status=<missing> ({authority_hardening_read_error})"
-        )
-        failures.append("authority_under_interference_hardening_reliability missing")
-    else:
-        if authority_hardening_read_error:
-            lines.append(
-                f"[SKIP] authority_under_interference_hardening.status - unreadable optional artifact ({authority_hardening_read_error})"
-            )
-        else:
-            lines.append("[SKIP] authority_under_interference_hardening.status - optional artifact missing")
-
-    if rpa_mode_switch_summary is not None:
-        rpa_mode_switch_status = rpa_mode_switch_summary.get("status")
-        rpa_mode_switch_ok = rpa_mode_switch_status == "PASS"
-        lines.append(
-            f"[{'PASS' if rpa_mode_switch_ok else 'FAIL'}] rpa_mode_switch.status={rpa_mode_switch_status}"
-        )
-        if not rpa_mode_switch_ok:
-            failures.append("rpa_mode_switch_reliability.status != PASS")
-    elif ns.require_rpa_mode_switch:
-        lines.append(f"[FAIL] rpa_mode_switch.status=<missing> ({rpa_mode_switch_read_error})")
-        failures.append("rpa_mode_switch_reliability missing")
-    else:
-        if rpa_mode_switch_read_error:
-            lines.append(
-                f"[SKIP] rpa_mode_switch.status - unreadable optional artifact ({rpa_mode_switch_read_error})"
-            )
-        else:
-            lines.append("[SKIP] rpa_mode_switch.status - optional artifact missing")
-
-    if intent_spec_summary is not None:
-        intent_spec_status = intent_spec_summary.get("status")
-        intent_spec_ok = intent_spec_status == "PASS"
-        lines.append(f"[{'PASS' if intent_spec_ok else 'FAIL'}] intent_spec_layer.status={intent_spec_status}")
-        if not intent_spec_ok:
-            failures.append("intent_spec_layer_reliability.status != PASS")
-    elif ns.require_intent_spec:
-        lines.append(f"[FAIL] intent_spec_layer.status=<missing> ({intent_spec_read_error})")
-        failures.append("intent_spec_layer_reliability missing")
-    else:
-        if intent_spec_read_error:
-            lines.append(
-                f"[SKIP] intent_spec_layer.status - unreadable optional artifact ({intent_spec_read_error})"
-            )
-        else:
-            lines.append("[SKIP] intent_spec_layer.status - optional artifact missing")
-
-    if noise_escalation_summary is not None:
-        noise_escalation_status = noise_escalation_summary.get("status")
-        noise_escalation_ok = noise_escalation_status == "PASS"
-        lines.append(
-            f"[{'PASS' if noise_escalation_ok else 'FAIL'}] noise_escalation.status={noise_escalation_status}"
-        )
-        if not noise_escalation_ok:
-            failures.append("noise_escalation_reliability.status != PASS")
-    elif ns.require_noise_escalation:
-        lines.append(f"[FAIL] noise_escalation.status=<missing> ({noise_escalation_read_error})")
-        failures.append("noise_escalation_reliability missing")
-    else:
-        if noise_escalation_read_error:
-            lines.append(
-                f"[SKIP] noise_escalation.status - unreadable optional artifact ({noise_escalation_read_error})"
-            )
-        else:
-            lines.append("[SKIP] noise_escalation.status - optional artifact missing")
+    _append_family_status(
+        "novel_continuity",
+        novel_summary,
+        failure_key="novel_continuity_reliability.status != PASS",
+        required=True,
+    )
+    _append_family_status(
+        "authority_under_interference",
+        authority_summary,
+        failure_key="authority_under_interference_reliability.status != PASS",
+        required=True,
+    )
+    _append_family_status(
+        "compression_roundtrip_generalization",
+        compression_roundtrip_summary,
+        failure_key="compression_roundtrip_generalization_reliability.status != PASS",
+        required=ns.require_compression_roundtrip,
+        read_error=compression_roundtrip_read_error,
+    )
+    _append_family_status(
+        "novel_continuity_long_horizon",
+        long_horizon_summary,
+        failure_key="novel_continuity_long_horizon_reliability.status != PASS",
+        required=ns.require_novel_long_horizon,
+        read_error=long_horizon_read_error,
+    )
+    _append_family_status(
+        "myopic_planning_traps",
+        myopic_planning_summary,
+        failure_key="myopic_planning_traps_reliability.status != PASS",
+        required=ns.require_myopic_planning,
+        read_error=myopic_planning_read_error,
+    )
+    _append_family_status(
+        "referential_indexing_suite",
+        referential_summary,
+        failure_key="referential_indexing_suite_reliability.status != PASS",
+        required=ns.require_referential_indexing,
+        read_error=referential_read_error,
+    )
+    _append_family_status(
+        "epistemic_calibration_suite",
+        epistemic_summary,
+        failure_key="epistemic_calibration_suite_reliability.status != PASS",
+        required=ns.require_epistemic,
+        read_error=epistemic_read_error,
+    )
+    _append_family_status(
+        "authority_under_interference_hardening",
+        authority_hardening_summary,
+        failure_key="authority_under_interference_hardening_reliability.status != PASS",
+        required=ns.require_authority_hardening,
+        read_error=authority_hardening_read_error,
+    )
+    _append_family_status(
+        "rpa_mode_switch",
+        rpa_mode_switch_summary,
+        failure_key="rpa_mode_switch_reliability.status != PASS",
+        required=ns.require_rpa_mode_switch,
+        read_error=rpa_mode_switch_read_error,
+    )
+    _append_family_status(
+        "intent_spec_layer",
+        intent_spec_summary,
+        failure_key="intent_spec_layer_reliability.status != PASS",
+        required=ns.require_intent_spec,
+        read_error=intent_spec_read_error,
+    )
+    _append_family_status(
+        "noise_escalation",
+        noise_escalation_summary,
+        failure_key="noise_escalation_reliability.status != PASS",
+        required=ns.require_noise_escalation,
+        read_error=noise_escalation_read_error,
+    )
+    _append_family_status(
+        "implication_coherence",
+        implication_coherence_summary,
+        failure_key="implication_coherence_reliability.status != PASS",
+        required=ns.require_implication_coherence,
+        read_error=implication_coherence_read_error,
+    )
+    _append_family_status(
+        "agency_preserving_substitution",
+        agency_preserving_substitution_summary,
+        failure_key="agency_preserving_substitution_reliability.status != PASS",
+        required=ns.require_agency_preserving_substitution,
+        read_error=agency_preserving_substitution_read_error,
+    )
 
     novel_holdout_means, novel_holdout_means_error = _holdout_means_from_family_reliability(novel_summary)
     long_horizon_holdout_means, long_horizon_holdout_means_error = _holdout_means_from_family_reliability(
@@ -919,6 +1025,12 @@ def main() -> int:
     authority_holdout_means, authority_holdout_means_error = _holdout_means_from_family_reliability(
         authority_hardening_summary if authority_hardening_summary is not None else authority_summary
     )
+    implication_holdout_means, implication_holdout_means_error = _holdout_means_from_family_reliability(
+        implication_coherence_summary
+    )
+    agency_holdout_means, agency_holdout_means_error = _holdout_means_from_family_reliability(
+        agency_preserving_substitution_summary
+    )
 
     derived_scores = _derive_scores(
         strict_means=means,
@@ -929,6 +1041,8 @@ def main() -> int:
         epistemic_means=epistemic_holdout_means,
         authority_means=authority_holdout_means,
         compression_roundtrip_means=compression_roundtrip_holdout_means,
+        implication_coherence_means=implication_holdout_means,
+        agency_preservation_means=agency_holdout_means,
     )
 
     reasoning_score = derived_scores["reasoning_score"]
@@ -1010,6 +1124,8 @@ def main() -> int:
 
     payload = {
         "benchmark": "reliability_signal",
+        "profile": ns.profile,
+        "allow_mock_canary_soft_fail": ns.allow_mock_canary_soft_fail,
         "strict_summary_path": str(strict_summary_path),
         "compression_reliability_path": str(ns.compression_reliability),
         "novel_continuity_reliability_path": str(ns.novel_reliability),
@@ -1032,6 +1148,12 @@ def main() -> int:
         "require_intent_spec": ns.require_intent_spec,
         "noise_escalation_reliability_path": str(ns.noise_escalation_reliability),
         "require_noise_escalation": ns.require_noise_escalation,
+        "implication_coherence_reliability_path": str(ns.implication_coherence_reliability),
+        "require_implication_coherence": ns.require_implication_coherence,
+        "agency_preserving_substitution_reliability_path": str(
+            ns.agency_preserving_substitution_reliability
+        ),
+        "require_agency_preserving_substitution": ns.require_agency_preserving_substitution,
         "status": overall,
         "failures": failures,
         "thresholds": {
@@ -1059,6 +1181,8 @@ def main() -> int:
                 "epistemic_calibration_suite": epistemic_holdout_means_error,
                 "compression_roundtrip_generalization": compression_roundtrip_holdout_means_error,
                 "authority": authority_holdout_means_error,
+                "implication_coherence": implication_holdout_means_error,
+                "agency_preserving_substitution": agency_holdout_means_error,
             },
         },
     }

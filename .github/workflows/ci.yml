@@ -24,6 +24,11 @@ jobs:
       - name: Tests
         run: python -m pytest
 
+      - name: Validate RPA control v0.2 schema
+        run: |
+          python .\scripts\build_rpa_control_snapshot.py --out .\runs\rpa_control_latest.json
+          python .\scripts\validate_artifact.py --schema .\schemas\rpa_control_latest_v0_2.schema.json --path .\runs\rpa_control_latest.json
+
       - name: Mock adapter baseline
         shell: pwsh
         run: .\scripts\run_adapter_baseline.ps1 -Preset smoke
@@ -43,3 +48,59 @@ jobs:
             exit 0
           }
           .\scripts\check_reliability_signal.ps1
+
+  preflight_cross_app:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .
+
+      - name: Run cross-app preflight (fixture)
+        shell: pwsh
+        run: |
+          goldevidencebench preflight `
+            --profile cross_app_v1 `
+            --stage dev `
+            --data fixture `
+            --adapter "goldevidencebench.adapters.mock_adapter:create_adapter"
+
+      - name: Collect preflight artifacts
+        shell: pwsh
+        run: |
+          $artifactDir = "runs\preflight\ci_artifacts"
+          New-Item -ItemType Directory -Path $artifactDir -Force | Out-Null
+
+          Copy-Item "runs\preflight\latest.json" (Join-Path $artifactDir "latest.json") -Force
+
+          $packDir = "runs\preflight\cross_app_v1"
+          Copy-Item (Join-Path $packDir "cross_app_intent_preservation_pack_summary.json") `
+            (Join-Path $artifactDir "cross_app_intent_preservation_pack_summary.json") -Force
+          Copy-Item (Join-Path $packDir "cross_app_intent_preservation_pack_rows.jsonl") `
+            (Join-Path $artifactDir "cross_app_intent_preservation_pack_rows.jsonl") -Force
+
+          $pointerPath = "runs\latest_cross_app_intent_preservation_pack"
+          if (Test-Path $pointerPath) {
+            $target = (Get-Content $pointerPath -Raw).Trim()
+            Set-Content (Join-Path $artifactDir "latest_cross_app_intent_preservation_pack.pointer.txt") $target
+            if ($target -and (Test-Path $target)) {
+              Copy-Item $target (Join-Path $artifactDir "latest_cross_app_intent_preservation_pack.target.json") -Force
+            }
+          }
+
+      - name: Upload preflight artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: preflight-cross-app-artifacts
+          path: runs/preflight/ci_artifacts
+          if-no-files-found: error

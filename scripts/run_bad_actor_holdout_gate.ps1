@@ -78,7 +78,8 @@ if (-not $finalRunsDir) {
 }
 New-Item -ItemType Directory -Path $finalRunsDir -Force | Out-Null
 
-if (-not ($Adapter -like "*llama_server_adapter*")) {
+$adapterUsesExternalModelService = ($Adapter -like "*llama_server_adapter*") -or ($Adapter -like "*mock_adapter*")
+if (-not $adapterUsesExternalModelService) {
     if (-not $ModelPath) {
         Write-Error "Set -ModelPath or GOLDEVIDENCEBENCH_MODEL before running."
         exit 1

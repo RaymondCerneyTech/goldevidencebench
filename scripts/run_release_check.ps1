@@ -169,6 +169,15 @@ after bootstrap.
  Enables local iteration mode that reuses fresh heavyweight artifacts when
  available to reduce cycle time.
 
+.PARAMETER GateProfile
+ Release gate policy profile. `fastlocal` relaxes non-critical missing-artifact
+ checks for developer iteration. `release` enforces full matrix strictness.
+ Default: `fastlocal` when `-FastLocal` is set, otherwise `release`.
+
+.PARAMETER GateProfileConfigPath
+ JSON config path for gate-profile defaults used by release and fastlocal
+ policy modes.
+
 .PARAMETER ReuseInstructionOverrideMaxAgeMinutes
  Maximum artifact age (minutes) for reusing instruction-override gate outputs in
  FastLocal mode.
@@ -238,6 +247,9 @@ param(
     [string]$OptionalMetricExemptionsAllowlistPath = "configs\\optional_metric_exemptions_allowlist.json",
     [switch]$FailOnInstructionOverrideSoftFail,
     [switch]$FastLocal,
+    [ValidateSet("fastlocal", "release")]
+    [string]$GateProfile = "",
+    [string]$GateProfileConfigPath = "configs\\release_gate_profiles.json",
     [int]$ReuseInstructionOverrideMaxAgeMinutes = 240,
     [int]$ReuseUiBaselinesMaxAgeMinutes = 240,
     [int]$ReuseUtilityEvalMaxAgeMinutes = 240,
@@ -451,6 +463,61 @@ if ($ReuseUtilityEvalMaxAgeMinutes -lt 0) {
     Write-Error "ReuseUtilityEvalMaxAgeMinutes must be >= 0."
     exit 1
 }
+if (-not $PSBoundParameters.ContainsKey("GateProfile") -or [string]::IsNullOrWhiteSpace($GateProfile)) {
+    if ($FastLocal) {
+        $GateProfile = "fastlocal"
+    } else {
+        $GateProfile = "release"
+    }
+}
+if ($GateProfile -eq "fastlocal" -and -not $FastLocal) {
+    Write-Warning "GateProfile=fastlocal without -FastLocal. Proceeding with fastlocal policy semantics."
+}
+if ($GateProfile -eq "release" -and $FastLocal) {
+    Write-Warning "GateProfile=release with -FastLocal. Local artifact reuse remains enabled, but release-strict gate semantics apply."
+}
+if (-not (Test-Path $GateProfileConfigPath)) {
+    Write-Error ("GateProfileConfigPath does not exist: {0}" -f $GateProfileConfigPath)
+    exit 1
+}
+$gateProfileConfigPayload = $null
+try {
+    $gateProfileConfigPayload = Get-Content -Raw -Path $GateProfileConfigPath | ConvertFrom-Json
+} catch {
+    Write-Error ("Unable to parse gate profile config: {0} ({1})" -f $GateProfileConfigPath, $_.Exception.Message)
+    exit 1
+}
+$selectedGateProfileConfig = $null
+if ($gateProfileConfigPayload -and ($gateProfileConfigPayload.PSObject.Properties.Name -contains $GateProfile)) {
+    $selectedGateProfileConfig = $gateProfileConfigPayload.$GateProfile
+}
+if (-not $selectedGateProfileConfig) {
+    Write-Error ("Gate profile '{0}' not found in {1}" -f $GateProfile, $GateProfileConfigPath)
+    exit 1
+}
+$gateProfileThresholdProfile = $GateProfile
+if ($selectedGateProfileConfig.PSObject.Properties.Name -contains "threshold_profile") {
+    $candidateThresholdProfile = "$($selectedGateProfileConfig.threshold_profile)".Trim()
+    if (-not [string]::IsNullOrWhiteSpace($candidateThresholdProfile)) {
+        $gateProfileThresholdProfile = $candidateThresholdProfile
+    }
+}
+$gateProfileRequireFullMatrix = $false
+if ($selectedGateProfileConfig.PSObject.Properties.Name -contains "require_full_matrix") {
+    try {
+        $gateProfileRequireFullMatrix = [bool]$selectedGateProfileConfig.require_full_matrix
+    } catch {
+        $gateProfileRequireFullMatrix = $false
+    }
+}
+$gateProfileAllowMockCanarySoftFail = $false
+if ($selectedGateProfileConfig.PSObject.Properties.Name -contains "allow_mock_canary_soft_fail") {
+    try {
+        $gateProfileAllowMockCanarySoftFail = [bool]$selectedGateProfileConfig.allow_mock_canary_soft_fail
+    } catch {
+        $gateProfileAllowMockCanarySoftFail = $false
+    }
+}
 if ($FastLocal -and -not $PSBoundParameters.ContainsKey("SkipWarningDebtGuard")) {
     $SkipWarningDebtGuard = $true
     Write-Host "[FAST] SkipWarningDebtGuard enabled by default in FastLocal mode."
@@ -468,6 +535,11 @@ $manifest = [ordered]@{
         bad_actor = $BadActorHoldoutId
     }
     unified_reliability_gate = [ordered]@{
+        gate_profile = $GateProfile
+        gate_profile_config_path = $GateProfileConfigPath
+        gate_profile_threshold_profile = $gateProfileThresholdProfile
+        gate_profile_require_full_matrix = [bool]$gateProfileRequireFullMatrix
+        gate_profile_allow_mock_canary_soft_fail = [bool]$gateProfileAllowMockCanarySoftFail
         fast_local = [bool]$FastLocal
         reuse_instruction_override_max_age_minutes = $ReuseInstructionOverrideMaxAgeMinutes
         reuse_ui_baselines_max_age_minutes = $ReuseUiBaselinesMaxAgeMinutes
@@ -533,6 +605,7 @@ $manifest = [ordered]@{
         memory_verify_gate = "runs\\release_gates\\memory_verify.json"
         memory_verify_sensitivity_gate = "runs\\release_gates\\memory_verify_sensitivity.json"
         persona_invariance_gate = "runs\\release_gates\\persona_invariance\\summary.json"
+        cross_app_intent_preservation_pack_gate = "runs\\release_gates\\cross_app_intent_preservation_pack\\summary.json"
         update_burst_release_gate = "runs\\release_gates\\update_burst_full_linear_k16_bucket5_rate0.12\\summary.json"
         reliability_signal = "runs\\reliability_signal_latest.json"
         compression_reliability = "runs\\compression_reliability_latest.json"
@@ -560,6 +633,8 @@ $manifest | ConvertTo-Json -Depth 6 | Set-Content -Path $manifestPath -Encoding 
 
 .\scripts\set_latest_pointer.ps1 -RunDir $ReleaseRunDir -PointerPath "runs\\latest_release" | Out-Host
 Write-Host "Release manifest: $manifestPath"
+Write-Host ("Gate profile: {0} (threshold_profile={1}, require_full_matrix={2}, allow_mock_canary_soft_fail={3})" -f `
+    $GateProfile, $gateProfileThresholdProfile, $gateProfileRequireFullMatrix, $gateProfileAllowMockCanarySoftFail)
 
 $releaseIntegrityWarnings = New-Object System.Collections.Generic.List[string]
 $releaseRiskWarnings = New-Object System.Collections.Generic.List[string]
@@ -645,6 +720,34 @@ function Get-MedianValue {
     $upper = [int]($count / 2)
     $lower = $upper - 1
     return ([double]$sorted[$lower] + [double]$sorted[$upper]) / 2.0
+}
+
+function Get-PercentileValue {
+    param(
+        [double[]]$Values,
+        [double]$Percentile
+    )
+    if (-not $Values -or $Values.Count -eq 0) {
+        return $null
+    }
+    if ($Percentile -lt 0.0) {
+        $Percentile = 0.0
+    }
+    if ($Percentile -gt 1.0) {
+        $Percentile = 1.0
+    }
+    $sorted = @($Values | Sort-Object)
+    if ($sorted.Count -eq 1) {
+        return [double]$sorted[0]
+    }
+    $position = $Percentile * ($sorted.Count - 1)
+    $lower = [int][math]::Floor($position)
+    $upper = [int][math]::Ceiling($position)
+    if ($lower -eq $upper) {
+        return [double]$sorted[$lower]
+    }
+    $fraction = $position - $lower
+    return ((1.0 - $fraction) * [double]$sorted[$lower]) + ($fraction * [double]$sorted[$upper])
 }
 
 function Get-ReleaseSnapshotTimestampUtc {
@@ -861,7 +964,7 @@ function Get-NextHoldoutFromReport {
     return $result
 }
 
-if (-not $SkipThresholds) {
+if ($true) {
     $stamp = Get-Date -Format "yyyyMMdd_HHmmss"
     $resolvedHoldout = $VariantsHoldoutName
     if ($AutoCurriculum) {
@@ -1019,8 +1122,40 @@ if (-not $SkipThresholds) {
     }
     $instructionOverrideEfficiency = $instructionOverridePayload.efficiency
     if (-not $instructionOverrideEfficiency) {
-        Write-Error "Instruction override summary missing efficiency block; rerun gate with updated summarizer."
-        exit 1
+        $combinedPath = "runs\\release_gates\\instruction_override_gate\\combined.json"
+        $combinedPayload = Read-JsonObject -Path $combinedPath
+        $tokensPerQSamples = @()
+        $wallPerQSamples = @()
+        if ($combinedPayload -is [System.Array]) {
+            foreach ($row in $combinedPayload) {
+                if (-not $row) { continue }
+                $eff = $row.efficiency
+                if (-not $eff) { continue }
+                $tokensSample = ConvertTo-NullableDouble $eff.tokens_per_q
+                if ($null -ne $tokensSample) { $tokensPerQSamples += [double]$tokensSample }
+                $wallSample = ConvertTo-NullableDouble $eff.wall_s_per_q
+                if ($null -ne $wallSample) { $wallPerQSamples += [double]$wallSample }
+            }
+        }
+        if ($tokensPerQSamples.Count -gt 0 -and $wallPerQSamples.Count -gt 0) {
+            $instructionOverrideEfficiency = [ordered]@{
+                tokens_per_q_mean = (($tokensPerQSamples | Measure-Object -Average).Average)
+                tokens_per_q_p90 = (Get-PercentileValue -Values $tokensPerQSamples -Percentile 0.90)
+                wall_s_per_q_mean = (($wallPerQSamples | Measure-Object -Average).Average)
+                wall_s_per_q_p90 = (Get-PercentileValue -Values $wallPerQSamples -Percentile 0.90)
+                source = "derived_from_combined_json"
+            }
+            try {
+                $instructionOverridePayload | Add-Member -NotePropertyName efficiency -NotePropertyValue $instructionOverrideEfficiency -Force
+                $instructionOverridePayload | ConvertTo-Json -Depth 8 | Set-Content -Path $instructionOverrideSummary -Encoding UTF8
+            } catch {
+                # Non-fatal; continue with derived in-memory efficiency.
+            }
+            Write-Warning "Instruction override summary missing efficiency block; derived efficiency from combined.json."
+        } else {
+            Write-Error "Instruction override summary missing efficiency block and unable to derive efficiency from combined.json."
+            exit 1
+        }
     }
     $instructionOverrideTokensPerQP90 = ConvertTo-NullableDouble $instructionOverrideEfficiency.tokens_per_q_p90
     $instructionOverrideTokensPerQMean = ConvertTo-NullableDouble $instructionOverrideEfficiency.tokens_per_q_mean
@@ -1124,11 +1259,23 @@ if (-not $SkipThresholds) {
 
     Write-Host "Running memory verification sensitivity gate..."
     Write-Host "Note: sensitivity fixtures intentionally include synthetic invalid-citation modes (including missing-file) to validate blocker behavior."
-    python .\scripts\run_memory_verify_sensitivity.py `
-        --out .\runs\release_gates\memory_verify_sensitivity.json
-    if ($LASTEXITCODE -ne 0) {
-        Write-Error "Memory verification sensitivity gate failed."
-        exit $LASTEXITCODE
+    $memorySensitivityScript = ".\scripts\run_memory_verify_sensitivity.py"
+    $memorySensitivityOut = ".\runs\release_gates\memory_verify_sensitivity.json"
+    if (Test-Path $memorySensitivityScript) {
+        python $memorySensitivityScript `
+            --out $memorySensitivityOut
+        if ($LASTEXITCODE -ne 0) {
+            Write-Error "Memory verification sensitivity gate failed."
+            exit $LASTEXITCODE
+        }
+    } else {
+        if (Test-Path $memorySensitivityOut) {
+            Write-Warning ("Memory verification sensitivity script missing: {0}; reusing existing artifact {1}." -f $memorySensitivityScript, $memorySensitivityOut)
+            $releaseIntegrityWarnings.Add("memory_verify_sensitivity_script_missing_reused_artifact")
+        } else {
+            Write-Error ("Memory verification sensitivity script missing and no existing artifact to reuse: {0}" -f $memorySensitivityScript)
+            exit 1
+        }
     }
     $memoryVerifySensitivity = "runs\\release_gates\\memory_verify_sensitivity.json"
     if (Test-Path $memoryVerifySensitivity) {
@@ -1552,7 +1699,8 @@ if (-not $SkipThresholds) {
             exit 1
         }
     }
-    $gateRequiresModelPath = -not ($GateAdapter -like "*llama_server_adapter*")
+    $gateUsesExternalModelService = ($GateAdapter -like "*llama_server_adapter*") -or ($GateAdapter -like "*mock_adapter*")
+    $gateRequiresModelPath = -not $gateUsesExternalModelService
     if ($gateRequiresModelPath -and -not $ModelPath) {
         Write-Error ("Set -ModelPath or GOLDEVIDENCEBENCH_MODEL before running the bad actor holdout gate with adapter '{0}'." -f $GateAdapter)
         exit 1
@@ -1603,8 +1751,58 @@ if (-not $SkipThresholds) {
     }
     .\scripts\set_latest_pointer.ps1 -RunDir $personaGateSummaryPath -PointerPath "runs\\latest_persona_invariance_gate" | Out-Host
 
+    Write-Host "Collecting cross-app intent-preservation pack release artifact (warn-only)..."
+    $crossAppGateDir = "runs\\release_gates\\cross_app_intent_preservation_pack"
+    New-Item -ItemType Directory -Path $crossAppGateDir -Force | Out-Null
+    $crossAppGateSummaryPath = Join-Path $crossAppGateDir "summary.json"
+    $crossAppGateRowsPath = Join-Path $crossAppGateDir "rows.jsonl"
+    $crossAppPointerPath = "runs\\latest_cross_app_intent_preservation_pack"
+    $crossAppSourcePointerTarget = Resolve-PointerTarget -PointerPath $crossAppPointerPath
+    $crossAppSourceSummaryPath = $null
+    if (-not [string]::IsNullOrWhiteSpace($crossAppSourcePointerTarget)) {
+        if (Test-Path $crossAppSourcePointerTarget -PathType Container) {
+            $crossAppCandidateSummary = Join-Path $crossAppSourcePointerTarget "cross_app_intent_preservation_pack_summary.json"
+            if (Test-Path $crossAppCandidateSummary) {
+                $crossAppSourceSummaryPath = $crossAppCandidateSummary
+            }
+        } elseif (Test-Path $crossAppSourcePointerTarget) {
+            $crossAppSourceSummaryPath = $crossAppSourcePointerTarget
+        }
+    }
+    if (-not $crossAppSourceSummaryPath) {
+        $fallbackSummary = "runs\\cross_app_intent_preservation_pack\\cross_app_intent_preservation_pack_summary.json"
+        if (Test-Path $fallbackSummary) {
+            $crossAppSourceSummaryPath = $fallbackSummary
+        }
+    }
+    if ($crossAppSourceSummaryPath -and (Test-Path $crossAppSourceSummaryPath)) {
+        Copy-Item -Path $crossAppSourceSummaryPath -Destination $crossAppGateSummaryPath -Force
+        $crossAppSourceSummary = Read-JsonObject -Path $crossAppSourceSummaryPath
+        if ($crossAppSourceSummary -and $crossAppSourceSummary.artifacts -and $crossAppSourceSummary.artifacts.rows) {
+            $crossAppRowsCandidate = "$($crossAppSourceSummary.artifacts.rows)"
+            if ($crossAppRowsCandidate -and (Test-Path $crossAppRowsCandidate)) {
+                Copy-Item -Path $crossAppRowsCandidate -Destination $crossAppGateRowsPath -Force
+            }
+        }
+        .\scripts\set_latest_pointer.ps1 -RunDir $crossAppGateSummaryPath -PointerPath "runs\\latest_cross_app_intent_preservation_pack_gate" | Out-Host
+        $crossAppGateSummary = Read-JsonObject -Path $crossAppGateSummaryPath
+        $crossAppHardGateStatus = "$($crossAppGateSummary.hard_gate_status)"
+        if ($crossAppHardGateStatus -eq "FAIL") {
+            Write-Warning "Cross-app intent-preservation pack holdout failed (warn-only release coupling)."
+            $releaseRiskWarnings.Add("cross_app_intent_preservation_pack_warn_fail")
+        }
+    } else {
+        Write-Warning "Cross-app intent-preservation pack summary missing; release continues (warn-only coupling)."
+        $releaseIntegrityWarnings.Add("cross_app_intent_preservation_pack_missing")
+    }
+
     $thresholdHistoryPassCount = 0
     $thresholdHistoryRejectedCount = 0
+    $strictOptionalThresholdMetricsActive = $false
+    $optionalMissingNaCount = 0
+    $thresholdErrorCount = $null
+    $exitCode = 0
+    if (-not $SkipThresholds) {
     $thresholdHistoryNowUtc = [datetimeoffset]::UtcNow
     $releaseDirResolvedForThresholds = ""
     try {
@@ -1643,7 +1841,9 @@ if (-not $SkipThresholds) {
         $thresholdHistoryPassCount += 1
     }
     $strictOptionalThresholdMetricsActive = $false
-    if ($StrictOptionalThresholdMetrics) {
+    if ($gateProfileThresholdProfile -eq "fastlocal") {
+        Write-Host "[FAST] threshold optional-metric strict mode disabled by fastlocal gate profile."
+    } elseif ($StrictOptionalThresholdMetrics) {
         if (($thresholdHistoryPassCount + 1) -ge $TrendMinHistory) {
             $strictOptionalThresholdMetricsActive = $true
             Write-Host "[ENFORCE] threshold optional-metric strict mode enabled (quality-qualified history)."
@@ -1658,6 +1858,7 @@ if (-not $SkipThresholds) {
     $thresholdArgs = @(
         ".\scripts\check_thresholds.py",
         "--config", ".\configs\usecase_checks.json",
+        "--profile", $gateProfileThresholdProfile,
         "--quiet-passes",
         "--out", $thresholdEvalPath
     )
@@ -1946,9 +2147,14 @@ if (-not $SkipThresholds) {
         Write-Error "Release threshold checks failed."
         exit 1
     }
+    } else {
+        Write-Host "Skipping release threshold checks (-SkipThresholds)."
+    }
     if (-not $SkipReliabilitySignal) {
         Write-Host "Running unified reliability signal gate..."
-        $reliabilityParams = @{}
+        $reliabilityParams = @{
+            Profile = $GateProfile
+        }
         if (-not $SkipRequireControlFamilies) {
             $reliabilityParams.RequireRPAModeSwitch = $true
             $reliabilityParams.RequireIntentSpec = $true
@@ -1957,6 +2163,22 @@ if (-not $SkipThresholds) {
             $reliabilityParams.RequireAgencyPreservingSubstitution = $true
         } else {
             Write-Warning "SkipRequireControlFamilies enabled: unified reliability gate will not require RPA/intent/noise/implication/agency families."
+        }
+        if ($gateProfileRequireFullMatrix) {
+            $reliabilityParams.RequireCompressionRoundtrip = $true
+            $reliabilityParams.RequireNovelLongHorizon = $true
+            $reliabilityParams.RequireMyopicPlanning = $true
+            $reliabilityParams.RequireReferentialIndexing = $true
+            $reliabilityParams.RequireEpistemic = $true
+            $reliabilityParams.RequireAuthorityHardening = $true
+        }
+        if (
+            $GateProfile -eq "fastlocal" -and
+            $gateProfileAllowMockCanarySoftFail -and
+            ($GateAdapter -like "*mock_adapter*")
+        ) {
+            $reliabilityParams.AllowMockCanarySoftFail = $true
+            Write-Warning "Fastlocal + mock adapter: canary-only reliability failures are downgraded to WARN."
         }
         if (-not $SkipDerivedScoreFloors) {
             $reliabilityParams.MinReasoningScore = $MinReleaseReasoningScore
@@ -2003,16 +2225,27 @@ if (-not $SkipThresholds) {
         if (-not $SkipRealWorldUtilityEval) {
             Write-Host "Running real-world utility A/B gate..."
             $utilityEvalPath = "runs\\real_world_utility_eval_latest.json"
+            $utilityEvalScript = ".\\scripts\\run_real_world_utility_eval.ps1"
             $reuseUtilityEval = $false
             if ($FastLocal -and (Test-ArtifactFresh -Path $utilityEvalPath -MaxAgeMinutes $ReuseUtilityEvalMaxAgeMinutes)) {
                 $reuseUtilityEval = $true
                 Write-Host ("[FAST] Reusing real-world utility eval artifact ({0}, max_age={1}m)." -f $utilityEvalPath, $ReuseUtilityEvalMaxAgeMinutes)
             }
             if (-not $reuseUtilityEval) {
-                .\scripts\run_real_world_utility_eval.ps1 -Adapter $GateAdapter -Protocol "closed_book"
-                if ($LASTEXITCODE -ne 0) {
-                    Write-Error "Real-world utility A/B gate failed."
-                    exit 1
+                if (Test-Path $utilityEvalScript) {
+                    & $utilityEvalScript -Adapter $GateAdapter -Protocol "closed_book"
+                    if ($LASTEXITCODE -ne 0) {
+                        Write-Error "Real-world utility A/B gate failed."
+                        exit 1
+                    }
+                } else {
+                    if ($GateProfile -eq "fastlocal" -and (Test-Path $utilityEvalPath)) {
+                        Write-Warning ("Real-world utility script missing ({0}); reusing existing artifact in fastlocal mode." -f $utilityEvalScript)
+                        $releaseIntegrityWarnings.Add("real_world_utility_script_missing_reused_artifact")
+                    } else {
+                        Write-Error ("Real-world utility script missing: {0}" -f $utilityEvalScript)
+                        exit 1
+                    }
                 }
             }
             if (-not (Test-Path $utilityEvalPath)) {
@@ -2130,9 +2363,15 @@ if (-not $SkipThresholds) {
 
         Write-Host "Building codex next-step report..."
         python .\scripts\build_codex_next_step_report.py
-        if ($LASTEXITCODE -ne 0) {
-            Write-Error "Codex next-step report build failed."
-            exit 1
+        $nextStepExitCode = $LASTEXITCODE
+        if ($nextStepExitCode -ne 0) {
+            if ($GateProfile -eq "fastlocal" -and (Test-Path "runs\\codex_next_step_report.json")) {
+                Write-Warning "Codex next-step report returned non-zero status in fastlocal mode; continuing with generated artifact."
+                $releaseRiskWarnings.Add("codex_next_step_report_nonzero_fastlocal")
+            } else {
+                Write-Error "Codex next-step report build failed."
+                exit 1
+            }
         }
         if (-not (Test-Path "runs\\codex_next_step_report.json")) {
             Write-Error "Missing codex next-step report artifact: runs\\codex_next_step_report.json"

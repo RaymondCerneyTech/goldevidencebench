@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import sys
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -677,6 +678,118 @@ def _run_preset(ns: argparse.Namespace) -> int:
     return subprocess.call(cmd, cwd=str(repo_root))
 
 
+def _cmd_preflight(ns: argparse.Namespace) -> int:
+    repo_root = Path(__file__).resolve().parents[2]
+    scripts_dir = repo_root / "scripts"
+    run_script = scripts_dir / "run_cross_app_intent_preservation_pack.ps1"
+    out_root = Path("runs/preflight") / ns.profile
+    stage = "target" if ns.stage == "target" else "observe"
+
+    if os.name == "nt":
+        ps = shutil.which("powershell") or "powershell"
+        cmd = [
+            ps,
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(run_script),
+            "-OutRoot",
+            str(out_root),
+            "-Adapter",
+            ns.adapter,
+            "-Stage",
+            stage,
+            "-DataMode",
+            ns.data,
+        ]
+        if ns.fail_on_canary_warn:
+            cmd.append("-FailOnCanaryWarn")
+    else:
+        ps = shutil.which("pwsh")
+        if not ps:
+            print("PowerShell is required for preflight execution.")
+            return 2
+        cmd = [
+            ps,
+            "-NoProfile",
+            "-File",
+            str(run_script),
+            "-OutRoot",
+            str(out_root),
+            "-Adapter",
+            ns.adapter,
+            "-Stage",
+            stage,
+            "-DataMode",
+            ns.data,
+        ]
+        if ns.fail_on_canary_warn:
+            cmd.append("-FailOnCanaryWarn")
+
+    run_exit = subprocess.call(cmd, cwd=str(repo_root))
+    summary_path = out_root / "cross_app_intent_preservation_pack_summary.json"
+    summary_payload: dict[str, Any] = {}
+    if summary_path.exists():
+        try:
+            loaded = json.loads(summary_path.read_text(encoding="utf-8-sig"))
+            if isinstance(loaded, dict):
+                summary_payload = loaded
+        except Exception:
+            summary_payload = {}
+
+    blocked_gates: list[str] = []
+    top_fixes: list[str] = []
+    status = "FAIL" if run_exit else "PASS"
+
+    holdout = summary_payload.get("holdout")
+    if isinstance(holdout, dict):
+        failures = holdout.get("failures")
+        if isinstance(failures, list):
+            blocked_gates = [str(item) for item in failures]
+
+    if blocked_gates:
+        for gate in blocked_gates:
+            if "unauthorized_substitution_rate" in gate:
+                top_fixes.append("Reduce substitution drift and require explicit authorization.")
+            elif "implication_break_rate" in gate:
+                top_fixes.append("Improve implication dependency propagation and repair checks.")
+            elif "support_coverage_rate" in gate:
+                top_fixes.append("Strengthen support-id grounding before action selection.")
+            elif "verify_before_irreversible_rate" in gate:
+                top_fixes.append("Force verify mode ahead of irreversible operations.")
+            else:
+                top_fixes.append(f"Address failing gate: {gate}")
+    else:
+        top_fixes.append("No blocking gates detected.")
+
+    next_command = (
+        f"goldevidencebench preflight --profile {ns.profile} --stage target --data {ns.data} --adapter {ns.adapter}"
+    )
+    out_payload = {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "profile": ns.profile,
+        "stage": ns.stage,
+        "data_mode": ns.data,
+        "adapter": ns.adapter,
+        "status": status,
+        "out_root": str(out_root),
+        "summary_path": str(summary_path),
+        "blocked_gates": blocked_gates,
+        "top_fixes": top_fixes,
+        "next_command": next_command,
+    }
+
+    ns.out.parent.mkdir(parents=True, exist_ok=True)
+    ns.out.write_text(json.dumps(out_payload, indent=2), encoding="utf-8")
+    print(
+        f"preflight status={status} blocked_gates={len(blocked_gates)} out={ns.out}"
+    )
+    for gate in blocked_gates[:5]:
+        print(f"- blocked: {gate}")
+    return 0 if status == "PASS" else 1
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="goldevidencebench")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -805,6 +918,48 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("--out", type=Path, default=None)
     r.add_argument("--results-json", type=Path, default=None, help="Optional machine-readable metrics output.")
     r.set_defaults(func=_cmd_run)
+
+    pf = sub.add_parser(
+        "preflight",
+        help="Run cross-app intent-preservation preflight and emit a machine-readable report.",
+    )
+    pf.add_argument(
+        "--profile",
+        type=str,
+        default="cross_app_v1",
+        help="Preflight profile identifier.",
+    )
+    pf.add_argument(
+        "--stage",
+        choices=("dev", "target"),
+        default="dev",
+        help="Dev maps to observe; target maps to target-stage hard gates.",
+    )
+    pf.add_argument(
+        "--data",
+        choices=("fixture", "live-smoke", "hybrid"),
+        default="fixture",
+        help="Preflight data mode.",
+    )
+    pf.add_argument(
+        "--adapter",
+        type=str,
+        default="goldevidencebench.adapters.mock_adapter:create_adapter",
+        help="Adapter spec module:factory.",
+    )
+    pf.add_argument(
+        "--out",
+        type=Path,
+        default=Path("runs/preflight/latest.json"),
+        help="Machine-readable preflight output path.",
+    )
+    pf.add_argument(
+        "--fail-on-canary-warn",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Escalate canary WARN to hard-fail in preflight.",
+    )
+    pf.set_defaults(func=_cmd_preflight)
 
     m = sub.add_parser("model", help="Run a custom adapter (LLM or tool) and grade it.")
     m.add_argument("--data", required=True, type=Path)

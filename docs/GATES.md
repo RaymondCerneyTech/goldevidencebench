@@ -22,6 +22,7 @@ Gates are constraint checks: they don't prevent optimization, they ensure optimi
 | Instruction override | `.\scripts\run_instruction_override_gate.ps1` | `configs/usecase_checks.json` (`instruction_override`) | `runs/release_gates/instruction_override_gate/summary.json` |
 | Memory verify | `python .\scripts\verify_memories.py ...` | `configs/usecase_checks.json` (`memory_verify_gate`) | `runs/release_gates/memory_verify.json` |
 | Persona invariance | `python .\scripts\check_persona_invariance_gate.py` (invoked by `.\scripts\run_release_check.ps1`) | `configs/usecase_checks.json` (`persona_invariance_gate`, `overall.min_row_invariance_rate >= 1.0`) | `runs/release_gates/persona_invariance/summary.json` |
+| Cross-app intent-preservation pack | `.\scripts\run_cross_app_intent_preservation_pack.ps1` (collected by `.\scripts\run_release_check.ps1`) | `configs/usecase_checks.json` (`cross_app_intent_preservation_pack`) | `runs/release_gates/cross_app_intent_preservation_pack/summary.json` |
 | Update burst release gate | `.\scripts\run_update_burst_full_linear_bucket10.ps1` (via release check) | `configs/usecase_checks.json` (`update_burst_release_gate`) | `runs/release_gates/update_burst_full_linear_k16_bucket5_rate0.12/summary.json` |
 | Bad actor holdout gate | `.\scripts\run_bad_actor_holdout_gate.ps1` | `configs/bad_actor_holdout_list.json` + `configs/usecase_checks.json` (`bad_actor_holdout_gate`) | `runs/bad_actor_holdout_latest/summary.json` |
 | UI same_label stub | `.\scripts\run_ui_same_label_stub.ps1` | `configs/usecase_checks.json` (`ui_same_label_gate`) | `runs/ui_same_label_gate.json` |
@@ -44,6 +45,8 @@ Default release/nightly contract:
   (`runs/real_world_utility_eval_latest.json` must be `PASS`).
 - `run_release_check.ps1` now hard-fails on persona contract drift using the
   consolidated persona invariance gate (`row_invariance_rate == 1.0`).
+- `cross_app_intent_preservation_pack` is currently warn-only in release
+  coupling (visible in threshold output and release integrity/risk warnings).
 - On unified reliability PASS, `run_release_check.ps1` also rebuilds Codex
   compatibility outputs and updates `runs/latest_codex_compat_*` pointers.
 - `run_release_overnight.ps1` inherits the same default behavior.

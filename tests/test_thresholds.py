@@ -104,6 +104,59 @@ def test_evaluate_checks_skip_if(tmp_path: Path) -> None:
     assert any(issue.status == "skipped" for issue in issues)
 
 
+def test_evaluate_checks_fastlocal_missing_metric_is_not_applicable(tmp_path: Path) -> None:
+    summary_path = tmp_path / "summary.json"
+    _write_json(summary_path, {"overall": {"value_acc_mean": 0.9}})
+    config = {
+        "checks": [
+            {
+                "id": "fastlocal-missing",
+                "summary_path": str(summary_path),
+                "severity": "error",
+                "metrics": [{"path": "overall.exact_acc_mean", "min": 0.8}],
+            }
+        ]
+    }
+    issues, errors = thresholds.evaluate_checks(config, root=Path("."), profile="fastlocal")
+    assert errors == 0
+    assert any(issue.status == "not_applicable" for issue in issues)
+
+
+def test_evaluate_checks_release_missing_metric_fails(tmp_path: Path) -> None:
+    summary_path = tmp_path / "summary.json"
+    _write_json(summary_path, {"overall": {"value_acc_mean": 0.9}})
+    config = {
+        "checks": [
+            {
+                "id": "release-missing",
+                "summary_path": str(summary_path),
+                "severity": "error",
+                "metrics": [{"path": "overall.exact_acc_mean", "min": 0.8}],
+            }
+        ]
+    }
+    issues, errors = thresholds.evaluate_checks(config, root=Path("."), profile="release")
+    assert errors == 1
+    assert any(issue.status == "missing" for issue in issues)
+
+
+def test_evaluate_checks_optional_summary_missing_is_not_applicable(tmp_path: Path) -> None:
+    missing_summary = tmp_path / "missing_summary.json"
+    config = {
+        "checks": [
+            {
+                "id": "optional-summary",
+                "summary_path": str(missing_summary),
+                "required_summary": False,
+                "metrics": [{"path": "overall.value_acc_mean", "min": 0.9}],
+            }
+        ]
+    }
+    issues, errors = thresholds.evaluate_checks(config, root=Path("."), profile="release")
+    assert errors == 0
+    assert any(issue.status == "not_applicable" for issue in issues)
+
+
 def test_check_thresholds_out(tmp_path: Path) -> None:
     summary_path = tmp_path / "summary.json"
     summary_path.write_text(json.dumps({"overall": {"value_acc_mean": 0.9}}), encoding="utf-8")
@@ -134,3 +187,40 @@ def test_check_thresholds_out(tmp_path: Path) -> None:
     payload = json.loads(out_path.read_text(encoding="utf-8"))
     assert isinstance(payload.get("issues"), list)
     assert payload.get("error_count") == 0
+
+
+def test_check_thresholds_profile_fastlocal_missing_metric_nonblocking(tmp_path: Path) -> None:
+    summary_path = tmp_path / "summary.json"
+    summary_path.write_text(json.dumps({"overall": {"value_acc_mean": 0.9}}), encoding="utf-8")
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        json.dumps(
+            {
+                "checks": [
+                    {
+                        "id": "missing-metric",
+                        "summary_path": str(summary_path),
+                        "severity": "error",
+                        "metrics": [{"path": "overall.exact_acc_mean", "min": 0.8}],
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    script_path = Path(__file__).resolve().parents[1] / "scripts" / "check_thresholds.py"
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(script_path),
+            "--config",
+            str(config_path),
+            "--profile",
+            "fastlocal",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0
+    assert "optional metric missing (fastlocal profile)" in result.stdout

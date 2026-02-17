@@ -32,6 +32,14 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--max-cite-f1-jitter", type=float, default=0.05)
     parser.add_argument("--max-authority-violation-jitter", type=float, default=0.05)
     parser.add_argument("--max-canary-exact-rate", type=float, default=0.85)
+    parser.add_argument(
+        "--allow-latest-nontarget",
+        action="store_true",
+        help=(
+            "Compatibility no-op for generic family stage runners. "
+            "Authority hardening reliability checks do not enforce stage-specific latest guards."
+        ),
+    )
     parser.add_argument("--out", type=Path, default=None)
     return parser.parse_args()
 

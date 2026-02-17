@@ -74,6 +74,8 @@ Optional latest pointers (written by release check):
 - `runs/latest_instruction_override_gate`
 - `runs/latest_memory_verify_gate`
 - `runs/latest_persona_invariance_gate`
+- `runs/latest_cross_app_intent_preservation_pack`
+- `runs/latest_cross_app_intent_preservation_pack_gate`
 - `runs/latest_ui_same_label_gate`
 - `runs/latest_ui_popup_overlay_gate`
 - `runs/latest_ui_minipilot_notepad_gate`
@@ -300,6 +302,18 @@ Release check (full suite):
 .\scripts\run_release_check.ps1 -ModelPath "<MODEL_PATH>"
 ```
 
+Gate profiles:
+
+| Profile | Intended use | Missing metric paths in threshold checks | Reliability family matrix |
+|---|---|---|---|
+| `fastlocal` | Local developer loop | Non-blocking (`N/A`) | Partial matrix allowed; canary-only reliability FAIL can be softened when using mock adapter |
+| `release` | CI / shipping decision | Hard-fail | Full matrix required |
+
+Profile selection defaults:
+- `-FastLocal` implies `-GateProfile fastlocal` unless overridden.
+- Without `-FastLocal`, default is `-GateProfile release`.
+- Profile defaults are configured in `configs/release_gate_profiles.json`.
+
 Includes the bad_actor holdout safety gate (fixtures in `configs/bad_actor_holdout_list.json`, thresholds in `configs/usecase_checks.json`), using `prefer_update_latest` rerank (CLEAR-aware) with authority filtering by default.
 The final release step is the unified reliability signal gate (`scripts/check_reliability_signal.ps1`); its exit code is treated as ship/no-ship.
 The gate now also emits derived `reasoning_score`, `planning_score`, and
@@ -364,6 +378,12 @@ Release check now also enforces persona contract invariance across trap families
 - consolidated gate artifact: `runs/release_gates/persona_invariance/summary.json`
 - failure category: `persona_contract_drift`
 - hard threshold: `overall.min_row_invariance_rate == 1.0`
+
+Release check now also collects cross-app intent-preservation pack output as a
+warn-only release check:
+- artifact: `runs/release_gates/cross_app_intent_preservation_pack/summary.json`
+- threshold check id: `cross_app_intent_preservation_pack` (`severity=warn`)
+- this does not hard-fail release in v1; it records warning debt until promoted.
 
 Diagnostic-only override:
 
@@ -482,6 +502,37 @@ This produces:
 - `runs/codex_next_step_report.json` (current blockers and next actions for
   `rpa_mode_switch`, `intent_spec_layer`, `noise_escalation`,
   `implication_coherence`, `agency_preserving_substitution`)
+- schema contract: `schemas/rpa_control_latest_v0_2.schema.json`
+
+Validate snapshot schema:
+
+```powershell
+python .\scripts\validate_artifact.py --schema .\schemas\rpa_control_latest_v0_2.schema.json --path .\runs\rpa_control_latest.json
+```
+
+Preflight shortcut for cross-app pack (fixture-first):
+
+```powershell
+goldevidencebench preflight `
+  --profile cross_app_v1 `
+  --stage dev `
+  --data fixture `
+  --adapter "goldevidencebench.adapters.mock_adapter:create_adapter"
+```
+
+Alias equivalent:
+
+```powershell
+geb preflight --profile cross_app_v1 --stage dev --data fixture --adapter "goldevidencebench.adapters.mock_adapter:create_adapter"
+```
+
+State backend selector (default remains current backend):
+
+```powershell
+$env:GOLDEVIDENCEBENCH_STATE_STORE_BACKEND = "current"     # default
+# experimental:
+$env:GOLDEVIDENCEBENCH_STATE_STORE_BACKEND = "sparse_set"
+```
 
 Core benchmark (curated fixtures):
 
@@ -619,6 +670,7 @@ python .\scripts\generate_authority_under_interference_family.py --overwrite
 python .\scripts\score_authority_under_interference.py --data "data\authority_under_interference\authority_under_interference_anchors.jsonl" --preds "<PREDS_JSONL>" --rows-out "<ROWS_JSONL>"
 .\scripts\run_authority_under_interference_family.ps1 -Adapter "goldevidencebench.adapters.llama_server_adapter:create_adapter" -OverwriteFixtures
 python .\scripts\check_authority_under_interference_reliability.py --run-dirs "<RUN_A>" "<RUN_B>" "<RUN_C>"
+# compatibility: generic stage runners may pass --allow-latest-nontarget; authority reliability checkers accept it as a no-op
 python .\scripts\generate_authority_under_interference_hardening_family.py --overwrite
 python .\scripts\score_authority_under_interference_hardening.py --data "data\authority_under_interference_hardening\authority_under_interference_hardening_anchors.jsonl" --preds "<PREDS_JSONL>" --rows-out "<ROWS_JSONL>"
 .\scripts\run_authority_under_interference_hardening_family.ps1 -Adapter "goldevidencebench.adapters.llama_server_adapter:create_adapter" -Stage observe -OverwriteFixtures

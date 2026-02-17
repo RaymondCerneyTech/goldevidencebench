@@ -32,10 +32,32 @@ def main() -> int:
         action="store_true",
         help="Hide PASS lines in console output (show FAIL/MISSING/SKIP only).",
     )
+    parser.add_argument(
+        "--profile",
+        choices=("fastlocal", "release"),
+        default="release",
+        help=(
+            "Threshold policy profile. "
+            "`fastlocal` treats missing metric paths as non-blocking N/A; "
+            "`release` keeps strict missing-path failures."
+        ),
+    )
+    parser.add_argument(
+        "--strict-optional",
+        action="store_true",
+        help=(
+            "Treat optional metrics as required unless metric.strict_optional_missing=false."
+        ),
+    )
     args = parser.parse_args()
 
     config = load_config(args.config)
-    issues, error_count = evaluate_checks(config, root=args.root)
+    issues, error_count = evaluate_checks(
+        config,
+        root=args.root,
+        profile=args.profile,
+        strict_optional=args.strict_optional,
+    )
     issues_to_print = issues
     if args.quiet_passes:
         issues_to_print = [issue for issue in issues if issue.status != "pass"]

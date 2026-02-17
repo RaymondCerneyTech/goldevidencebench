@@ -16,7 +16,7 @@ class Issue:
 
 
 def load_config(path: Path) -> dict[str, Any]:
-    data = json.loads(path.read_text(encoding="utf-8"))
+    data = json.loads(path.read_text(encoding="utf-8-sig"))
     if not isinstance(data, dict) or "checks" not in data:
         raise ValueError("config must be an object with a 'checks' list")
     if not isinstance(data["checks"], list):
@@ -91,14 +91,45 @@ def _skip_metric(summary: dict[str, Any], metric: dict[str, Any]) -> bool:
     return False
 
 
-def evaluate_checks(config: dict[str, Any], *, root: Path) -> tuple[list[Issue], int]:
+def _evaluate_checks(
+    config: dict[str, Any],
+    *,
+    root: Path,
+    profile: str,
+    strict_optional: bool,
+) -> tuple[list[Issue], int]:
+    if profile not in {"release", "fastlocal"}:
+        raise ValueError(f"unsupported threshold profile: {profile}")
     issues: list[Issue] = []
     error_count = 0
     for check in config.get("checks", []):
         check_id = str(check.get("id", "unknown"))
         severity = str(check.get("severity", "error")).lower()
+        required_summary = bool(check.get("required_summary", True))
         summary_path = root / Path(str(check.get("summary_path", "")))
         if not summary_path.exists():
+            if not required_summary:
+                issues.append(
+                    Issue(
+                        check_id=check_id,
+                        metric_path="summary_path",
+                        status="not_applicable",
+                        message=f"optional summary missing at {summary_path}",
+                        severity=severity,
+                    )
+                )
+                continue
+            if profile == "fastlocal" and severity != "error":
+                issues.append(
+                    Issue(
+                        check_id=check_id,
+                        metric_path="summary_path",
+                        status="not_applicable",
+                        message=f"summary missing in fastlocal profile at {summary_path}",
+                        severity=severity,
+                    )
+                )
+                continue
             issues.append(
                 Issue(
                     check_id=check_id,
@@ -111,7 +142,7 @@ def evaluate_checks(config: dict[str, Any], *, root: Path) -> tuple[list[Issue],
             if severity == "error":
                 error_count += 1
             continue
-        summary = json.loads(summary_path.read_text(encoding="utf-8"))
+        summary = json.loads(summary_path.read_text(encoding="utf-8-sig"))
         metrics = check.get("metrics", [])
         for metric in metrics:
             metric_path = str(metric.get("path", ""))
@@ -127,16 +158,35 @@ def evaluate_checks(config: dict[str, Any], *, root: Path) -> tuple[list[Issue],
                 )
                 continue
             allow_missing = bool(metric.get("allow_missing", False))
+            metric_required = True
+            if "required" in metric:
+                metric_required = bool(metric.get("required", True))
+            elif "allow_missing" in metric:
+                metric_required = not allow_missing
+            strict_optional_missing = bool(metric.get("strict_optional_missing", True))
+            if strict_optional and not metric_required and strict_optional_missing:
+                metric_required = True
             raw_value = _get_path(summary, metric_path) if metric_path else None
             value = _as_float(raw_value)
             if value is None:
-                if allow_missing:
+                if not metric_required:
                     issues.append(
                         Issue(
                             check_id=check_id,
                             metric_path=metric_path,
                             status="skipped",
                             message="missing metric (allowed)",
+                            severity=severity,
+                        )
+                    )
+                    continue
+                if profile == "fastlocal":
+                    issues.append(
+                        Issue(
+                            check_id=check_id,
+                            metric_path=metric_path,
+                            status="not_applicable",
+                            message="optional metric missing (fastlocal profile)",
                             severity=severity,
                         )
                     )
@@ -193,6 +243,16 @@ def evaluate_checks(config: dict[str, Any], *, root: Path) -> tuple[list[Issue],
     return issues, error_count
 
 
+def evaluate_checks(
+    config: dict[str, Any],
+    *,
+    root: Path,
+    profile: str = "release",
+    strict_optional: bool = False,
+) -> tuple[list[Issue], int]:
+    return _evaluate_checks(config, root=root, profile=profile, strict_optional=strict_optional)
+
+
 def format_issues(issues: list[Issue]) -> str:
     if not issues:
         return "No checks configured."
@@ -200,6 +260,8 @@ def format_issues(issues: list[Issue]) -> str:
     for issue in issues:
         if issue.status in {"fail", "missing"}:
             prefix = f"FAIL({issue.severity})" if issue.status == "fail" else f"MISSING({issue.severity})"
+        elif issue.status == "not_applicable":
+            prefix = "N/A"
         elif issue.status == "skipped":
             prefix = "SKIP"
         else:

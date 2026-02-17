@@ -1,0 +1,314 @@
+{
+  "type": "object",
+  "required": [
+    "control_contract_version",
+    "mode",
+    "decision",
+    "confidence",
+    "risk",
+    "horizon_depth",
+    "needed_info",
+    "support_ids",
+    "reversibility",
+    "why",
+    "control_v2",
+    "signals",
+    "inputs",
+    "thresholds"
+  ],
+  "properties": {
+    "control_contract_version": {
+      "type": "string",
+      "enum": ["0.2"]
+    },
+    "mode": {
+      "type": "string",
+      "enum": ["reason", "plan", "act"]
+    },
+    "decision": {
+      "type": "string",
+      "enum": ["answer", "abstain", "ask", "retrieve", "verify", "defer"]
+    },
+    "confidence": {
+      "type": "number"
+    },
+    "risk": {
+      "type": "number"
+    },
+    "horizon_depth": {
+      "type": "integer"
+    },
+    "needed_info": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "support_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "reversibility": {
+      "type": "string",
+      "enum": ["reversible", "irreversible"]
+    },
+    "why": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "control_v2": {
+      "type": "object",
+      "required": [
+        "assumptions_used",
+        "implications",
+        "substitution",
+        "needed_info",
+        "reversibility_detail",
+        "policy"
+      ],
+      "properties": {
+        "assumptions_used": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "text", "source", "confidence"],
+            "properties": {
+              "id": { "type": "string" },
+              "text": { "type": "string" },
+              "source": { "type": "string" },
+              "confidence": { "type": "number" }
+            }
+          }
+        },
+        "implications": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["from", "to", "type", "strength", "status"],
+            "properties": {
+              "from": { "type": "string" },
+              "to": { "type": "string" },
+              "type": { "type": "string" },
+              "strength": { "type": "number" },
+              "status": { "type": "string" }
+            }
+          }
+        },
+        "substitution": {
+          "type": "object",
+          "required": [
+            "requested_option",
+            "proposed_option",
+            "reason_code",
+            "disclosed",
+            "authorized",
+            "recoverable"
+          ],
+          "properties": {
+            "requested_option": { "type": "string" },
+            "proposed_option": { "type": "string" },
+            "reason_code": { "type": "string" },
+            "disclosed": { "type": "boolean" },
+            "authorized": { "type": "boolean" },
+            "recoverable": { "type": "boolean" }
+          }
+        },
+        "needed_info": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "kind", "required_for", "source_hint"],
+            "properties": {
+              "id": { "type": "string" },
+              "kind": { "type": "string" },
+              "required_for": { "type": "string" },
+              "source_hint": { "type": "string" }
+            }
+          }
+        },
+        "reversibility_detail": {
+          "type": "object",
+          "required": ["class", "rationale", "verify_required"],
+          "properties": {
+            "class": {
+              "type": "string",
+              "enum": ["reversible", "irreversible"]
+            },
+            "rationale": { "type": "string" },
+            "verify_required": { "type": "boolean" }
+          }
+        },
+        "policy": {
+          "type": "object",
+          "required": ["blocked", "reasons", "required_actions"],
+          "properties": {
+            "blocked": { "type": "boolean" },
+            "reasons": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "code",
+                  "severity",
+                  "source",
+                  "metric",
+                  "value",
+                  "threshold",
+                  "message"
+                ],
+                "properties": {
+                  "code": { "type": "string" },
+                  "severity": {
+                    "type": "string",
+                    "enum": ["info", "warn", "error"]
+                  },
+                  "source": {
+                    "type": "string",
+                    "enum": ["controller", "planner", "router", "scorer", "release_gate"]
+                  },
+                  "metric": { "type": ["string", "null"] },
+                  "value": { "type": ["number", "null"] },
+                  "threshold": { "type": ["number", "null"] },
+                  "message": { "type": "string" }
+                }
+              }
+            },
+            "required_actions": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "signals": {
+      "type": "object",
+      "required": [
+        "reliability_signal_status",
+        "family_statuses",
+        "derived_scores",
+        "epistemic_means",
+        "authority_means",
+        "myopic_means",
+        "referential_means",
+        "long_horizon_means",
+        "implication_means",
+        "agency_means"
+      ],
+      "properties": {
+        "reliability_signal_status": {
+          "type": ["string", "null"]
+        },
+        "family_statuses": {
+          "type": "object",
+          "required": [
+            "epistemic_calibration_suite",
+            "authority_under_interference_hardening",
+            "myopic_planning_traps",
+            "referential_indexing_suite",
+            "novel_continuity_long_horizon",
+            "implication_coherence",
+            "agency_preserving_substitution"
+          ],
+          "properties": {
+            "epistemic_calibration_suite": { "type": ["string", "null"] },
+            "authority_under_interference_hardening": { "type": ["string", "null"] },
+            "myopic_planning_traps": { "type": ["string", "null"] },
+            "referential_indexing_suite": { "type": ["string", "null"] },
+            "novel_continuity_long_horizon": { "type": ["string", "null"] },
+            "implication_coherence": { "type": ["string", "null"] },
+            "agency_preserving_substitution": { "type": ["string", "null"] }
+          }
+        },
+        "derived_scores": {
+          "type": "object",
+          "required": ["reasoning_score", "planning_score", "intelligence_index"],
+          "properties": {
+            "reasoning_score": { "type": ["number", "null"] },
+            "planning_score": { "type": ["number", "null"] },
+            "intelligence_index": { "type": ["number", "null"] }
+          }
+        },
+        "epistemic_means": { "type": "object" },
+        "authority_means": { "type": "object" },
+        "myopic_means": { "type": "object" },
+        "referential_means": { "type": "object" },
+        "long_horizon_means": { "type": "object" },
+        "implication_means": { "type": "object" },
+        "agency_means": { "type": "object" }
+      }
+    },
+    "inputs": {
+      "type": "object",
+      "required": [
+        "reliability_signal",
+        "epistemic_reliability",
+        "authority_reliability",
+        "myopic_reliability",
+        "referential_reliability",
+        "novel_long_horizon_reliability",
+        "implication_reliability",
+        "agency_reliability",
+        "errors"
+      ],
+      "properties": {
+        "reliability_signal": { "type": "string" },
+        "epistemic_reliability": { "type": "string" },
+        "authority_reliability": { "type": "string" },
+        "myopic_reliability": { "type": "string" },
+        "referential_reliability": { "type": "string" },
+        "novel_long_horizon_reliability": { "type": "string" },
+        "implication_reliability": { "type": "string" },
+        "agency_reliability": { "type": "string" },
+        "errors": {
+          "type": "object",
+          "required": [
+            "reliability_signal",
+            "epistemic",
+            "authority",
+            "myopic",
+            "referential",
+            "novel_long_horizon",
+            "implication",
+            "agency"
+          ],
+          "properties": {
+            "reliability_signal": { "type": ["string", "null"] },
+            "epistemic": { "type": ["string", "null"] },
+            "authority": { "type": ["string", "null"] },
+            "myopic": { "type": ["string", "null"] },
+            "referential": { "type": ["string", "null"] },
+            "novel_long_horizon": { "type": ["string", "null"] },
+            "implication": { "type": ["string", "null"] },
+            "agency": { "type": ["string", "null"] }
+          }
+        }
+      }
+    },
+    "thresholds": {
+      "type": "object",
+      "required": [
+        "confidence_floor",
+        "planning_floor",
+        "reasoning_floor",
+        "needed_info_floor",
+        "risk_floor",
+        "irreversible_confidence_floor"
+      ],
+      "properties": {
+        "confidence_floor": { "type": "number" },
+        "planning_floor": { "type": "number" },
+        "reasoning_floor": { "type": "number" },
+        "needed_info_floor": { "type": "number" },
+        "risk_floor": { "type": "number" },
+        "irreversible_confidence_floor": { "type": "number" }
+      }
+    }
+  }
+}

@@ -1,5 +1,8 @@
 param(
     [string]$Strict = "runs\latest_rag_strict",
+    [ValidateSet("fastlocal", "release")]
+    [string]$Profile = "release",
+    [switch]$AllowMockCanarySoftFail,
     [string]$CompressionReliability = "runs\compression_reliability_latest.json",
     [string]$NovelReliability = "runs\novel_continuity_reliability_latest.json",
     [string]$AuthorityInterferenceReliability = "runs\authority_under_interference_reliability_latest.json",
@@ -21,6 +24,10 @@ param(
     [switch]$RequireIntentSpec,
     [string]$NoiseEscalationReliability = "runs\noise_escalation_reliability_latest.json",
     [switch]$RequireNoiseEscalation,
+    [string]$ImplicationCoherenceReliability = "runs\implication_coherence_reliability_latest.json",
+    [switch]$RequireImplicationCoherence,
+    [string]$AgencyPreservingSubstitutionReliability = "runs\agency_preserving_substitution_reliability_latest.json",
+    [switch]$RequireAgencyPreservingSubstitution,
     [double]$MinValueAcc = 0.95,
     [double]$MinExactAcc = 0.95,
     [double]$MinCiteF1 = 0.95,
@@ -38,6 +45,7 @@ $ErrorActionPreference = "Stop"
 $args = @(
     ".\scripts\check_reliability_signal.py",
     "--strict", $Strict,
+    "--profile", $Profile,
     "--compression-reliability", $CompressionReliability,
     "--novel-reliability", $NovelReliability,
     "--authority-interference-reliability", $AuthorityInterferenceReliability,
@@ -50,6 +58,8 @@ $args = @(
     "--rpa-mode-switch-reliability", $RPAModeSwitchReliability,
     "--intent-spec-reliability", $IntentSpecReliability,
     "--noise-escalation-reliability", $NoiseEscalationReliability,
+    "--implication-coherence-reliability", $ImplicationCoherenceReliability,
+    "--agency-preserving-substitution-reliability", $AgencyPreservingSubstitutionReliability,
     "--min-value-acc", "$MinValueAcc",
     "--min-exact-acc", "$MinExactAcc",
     "--min-cite-f1", "$MinCiteF1",
@@ -95,6 +105,15 @@ if ($RequireIntentSpec) {
 }
 if ($RequireNoiseEscalation) {
     $args += "--require-noise-escalation"
+}
+if ($RequireImplicationCoherence) {
+    $args += "--require-implication-coherence"
+}
+if ($RequireAgencyPreservingSubstitution) {
+    $args += "--require-agency-preserving-substitution"
+}
+if ($AllowMockCanarySoftFail) {
+    $args += "--allow-mock-canary-soft-fail"
 }
 
 python @args | Out-Host

@@ -6,6 +6,8 @@ param(
     [string]$TextPrompt = "Write a short, friendly note suitable for Notepad.",
     [string]$FilePath = "",
     [string]$ConfigPath = "configs\\demo_presets.json",
+    [switch]$UseRpaController,
+    [string]$ControlSnapshotPath = "runs\\rpa_control_latest.json",
     [switch]$List,
     [switch]$PromptForText,
     [switch]$GenerateText,
@@ -138,6 +140,40 @@ function Select-PresetByTask($presets, [string]$task) {
     return $best
 }
 
+function Read-JsonFile([string]$path) {
+    if (-not (Test-Path $path)) {
+        return $null
+    }
+    return (Get-Content $path -Raw | ConvertFrom-Json)
+}
+
+function Resolve-PolicyReasonCode($control) {
+    if ($null -eq $control) {
+        return "BLOCKED_BY_RUNTIME_POLICY"
+    }
+    if ($control.control_v2 -and $control.control_v2.policy -and $control.control_v2.policy.reasons) {
+        $reasons = @($control.control_v2.policy.reasons)
+        if ($reasons.Count -gt 0 -and $reasons[0].code) {
+            return [string]$reasons[0].code
+        }
+    }
+    return "BLOCKED_BY_RUNTIME_POLICY"
+}
+
+function Resolve-NextAction([string]$decision) {
+    if ([string]::IsNullOrWhiteSpace($decision)) {
+        return "defer"
+    }
+    switch ($decision.Trim().ToLowerInvariant()) {
+        "ask" { return "ask" }
+        "retrieve" { return "retrieve" }
+        "verify" { return "verify" }
+        "defer" { return "defer" }
+        "abstain" { return "ask" }
+        default { return "defer" }
+    }
+}
+
 $config = Read-DemoConfig $ConfigPath
 $presets = $config.presets
 if (-not $presets -or $presets.Count -eq 0) {
@@ -205,6 +241,46 @@ if (-not [System.IO.Path]::IsPathRooted($scriptPath)) {
 if (-not (Test-Path $scriptPath)) {
     Write-Error "Preset script not found: $scriptPath"
     exit 1
+}
+
+if ($UseRpaController) {
+    if (-not (Test-Path $ControlSnapshotPath)) {
+        $snapshotBuilder = Join-Path $PSScriptRoot "run_rpa_control_snapshot.ps1"
+        if (-not (Test-Path $snapshotBuilder)) {
+            Write-Error "Runtime policy enabled but snapshot builder missing: $snapshotBuilder"
+            exit 1
+        }
+        & $snapshotBuilder -Out $ControlSnapshotPath | Out-Host
+        if ($LASTEXITCODE -ne 0) {
+            Write-Error "Failed to build runtime control snapshot."
+            exit $LASTEXITCODE
+        }
+    }
+
+    $control = Read-JsonFile $ControlSnapshotPath
+    if ($null -eq $control) {
+        Write-Error "Runtime policy enabled but control snapshot is missing: $ControlSnapshotPath"
+        exit 1
+    }
+
+    $decision = if ($control.decision) { [string]$control.decision } else { "" }
+    $mode = if ($control.mode) { [string]$control.mode } else { "" }
+    $policyBlocked = $false
+    if ($control.control_v2 -and $control.control_v2.policy) {
+        try {
+            $policyBlocked = [bool]$control.control_v2.policy.blocked
+        } catch {
+            $policyBlocked = $false
+        }
+    }
+    $blocked = $policyBlocked -or ($decision.Trim().ToLowerInvariant() -ne "answer")
+    if ($blocked) {
+        $reasonCode = Resolve-PolicyReasonCode $control
+        $nextAction = Resolve-NextAction $decision
+        Write-Error ("Runtime policy blocked demo execution: mode={0} decision={1} reason={2}. Next action: {3}" -f `
+            $mode, $decision, $reasonCode, $nextAction)
+        exit 2
+    }
 }
 
 $argsList = New-Object System.Collections.Generic.List[string]

@@ -1,0 +1,12 @@
+{
+  "fastlocal": {
+    "threshold_profile": "fastlocal",
+    "require_full_matrix": false,
+    "allow_mock_canary_soft_fail": true
+  },
+  "release": {
+    "threshold_profile": "release",
+    "require_full_matrix": true,
+    "allow_mock_canary_soft_fail": false
+  }
+}

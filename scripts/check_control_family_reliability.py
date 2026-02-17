@@ -5,7 +5,13 @@ import json
 from pathlib import Path
 from typing import Any
 
-_FAMILIES = ("rpa_mode_switch", "intent_spec_layer", "noise_escalation")
+_FAMILIES = (
+    "rpa_mode_switch",
+    "intent_spec_layer",
+    "noise_escalation",
+    "implication_coherence",
+    "agency_preserving_substitution",
+)
 
 
 def _parse_args(argv: list[str] | None = None, *, forced_family: str | None = None) -> argparse.Namespace:
@@ -41,6 +47,20 @@ def _parse_args(argv: list[str] | None = None, *, forced_family: str | None = No
     parser.add_argument("--max-recovery-latency", type=float, default=None)
     parser.add_argument("--max-irrecoverable-drift-rate", type=float, default=None)
 
+    parser.add_argument("--min-implication-consistency-rate", type=float, default=None)
+    parser.add_argument("--min-dependency-coverage", type=float, default=None)
+    parser.add_argument("--min-contradiction-repair-rate", type=float, default=None)
+    parser.add_argument("--min-causal-precision", type=float, default=None)
+    parser.add_argument("--max-propagation-latency-steps", type=float, default=None)
+    parser.add_argument("--max-implication-break-rate", type=float, default=None)
+    parser.add_argument("--min-ic-score", type=float, default=None)
+
+    parser.add_argument("--min-substitution-transparency-rate", type=float, default=None)
+    parser.add_argument("--max-unauthorized-substitution-rate", type=float, default=None)
+    parser.add_argument("--min-intent-preservation-score", type=float, default=None)
+    parser.add_argument("--max-agency-loss-error-rate", type=float, default=None)
+    parser.add_argument("--min-recovery-success-rate", type=float, default=None)
+
     parser.add_argument("--max-value-acc-jitter", type=float, default=0.05)
     parser.add_argument("--max-exact-acc-jitter", type=float, default=0.05)
     parser.add_argument("--max-cite-f1-jitter", type=float, default=0.05)
@@ -53,6 +73,18 @@ def _parse_args(argv: list[str] | None = None, *, forced_family: str | None = No
     parser.add_argument("--max-noise-slope-jitter", type=float, default=0.05)
     parser.add_argument("--max-recovery-latency-jitter", type=float, default=0.05)
     parser.add_argument("--max-irrecoverable-drift-jitter", type=float, default=0.05)
+    parser.add_argument("--max-implication-consistency-jitter", type=float, default=0.05)
+    parser.add_argument("--max-dependency-coverage-jitter", type=float, default=0.05)
+    parser.add_argument("--max-contradiction-repair-jitter", type=float, default=0.05)
+    parser.add_argument("--max-causal-precision-jitter", type=float, default=0.05)
+    parser.add_argument("--max-propagation-latency-jitter", type=float, default=0.05)
+    parser.add_argument("--max-implication-break-jitter", type=float, default=0.05)
+    parser.add_argument("--max-ic-score-jitter", type=float, default=0.05)
+    parser.add_argument("--max-substitution-transparency-jitter", type=float, default=0.05)
+    parser.add_argument("--max-unauthorized-substitution-jitter", type=float, default=0.05)
+    parser.add_argument("--max-intent-preservation-jitter", type=float, default=0.05)
+    parser.add_argument("--max-agency-loss-error-jitter", type=float, default=0.05)
+    parser.add_argument("--max-recovery-success-jitter", type=float, default=0.05)
     parser.add_argument("--max-canary-exact-rate", type=float, default=0.90)
 
     parser.add_argument(
@@ -229,6 +261,98 @@ def _family_stage_floors(family: str, stage: str) -> dict[str, float]:
                 "irrecoverable_drift_rate": 1.0,
             },
         },
+        "implication_coherence": {
+            "observe": {
+                "value_acc": 0.55,
+                "exact_acc": 0.55,
+                "cite_f1": 0.35,
+                "implication_consistency_rate": 0.55,
+                "dependency_coverage": 0.55,
+                "contradiction_repair_rate": 0.55,
+                "causal_precision": 0.55,
+                "propagation_latency_steps": 5.00,
+                "implication_break_rate": 0.45,
+                "ic_score": 0.55,
+            },
+            "ramp": {
+                "value_acc": 0.75,
+                "exact_acc": 0.75,
+                "cite_f1": 0.55,
+                "implication_consistency_rate": 0.75,
+                "dependency_coverage": 0.70,
+                "contradiction_repair_rate": 0.70,
+                "causal_precision": 0.70,
+                "propagation_latency_steps": 3.50,
+                "implication_break_rate": 0.25,
+                "ic_score": 0.70,
+            },
+            "target": {
+                "value_acc": 0.90,
+                "exact_acc": 0.90,
+                "cite_f1": 0.80,
+                "implication_consistency_rate": 0.85,
+                "dependency_coverage": 0.85,
+                "contradiction_repair_rate": 0.80,
+                "causal_precision": 0.85,
+                "propagation_latency_steps": 2.00,
+                "implication_break_rate": 0.10,
+                "ic_score": 0.75,
+            },
+            "custom": {
+                "value_acc": 0.0,
+                "exact_acc": 0.0,
+                "cite_f1": 0.0,
+                "implication_consistency_rate": 0.0,
+                "dependency_coverage": 0.0,
+                "contradiction_repair_rate": 0.0,
+                "causal_precision": 0.0,
+                "propagation_latency_steps": 999.0,
+                "implication_break_rate": 1.0,
+                "ic_score": 0.0,
+            },
+        },
+        "agency_preserving_substitution": {
+            "observe": {
+                "value_acc": 0.55,
+                "exact_acc": 0.55,
+                "cite_f1": 0.35,
+                "substitution_transparency_rate": 0.55,
+                "unauthorized_substitution_rate": 0.45,
+                "intent_preservation_score": 0.55,
+                "agency_loss_error_rate": 0.45,
+                "recovery_success_rate": 0.50,
+            },
+            "ramp": {
+                "value_acc": 0.75,
+                "exact_acc": 0.75,
+                "cite_f1": 0.55,
+                "substitution_transparency_rate": 0.75,
+                "unauthorized_substitution_rate": 0.25,
+                "intent_preservation_score": 0.75,
+                "agency_loss_error_rate": 0.25,
+                "recovery_success_rate": 0.70,
+            },
+            "target": {
+                "value_acc": 0.90,
+                "exact_acc": 0.90,
+                "cite_f1": 0.80,
+                "substitution_transparency_rate": 0.90,
+                "unauthorized_substitution_rate": 0.10,
+                "intent_preservation_score": 0.90,
+                "agency_loss_error_rate": 0.10,
+                "recovery_success_rate": 0.85,
+            },
+            "custom": {
+                "value_acc": 0.0,
+                "exact_acc": 0.0,
+                "cite_f1": 0.0,
+                "substitution_transparency_rate": 0.0,
+                "unauthorized_substitution_rate": 1.0,
+                "intent_preservation_score": 0.0,
+                "agency_loss_error_rate": 1.0,
+                "recovery_success_rate": 0.0,
+            },
+        },
     }
     return dict(by_family[family][stage])
 
@@ -252,6 +376,18 @@ def _resolve_floors(ns: argparse.Namespace) -> dict[str, float]:
         "noise_slope": ns.max_noise_slope,
         "recovery_latency": ns.max_recovery_latency,
         "irrecoverable_drift_rate": ns.max_irrecoverable_drift_rate,
+        "implication_consistency_rate": ns.min_implication_consistency_rate,
+        "dependency_coverage": ns.min_dependency_coverage,
+        "contradiction_repair_rate": ns.min_contradiction_repair_rate,
+        "causal_precision": ns.min_causal_precision,
+        "propagation_latency_steps": ns.max_propagation_latency_steps,
+        "implication_break_rate": ns.max_implication_break_rate,
+        "ic_score": ns.min_ic_score,
+        "substitution_transparency_rate": ns.min_substitution_transparency_rate,
+        "unauthorized_substitution_rate": ns.max_unauthorized_substitution_rate,
+        "intent_preservation_score": ns.min_intent_preservation_score,
+        "agency_loss_error_rate": ns.max_agency_loss_error_rate,
+        "recovery_success_rate": ns.min_recovery_success_rate,
     }
     for key, value in overrides.items():
         if value is not None:
@@ -275,6 +411,24 @@ def _metric_ops(family: str) -> list[tuple[str, str]]:
             ("clarification_f1", ">="),
             ("user_burden_score", "<="),
             ("downstream_error_reduction", ">="),
+        ]
+    if family == "implication_coherence":
+        return common + [
+            ("implication_consistency_rate", ">="),
+            ("dependency_coverage", ">="),
+            ("contradiction_repair_rate", ">="),
+            ("causal_precision", ">="),
+            ("propagation_latency_steps", "<="),
+            ("implication_break_rate", "<="),
+            ("ic_score", ">="),
+        ]
+    if family == "agency_preserving_substitution":
+        return common + [
+            ("substitution_transparency_rate", ">="),
+            ("unauthorized_substitution_rate", "<="),
+            ("intent_preservation_score", ">="),
+            ("agency_loss_error_rate", "<="),
+            ("recovery_success_rate", ">="),
         ]
     return common + [
         ("noise_control_accuracy", ">="),
@@ -312,6 +466,60 @@ def _jitter_specs(ns: argparse.Namespace) -> list[tuple[str, float, str]]:
                 ("noise_slope", ns.max_noise_slope_jitter, "holdout.noise_slope_jitter"),
                 ("recovery_latency", ns.max_recovery_latency_jitter, "holdout.recovery_latency_jitter"),
                 ("irrecoverable_drift_rate", ns.max_irrecoverable_drift_jitter, "holdout.irrecoverable_drift_rate_jitter"),
+            ]
+        )
+    elif ns.family == "implication_coherence":
+        specs.extend(
+            [
+                (
+                    "implication_consistency_rate",
+                    ns.max_implication_consistency_jitter,
+                    "holdout.implication_consistency_rate_jitter",
+                ),
+                ("dependency_coverage", ns.max_dependency_coverage_jitter, "holdout.dependency_coverage_jitter"),
+                (
+                    "contradiction_repair_rate",
+                    ns.max_contradiction_repair_jitter,
+                    "holdout.contradiction_repair_rate_jitter",
+                ),
+                ("causal_precision", ns.max_causal_precision_jitter, "holdout.causal_precision_jitter"),
+                (
+                    "propagation_latency_steps",
+                    ns.max_propagation_latency_jitter,
+                    "holdout.propagation_latency_steps_jitter",
+                ),
+                ("implication_break_rate", ns.max_implication_break_jitter, "holdout.implication_break_rate_jitter"),
+                ("ic_score", ns.max_ic_score_jitter, "holdout.ic_score_jitter"),
+            ]
+        )
+    elif ns.family == "agency_preserving_substitution":
+        specs.extend(
+            [
+                (
+                    "substitution_transparency_rate",
+                    ns.max_substitution_transparency_jitter,
+                    "holdout.substitution_transparency_rate_jitter",
+                ),
+                (
+                    "unauthorized_substitution_rate",
+                    ns.max_unauthorized_substitution_jitter,
+                    "holdout.unauthorized_substitution_rate_jitter",
+                ),
+                (
+                    "intent_preservation_score",
+                    ns.max_intent_preservation_jitter,
+                    "holdout.intent_preservation_score_jitter",
+                ),
+                (
+                    "agency_loss_error_rate",
+                    ns.max_agency_loss_error_jitter,
+                    "holdout.agency_loss_error_rate_jitter",
+                ),
+                (
+                    "recovery_success_rate",
+                    ns.max_recovery_success_jitter,
+                    "holdout.recovery_success_rate_jitter",
+                ),
             ]
         )
     return specs

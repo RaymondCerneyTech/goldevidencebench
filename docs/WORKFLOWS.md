@@ -88,6 +88,11 @@ Release check also runs persona invariance aggregation before threshold checks:
 - hard fail on `overall.min_row_invariance_rate < 1.0`
 - failure category: `persona_contract_drift`
 
+Release check also collects cross-app intent-preservation pack output (warn-only in v1):
+- `runs/release_gates/cross_app_intent_preservation_pack/summary.json`
+- threshold check id: `cross_app_intent_preservation_pack` (`severity=warn`)
+- does not hard-fail release in v1
+
 By default, the final gate now requires these control families:
 - `rpa_mode_switch`
 - `intent_spec_layer`
@@ -151,6 +156,30 @@ Writes `runs/real_world_utility_eval_latest.json` and updates
 Latest pointers:
 - Release: `runs/latest_release` (manifest inside the run dir).
 - Regression check (if run via `run_regression_check.ps1`): `runs/latest_regression`.
+
+## Preflight (cross-app pack)
+
+Use preflight to run a single machine-readable pack pass before longer campaigns.
+
+Python CLI:
+
+```powershell
+goldevidencebench preflight `
+  --profile cross_app_v1 `
+  --stage dev `
+  --data fixture `
+  --adapter "goldevidencebench.adapters.mock_adapter:create_adapter"
+```
+
+Alias:
+
+```powershell
+geb preflight --profile cross_app_v1 --stage dev --data fixture --adapter "goldevidencebench.adapters.mock_adapter:create_adapter"
+```
+
+Artifacts:
+- `runs/preflight/latest.json`
+- `runs/latest_cross_app_intent_preservation_pack`
 
 Drift wall signals:
 - Safety wall (default/latest): `runs/drift_wall_latest` (release-relevant).

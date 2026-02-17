@@ -1,6 +1,6 @@
 # CODEX Compatibility Report
 
-Generated: 2026-02-09T03:53:57.418476+00:00
+Generated: 2026-02-17T17:22:10.617297+00:00
 
 ## Scope
 - Verify family lifecycle compatibility (generator -> scorer -> wrapper -> reliability checker).
@@ -21,7 +21,10 @@ Generated: 2026-02-09T03:53:57.418476+00:00
 - none
 
 ## Unfilled Tracker
-- none
+- `authority_under_interference` (authority_interference): reliability_not_pass
+- `myopic_planning_traps` (myopic_planning): reliability_not_pass
+- `authority_under_interference_hardening` (authority_interference): reliability_not_pass
+- `referential_indexing_suite` (indexing_reassembly): reliability_not_pass
 
 ## Pairwise Orthogonality
 | Family A | Family B | Orthogonality | Intersection |

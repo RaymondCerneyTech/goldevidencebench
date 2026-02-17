@@ -7,11 +7,19 @@ from typing import Any
 
 from goldevidencebench.util import write_jsonl
 
-_FAMILIES = ("rpa_mode_switch", "intent_spec_layer", "noise_escalation")
+_FAMILIES = (
+    "rpa_mode_switch",
+    "intent_spec_layer",
+    "noise_escalation",
+    "implication_coherence",
+    "agency_preserving_substitution",
+)
 _FAMILY_OUT_DIR = {
     "rpa_mode_switch": "data/rpa_mode_switch",
     "intent_spec_layer": "data/intent_spec_layer",
     "noise_escalation": "data/noise_escalation",
+    "implication_coherence": "data/implication_coherence",
+    "agency_preserving_substitution": "data/agency_preserving_substitution",
 }
 _NOISE_KEYS = (
     "sensor.drift",
@@ -136,6 +144,151 @@ _NOISE_SCENARIOS = (
     },
 )
 
+_IC_SCENARIOS = (
+    {
+        "profile": "dependency_omission",
+        "dependency_required": True,
+        "contradiction_detected": False,
+        "causal_precision_required": False,
+        "implication_type_required": "logical",
+        "propagation_required": False,
+        "target_propagation_latency": 2.0,
+        "implication_break_if_missed": True,
+        "next_action": "ask",
+    },
+    {
+        "profile": "state_update_propagation",
+        "dependency_required": False,
+        "contradiction_detected": False,
+        "causal_precision_required": False,
+        "implication_type_required": "logical",
+        "propagation_required": True,
+        "target_propagation_latency": 1.5,
+        "implication_break_if_missed": True,
+        "next_action": "plan",
+    },
+    {
+        "profile": "coincidence_vs_causality",
+        "dependency_required": False,
+        "contradiction_detected": False,
+        "causal_precision_required": True,
+        "implication_type_required": "correlative",
+        "propagation_required": False,
+        "target_propagation_latency": 2.5,
+        "implication_break_if_missed": True,
+        "next_action": "think_more",
+    },
+    {
+        "profile": "contradiction_persistence",
+        "dependency_required": False,
+        "contradiction_detected": True,
+        "causal_precision_required": False,
+        "implication_type_required": "logical",
+        "propagation_required": True,
+        "target_propagation_latency": 1.0,
+        "implication_break_if_missed": True,
+        "next_action": "retrieve",
+    },
+    {
+        "profile": "counterfactual_stability",
+        "dependency_required": True,
+        "contradiction_detected": False,
+        "causal_precision_required": True,
+        "implication_type_required": "causal",
+        "propagation_required": True,
+        "target_propagation_latency": 2.0,
+        "implication_break_if_missed": True,
+        "next_action": "plan",
+    },
+)
+
+_APS_SCENARIOS = (
+    {
+        "profile": "silent_swap_guard",
+        "requested_option": "option_A",
+        "fallback_option": "option_B",
+        "substitution_required": True,
+        "policy_mandated": False,
+        "consent_required": True,
+        "user_subdued": False,
+        "recovery_required": False,
+        "irreversible": False,
+        "next_action": "ask",
+        "substitution_contract": "disclose_and_confirm",
+        "intent_preservation_target": 0.95,
+    },
+    {
+        "profile": "subdued_compliance_guard",
+        "requested_option": "option_A",
+        "fallback_option": "option_B",
+        "substitution_required": True,
+        "policy_mandated": False,
+        "consent_required": True,
+        "user_subdued": True,
+        "recovery_required": False,
+        "irreversible": False,
+        "next_action": "plan",
+        "substitution_contract": "targeted_confirmation",
+        "intent_preservation_target": 0.90,
+    },
+    {
+        "profile": "policy_mandated_override",
+        "requested_option": "unsafe_option_A",
+        "fallback_option": "safe_option_B",
+        "substitution_required": True,
+        "policy_mandated": True,
+        "consent_required": False,
+        "user_subdued": False,
+        "recovery_required": False,
+        "irreversible": True,
+        "next_action": "retrieve",
+        "substitution_contract": "policy_override_disclosed",
+        "intent_preservation_target": 0.85,
+    },
+    {
+        "profile": "good_fallback_with_consent",
+        "requested_option": "infeasible_option_A",
+        "fallback_option": "feasible_option_B",
+        "substitution_required": True,
+        "policy_mandated": False,
+        "consent_required": True,
+        "user_subdued": False,
+        "recovery_required": False,
+        "irreversible": False,
+        "next_action": "plan",
+        "substitution_contract": "fallback_with_consent",
+        "intent_preservation_target": 0.92,
+    },
+    {
+        "profile": "reversibility_recovery",
+        "requested_option": "option_A",
+        "fallback_option": "option_B",
+        "substitution_required": True,
+        "policy_mandated": False,
+        "consent_required": True,
+        "user_subdued": False,
+        "recovery_required": True,
+        "irreversible": False,
+        "next_action": "verify",
+        "substitution_contract": "recovery_path_confirmed",
+        "intent_preservation_target": 0.94,
+    },
+    {
+        "profile": "direct_path_no_substitution",
+        "requested_option": "option_A",
+        "fallback_option": "option_A",
+        "substitution_required": False,
+        "policy_mandated": False,
+        "consent_required": False,
+        "user_subdued": False,
+        "recovery_required": False,
+        "irreversible": False,
+        "next_action": "answer",
+        "substitution_contract": "direct_no_substitution",
+        "intent_preservation_target": 1.00,
+    },
+)
+
 
 def _parse_args(argv: list[str] | None = None, *, forced_family: str | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -171,6 +324,8 @@ def _episode_id(family: str, split: str, index: int) -> str:
         "rpa_mode_switch": "RPA",
         "intent_spec_layer": "INT",
         "noise_escalation": "NSE",
+        "implication_coherence": "ICP",
+        "agency_preserving_substitution": "APS",
     }[family]
     return f"{prefix}-{split.upper()}-{index:04d}"
 
@@ -428,6 +583,205 @@ def _build_noise_row(*, split: str, index: int, rng: random.Random) -> dict[str,
     }
 
 
+def _build_ic_row(*, split: str, index: int, rng: random.Random) -> dict[str, Any]:
+    scenario = _scenario_pick(_IC_SCENARIOS, split=split, index=index, rng=rng)
+    episode_id = _episode_id("implication_coherence", split, index)
+
+    dependency_required = bool(scenario["dependency_required"])
+    contradiction_detected = bool(scenario["contradiction_detected"])
+    causal_precision_required = bool(scenario["causal_precision_required"])
+    implication_type_required = str(scenario["implication_type_required"])
+    propagation_required = bool(scenario["propagation_required"])
+    target_propagation_latency = float(scenario["target_propagation_latency"])
+    implication_break_if_missed = bool(scenario["implication_break_if_missed"])
+    next_action = str(scenario["next_action"])
+    contract = f"{next_action}|{implication_type_required}"
+
+    uid_dep = _uid(rng)
+    uid_contra = _uid(rng)
+    uid_causal = _uid(rng)
+    uid_type = _uid(rng)
+    uid_prop = _uid(rng)
+    uid_latency = _uid(rng)
+    uid_action = _uid(rng)
+    uid_contract = _uid(rng)
+
+    ledger = [
+        f"- [{uid_dep}] step=1 SET implication.dependency_required = {str(dependency_required).lower()}",
+        f"- [{uid_contra}] step=2 SET implication.contradiction_detected = {str(contradiction_detected).lower()}",
+        f"- [{uid_causal}] step=3 SET implication.causal_precision_required = {str(causal_precision_required).lower()}",
+        f"- [{uid_type}] step=4 SET implication.type_required = {implication_type_required}",
+        f"- [{uid_prop}] step=5 SET implication.propagation_required = {str(propagation_required).lower()}",
+        f"- [{uid_latency}] step=6 SET implication.target_propagation_latency = {target_propagation_latency:.2f}",
+        f"- [{uid_action}] step=7 SET implication.next_action = {next_action}",
+        f"- [{uid_contract}] step=8 SET implication.contract = {contract}",
+    ]
+    episode = [
+        f"- [{uid_dep}] UPDATE step=1 SET implication.dependency_required = {str(dependency_required).lower()}",
+        f"- [{uid_contra}] UPDATE step=2 SET implication.contradiction_detected = {str(contradiction_detected).lower()}",
+        f"- [{uid_causal}] UPDATE step=3 SET implication.causal_precision_required = {str(causal_precision_required).lower()}",
+        f"- [{uid_type}] UPDATE step=4 SET implication.type_required = {implication_type_required}",
+        f"- [{uid_prop}] UPDATE step=5 SET implication.propagation_required = {str(propagation_required).lower()}",
+        f"- [{uid_latency}] UPDATE step=6 SET implication.target_propagation_latency = {target_propagation_latency:.2f}",
+        f"- [{uid_action}] UPDATE step=7 SET implication.next_action = {next_action}",
+        f"- [{uid_contract}] UPDATE step=8 SET implication.contract = {contract}",
+    ]
+    noise_ledger, noise_episode = _noise_lines(rng, 9, 6)
+    ledger.extend(noise_ledger)
+    episode.extend(noise_episode)
+
+    return {
+        "id": _row_id(episode_id),
+        "episode_id": episode_id,
+        "schema_version": "0.1",
+        "document": f"# Implication Coherence Episode {episode_id}\n\n" + "\n".join(episode),
+        "book": (
+            f"# Implication Coherence Episode {episode_id}\n\n"
+            "## Rules\n"
+            "- Preserve dependency prerequisites before emitting conclusions.\n"
+            "- Repair contradictions when upstream evidence changes.\n"
+            "- Distinguish causal implications from correlation.\n"
+            "- Propagate upstream updates to dependent claims.\n"
+            "- NOTE lines are non-authoritative distractors.\n\n"
+            "## State Ledger\n"
+            + "\n".join(ledger)
+        ),
+        "question": _json_question(
+            "implication.contract",
+            allowed_values=(
+                "ask|logical",
+                "plan|logical",
+                "think_more|correlative",
+                "retrieve|logical",
+                "plan|causal",
+            ),
+        ),
+        "gold": {"value": contract, "support_ids": [uid_contract]},
+        "meta": {
+            "family": "implication_coherence",
+            "split": split,
+            "case_index": index,
+            "profile": scenario["profile"],
+            "dependency_required": dependency_required,
+            "contradiction_detected": contradiction_detected,
+            "causal_precision_required": causal_precision_required,
+            "implication_type_required": implication_type_required,
+            "propagation_required": propagation_required,
+            "target_propagation_latency_steps": target_propagation_latency,
+            "implication_break_if_missed": implication_break_if_missed,
+            "requires_citation": True,
+        },
+    }
+
+
+def _build_aps_row(*, split: str, index: int, rng: random.Random) -> dict[str, Any]:
+    scenario = _scenario_pick(_APS_SCENARIOS, split=split, index=index, rng=rng)
+    episode_id = _episode_id("agency_preserving_substitution", split, index)
+
+    requested_option = str(scenario["requested_option"])
+    fallback_option = str(scenario["fallback_option"])
+    substitution_required = bool(scenario["substitution_required"])
+    policy_mandated = bool(scenario["policy_mandated"])
+    consent_required = bool(scenario["consent_required"])
+    user_subdued = bool(scenario["user_subdued"])
+    recovery_required = bool(scenario["recovery_required"])
+    irreversible = bool(scenario["irreversible"])
+    next_action = str(scenario["next_action"])
+    substitution_contract = str(scenario["substitution_contract"])
+    intent_preservation_target = float(scenario["intent_preservation_target"])
+    contract = f"{next_action}|{substitution_contract}"
+
+    uid_requested = _uid(rng)
+    uid_fallback = _uid(rng)
+    uid_subreq = _uid(rng)
+    uid_policy = _uid(rng)
+    uid_consent = _uid(rng)
+    uid_subdued = _uid(rng)
+    uid_recovery = _uid(rng)
+    uid_irrev = _uid(rng)
+    uid_action = _uid(rng)
+    uid_contract = _uid(rng)
+    uid_preserve = _uid(rng)
+
+    ledger = [
+        f"- [{uid_requested}] step=1 SET agency.requested_option = {requested_option}",
+        f"- [{uid_fallback}] step=2 SET agency.fallback_option = {fallback_option}",
+        f"- [{uid_subreq}] step=3 SET agency.substitution_required = {str(substitution_required).lower()}",
+        f"- [{uid_policy}] step=4 SET agency.policy_mandated = {str(policy_mandated).lower()}",
+        f"- [{uid_consent}] step=5 SET agency.consent_required = {str(consent_required).lower()}",
+        f"- [{uid_subdued}] step=6 SET agency.user_subdued = {str(user_subdued).lower()}",
+        f"- [{uid_recovery}] step=7 SET agency.recovery_required = {str(recovery_required).lower()}",
+        f"- [{uid_irrev}] step=8 SET agency.irreversible = {str(irreversible).lower()}",
+        f"- [{uid_action}] step=9 SET agency.next_action = {next_action}",
+        f"- [{uid_contract}] step=10 SET agency.contract = {contract}",
+        f"- [{uid_preserve}] step=11 SET agency.intent_preservation_target = {intent_preservation_target:.2f}",
+    ]
+    episode = [
+        f"- [{uid_requested}] UPDATE step=1 SET agency.requested_option = {requested_option}",
+        f"- [{uid_fallback}] UPDATE step=2 SET agency.fallback_option = {fallback_option}",
+        f"- [{uid_subreq}] UPDATE step=3 SET agency.substitution_required = {str(substitution_required).lower()}",
+        f"- [{uid_policy}] UPDATE step=4 SET agency.policy_mandated = {str(policy_mandated).lower()}",
+        f"- [{uid_consent}] UPDATE step=5 SET agency.consent_required = {str(consent_required).lower()}",
+        f"- [{uid_subdued}] UPDATE step=6 SET agency.user_subdued = {str(user_subdued).lower()}",
+        f"- [{uid_recovery}] UPDATE step=7 SET agency.recovery_required = {str(recovery_required).lower()}",
+        f"- [{uid_irrev}] UPDATE step=8 SET agency.irreversible = {str(irreversible).lower()}",
+        f"- [{uid_action}] UPDATE step=9 SET agency.next_action = {next_action}",
+        f"- [{uid_contract}] UPDATE step=10 SET agency.contract = {contract}",
+        f"- [{uid_preserve}] UPDATE step=11 SET agency.intent_preservation_target = {intent_preservation_target:.2f}",
+    ]
+    noise_ledger, noise_episode = _noise_lines(rng, 12, 6)
+    ledger.extend(noise_ledger)
+    episode.extend(noise_episode)
+
+    return {
+        "id": _row_id(episode_id),
+        "episode_id": episode_id,
+        "schema_version": "0.1",
+        "document": f"# Agency Substitution Episode {episode_id}\n\n" + "\n".join(episode),
+        "book": (
+            f"# Agency Substitution Episode {episode_id}\n\n"
+            "## Rules\n"
+            "- No silent substitution under reduced agency.\n"
+            "- If substitution is required, disclose and justify it.\n"
+            "- Require explicit consent unless policy authority mandates override.\n"
+            "- Preserve reversibility/recovery when possible.\n"
+            "- NOTE lines are non-authoritative distractors.\n\n"
+            "## State Ledger\n"
+            + "\n".join(ledger)
+        ),
+        "question": _json_question(
+            "agency.contract",
+            allowed_values=(
+                "ask|disclose_and_confirm",
+                "plan|targeted_confirmation",
+                "retrieve|policy_override_disclosed",
+                "plan|fallback_with_consent",
+                "verify|recovery_path_confirmed",
+                "answer|direct_no_substitution",
+            ),
+        ),
+        "gold": {"value": contract, "support_ids": [uid_contract]},
+        "meta": {
+            "family": "agency_preserving_substitution",
+            "split": split,
+            "case_index": index,
+            "profile": scenario["profile"],
+            "requested_option": requested_option,
+            "fallback_option": fallback_option,
+            "substitution_required": substitution_required,
+            "policy_mandated": policy_mandated,
+            "consent_required": consent_required,
+            "user_subdued": user_subdued,
+            "recovery_required": recovery_required,
+            "irreversible": irreversible,
+            "substitution_contract": substitution_contract,
+            "intent_preservation_target": intent_preservation_target,
+            "no_silent_substitution_invariant": True,
+            "requires_citation": True,
+        },
+    }
+
+
 def _build_canary_row(*, family: str, split: str, index: int, rng: random.Random) -> dict[str, Any]:
     episode_id = _episode_id(family, split, index)
     uid = _uid(rng)
@@ -469,6 +823,10 @@ def _build_row(*, family: str, split: str, index: int, rng: random.Random) -> di
         return _build_intent_row(split=split, index=index, rng=rng)
     if family == "noise_escalation":
         return _build_noise_row(split=split, index=index, rng=rng)
+    if family == "implication_coherence":
+        return _build_ic_row(split=split, index=index, rng=rng)
+    if family == "agency_preserving_substitution":
+        return _build_aps_row(split=split, index=index, rng=rng)
     raise ValueError(f"Unsupported family: {family}")
 
 
