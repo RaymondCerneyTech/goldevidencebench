@@ -1,0 +1,129 @@
+{
+  "contract_id": "release_gate_contract",
+  "version": "1.0",
+  "strict_release": {
+    "freshness_policy": "must_regenerate_this_run",
+    "canary_policy": "strict",
+    "required_reliability_families": [
+      {
+        "id": "compression",
+        "artifact_path": "runs/compression_reliability_latest.json",
+        "stage": "target",
+        "canary_policy": "triage",
+        "allowed_statuses": [
+          "PASS"
+        ]
+      },
+      {
+        "id": "compression_roundtrip_generalization",
+        "artifact_path": "runs/compression_roundtrip_generalization_reliability_latest.json",
+        "stage": "target",
+        "allowed_statuses": [
+          "PASS"
+        ]
+      },
+      {
+        "id": "novel_continuity",
+        "artifact_path": "runs/novel_continuity_reliability_latest.json",
+        "stage": "target",
+        "allowed_statuses": [
+          "PASS"
+        ]
+      },
+      {
+        "id": "novel_continuity_long_horizon",
+        "artifact_path": "runs/novel_continuity_long_horizon_reliability_latest.json",
+        "stage": "target",
+        "allowed_statuses": [
+          "PASS"
+        ]
+      },
+      {
+        "id": "myopic_planning_traps",
+        "artifact_path": "runs/myopic_planning_traps_reliability_latest.json",
+        "stage": "target",
+        "allowed_statuses": [
+          "PASS"
+        ]
+      },
+      {
+        "id": "referential_indexing_suite",
+        "artifact_path": "runs/referential_indexing_suite_reliability_latest.json",
+        "stage": "target",
+        "allowed_statuses": [
+          "PASS"
+        ]
+      },
+      {
+        "id": "epistemic_calibration_suite",
+        "artifact_path": "runs/epistemic_calibration_suite_reliability_latest.json",
+        "stage": "target",
+        "allowed_statuses": [
+          "PASS"
+        ]
+      },
+      {
+        "id": "authority_under_interference",
+        "artifact_path": "runs/authority_under_interference_reliability_latest.json",
+        "stage": "target",
+        "allowed_statuses": [
+          "PASS"
+        ]
+      },
+      {
+        "id": "authority_under_interference_hardening",
+        "artifact_path": "runs/authority_under_interference_hardening_reliability_latest.json",
+        "stage": "target",
+        "allowed_statuses": [
+          "PASS"
+        ]
+      },
+      {
+        "id": "rpa_mode_switch",
+        "artifact_path": "runs/rpa_mode_switch_reliability_latest.json",
+        "stage": "target",
+        "allowed_statuses": [
+          "PASS"
+        ]
+      },
+      {
+        "id": "intent_spec_layer",
+        "artifact_path": "runs/intent_spec_layer_reliability_latest.json",
+        "stage": "target",
+        "allowed_statuses": [
+          "PASS"
+        ]
+      },
+      {
+        "id": "noise_escalation",
+        "artifact_path": "runs/noise_escalation_reliability_latest.json",
+        "stage": "target",
+        "allowed_statuses": [
+          "PASS"
+        ]
+      },
+      {
+        "id": "implication_coherence",
+        "artifact_path": "runs/implication_coherence_reliability_latest.json",
+        "stage": "target",
+        "allowed_statuses": [
+          "PASS"
+        ]
+      },
+      {
+        "id": "agency_preserving_substitution",
+        "artifact_path": "runs/agency_preserving_substitution_reliability_latest.json",
+        "stage": "target",
+        "allowed_statuses": [
+          "PASS"
+        ]
+      }
+    ],
+    "utility_gate": {
+      "required": false,
+      "producer_mode": "deferred",
+      "producer_script": "scripts/run_real_world_utility_eval.ps1",
+      "artifact_path": "runs/real_world_utility_eval_latest.json"
+    }
+  }
+}

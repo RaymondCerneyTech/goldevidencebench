@@ -29,6 +29,10 @@ jobs:
           python .\scripts\build_rpa_control_snapshot.py --out .\runs\rpa_control_latest.json
           python .\scripts\validate_artifact.py --schema .\schemas\rpa_control_latest_v0_2.schema.json --path .\runs\rpa_control_latest.json
 
+      - name: Validate release gate contract schema
+        run: |
+          python .\scripts\validate_artifact.py --schema .\schemas\release_gate_contract.schema.json --path .\configs\release_gate_contract.json
+
       - name: Mock adapter baseline
         shell: pwsh
         run: .\scripts\run_adapter_baseline.ps1 -Preset smoke

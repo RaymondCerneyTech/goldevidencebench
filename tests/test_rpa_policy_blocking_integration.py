@@ -9,6 +9,10 @@ from pathlib import Path
 import pytest
 
 
+def _powershell_executable() -> str | None:
+    return shutil.which("pwsh") or shutil.which("powershell")
+
+
 def _write_json(path: Path, payload: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload), encoding="utf-8")
@@ -70,9 +74,9 @@ def test_router_and_planner_blocking_from_fixture_snapshots(tmp_path: Path) -> N
     repo_root = Path(__file__).resolve().parents[1]
 
     # Router: run_demo should block with deterministic unauthorized substitution code.
-    powershell = shutil.which("powershell")
+    powershell = _powershell_executable()
     if not powershell:
-        pytest.skip("powershell executable is required for run_demo integration tests")
+        pytest.skip("pwsh/powershell executable is required for run_demo integration tests")
     marker = tmp_path / "marker.txt"
     preset_script = tmp_path / "preset.ps1"
     _write_noop_powershell(preset_script, marker)

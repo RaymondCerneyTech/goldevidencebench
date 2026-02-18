@@ -8,6 +8,10 @@ from pathlib import Path
 import pytest
 
 
+def _powershell_executable() -> str | None:
+    return shutil.which("pwsh") or shutil.which("powershell")
+
+
 def _write_json(path: Path, payload: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload), encoding="utf-8")
@@ -42,9 +46,9 @@ def _run_demo(
     config_path: Path,
     snapshot_path: Path,
 ) -> subprocess.CompletedProcess[str]:
-    powershell = shutil.which("powershell")
+    powershell = _powershell_executable()
     if not powershell:
-        pytest.skip("powershell executable is required for run_demo integration tests")
+        pytest.skip("pwsh/powershell executable is required for run_demo integration tests")
     script = Path(__file__).resolve().parents[1] / "scripts" / "run_demo.ps1"
     return subprocess.run(
         [

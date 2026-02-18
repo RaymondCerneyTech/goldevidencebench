@@ -8,10 +8,14 @@ from pathlib import Path
 import pytest
 
 
+def _powershell_executable() -> str | None:
+    return shutil.which("pwsh") or shutil.which("powershell")
+
+
 def test_cross_app_pack_runner_writes_expected_artifacts(tmp_path: Path) -> None:
-    powershell = shutil.which("powershell")
+    powershell = _powershell_executable()
     if not powershell:
-        pytest.skip("powershell executable is required for runner integration tests")
+        pytest.skip("pwsh/powershell executable is required for runner integration tests")
 
     out_root = tmp_path / "cross_app_pack_run"
     script = (

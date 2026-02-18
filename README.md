@@ -302,6 +302,20 @@ Release check (full suite):
 .\scripts\run_release_check.ps1 -ModelPath "<MODEL_PATH>"
 ```
 
+Fast iterative family loop (matrix + failing-family reruns, avoids heavy release gates):
+
+```powershell
+.\scripts\run_test_check.ps1 -Adapter "goldevidencebench.adapters.llama_server_adapter:create_adapter"
+```
+
+`run_test_check.ps1` also writes `artifact_audit.json` and now covers the full
+strict-release reliability set (including
+`compression_roundtrip_generalization`, `novel_continuity_long_horizon`,
+`myopic_planning_traps`, `referential_indexing_suite`,
+`epistemic_calibration_suite`, and
+`authority_under_interference_hardening`). `drift_holdout_gate` remains audited
+for presence/validity, but its `FAIL` status is non-blocking in test-check.
+
 Gate profiles:
 
 | Profile | Intended use | Missing metric paths in threshold checks | Reliability family matrix |
@@ -313,6 +327,26 @@ Profile selection defaults:
 - `-FastLocal` implies `-GateProfile fastlocal` unless overridden.
 - Without `-FastLocal`, default is `-GateProfile release`.
 - Profile defaults are configured in `configs/release_gate_profiles.json`.
+- Mixed mode (`-GateProfile release -FastLocal`) is blocked unless you explicitly pass `-AllowReleaseFastLocalTriage`.
+
+Strict release contract source of truth:
+- `configs/release_gate_contract.json`
+- schema: `schemas/release_gate_contract.schema.json`
+- contract fields define required reliability family IDs, allowed statuses, freshness policy, canary policy, and utility-gate ownership.
+- `strict_release.canary_policy` is the default policy (`strict` or `triage`) for release matrix producers.
+- each `required_reliability_families[]` row can optionally override with `canary_policy`; current contract sets compression to `triage` to keep release behavior explicit and deterministic.
+
+Strict release now generates a deterministic reliability matrix before the unified reliability signal:
+- producer: `scripts/run_release_reliability_matrix.ps1`
+- artifact: `<release_run_dir>/release_reliability_matrix.json`
+- latest pointer: `runs/latest_release_reliability_matrix`
+- on matrix failure, release check writes `<release_run_dir>/release_reliability_failure_report.txt` with per-family reliability/holdout/persona diagnostics
+- on matrix failure, release check also writes machine-usable row-id lists under `<release_run_dir>/release_reliability_failed_rows/`:
+  `failed_row_ids.txt`, `failed_holdout_row_ids.txt`, `persona_drift_base_row_ids.txt`, plus per-family files
+- when contract `freshness_policy=allow_latest`, release check runs matrix in existing-artifact mode (`-UseExistingArtifacts`)
+- matrix producer supports `-FailOnMatrixFail` for standalone CI jobs that want non-zero exit on matrix `status=FAIL`
+- helper for fast canary subsets: `python .\scripts\filter_jsonl_by_ids.py --data <fixture.jsonl> --ids <failed_row_ids.txt> --out <subset.jsonl>`
+- `llama_server_adapter` now neutralizes persona-prefixed questions (`[ORIGINAL QUESTION]` form) and applies one-shot epistemic JSON repair to enforce `decision/answer/confidence/needed_info/support_ids` contract fields.
 
 Includes the bad_actor holdout safety gate (fixtures in `configs/bad_actor_holdout_list.json`, thresholds in `configs/usecase_checks.json`), using `prefer_update_latest` rerank (CLEAR-aware) with authority filtering by default.
 The final release step is the unified reliability signal gate (`scripts/check_reliability_signal.ps1`); its exit code is treated as ship/no-ship.
@@ -370,9 +404,13 @@ reliability gate:
 - `implication_coherence_core >= 0.945`
 - `agency_preservation_core >= 0.92`
 
-Release check also runs the real-world utility A/B gate by default:
-- `.\scripts\run_real_world_utility_eval.ps1` (through the release wrapper)
-- requires `runs/real_world_utility_eval_latest.json` to report `status=PASS`
+Utility gate ownership is now contract-driven from `configs/release_gate_contract.json`:
+- `strict_release.utility_gate.required`
+- `strict_release.utility_gate.producer_mode` (`script` or `deferred`)
+- `strict_release.utility_gate.producer_script`
+- `strict_release.utility_gate.artifact_path`
+
+Current default contract is `required=false` with `producer_mode=deferred` (strict release skips utility gating until explicitly promoted in contract).
 
 Release check now also enforces persona contract invariance across trap families:
 - consolidated gate artifact: `runs/release_gates/persona_invariance/summary.json`
@@ -434,7 +472,7 @@ This wrapper:
   `implication_coherence_core >= 0.945` and
   `agency_preservation_core >= 0.92` by
   default through the wrapped release check.
-- runs the real-world utility A/B gate by default through the wrapped release check.
+- follows utility gate ownership from `configs/release_gate_contract.json` through the wrapped release check.
 
 Diagnostic-only overnight override:
 
@@ -640,7 +678,7 @@ python .\scripts\generate_compression_loss_bounded_family.py --overwrite
 python .\scripts\score_compression_loss_bounded.py --data "data\compression_loss_bounded\compression_loss_bounded_anchors.jsonl" --preds "<PREDS_JSONL>" --rows-out "<ROWS_JSONL>"
 python .\scripts\generate_compression_recoverability_family.py --overwrite
 python .\scripts\score_compression_recoverability.py --data "data\compression_recoverability\compression_recoverability_anchors.jsonl" --preds "<PREDS_JSONL>" --rows-out "<ROWS_JSONL>"
-.\scripts\run_compression_families.ps1 -Adapter "goldevidencebench.adapters.llama_server_adapter:create_adapter" -OverwriteFixtures
+.\scripts\run_compression_families.ps1 -Adapter "goldevidencebench.adapters.llama_server_adapter:create_adapter" -OverwriteFixtures -CanaryPolicy strict
 python .\scripts\check_compression_reliability.py --run-dirs "<RUN_A>" "<RUN_B>" "<RUN_C>"
 python .\scripts\generate_compression_roundtrip_generalization_family.py --overwrite
 python .\scripts\score_compression_roundtrip_generalization.py --data "data\compression_roundtrip_generalization\compression_roundtrip_generalization_anchors.jsonl" --preds "<PREDS_JSONL>" --rows-out "<ROWS_JSONL>"
@@ -702,6 +740,10 @@ Get-Content "runs\codex_compat\scaffold_backlog.json"
 python .\scripts\minimize_counterexample.py --drilldown "<DRILLDOWN_JSONL>" --out "<MIN_JSONL>" --max-rows 8 --cover-by both
 python .\scripts\promote_failures_to_anchors.py --data "<DATA_JSONL>" --drilldown "<DRILLDOWN_JSONL>" --out "<ANCHORS_JSONL>" --max-anchors 8 --cover-by both
 ```
+
+Compression-family canary policy:
+- `-CanaryPolicy strict` enforces canary WARN as a hard gate at `target` stage.
+- `-CanaryPolicy triage` records canary WARN but does not hard-fail unless `-FailOnCanaryWarn` is also set.
 
 Note: novel continuity (base + long-horizon) citation floors are stage-driven:
 - `observe` -> `min_cite_f1=0.00`

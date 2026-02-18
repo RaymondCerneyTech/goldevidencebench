@@ -18,6 +18,8 @@ param(
     [double]$CrvHoldoutMinExactAcc = 0.90,
     [double]$CrvHoldoutMinCiteF1 = 0.90,
     [double]$CanaryAlertExactRate = 0.95,
+    [ValidateSet("strict","triage")]
+    [string]$CanaryPolicy = "strict",
     [switch]$FailOnCanaryWarn,
     [bool]$RunPersonaTrap = $true,
     [string]$PersonaProfiles = "persona_confident_expert,persona_creative_writer,persona_ultra_brief,persona_overly_helpful"
@@ -73,6 +75,7 @@ Write-Host "Adapter: $Adapter"
 Write-Host "Protocol: $Protocol"
 Write-Host "MaxSupportK: $MaxSupportK"
 Write-Host "Stage: $Stage"
+Write-Host "CanaryPolicy: $CanaryPolicy"
 
 $clbAnchorsData = "data\compression_loss_bounded\compression_loss_bounded_anchors.jsonl"
 $clbHoldoutData = "data\compression_loss_bounded\compression_loss_bounded_holdout.jsonl"
@@ -305,7 +308,8 @@ $clbCanaryAlert = (-not [double]::IsNaN($clbCanaryExact)) -and ($clbCanaryExact 
 $crvCanaryAlert = (-not [double]::IsNaN($crvCanaryExact)) -and ($crvCanaryExact -ge $CanaryAlertExactRate)
 $canaryStatus = if ($clbCanaryAlert -or $crvCanaryAlert) { "WARN" } else { "OK" }
 $releaseStageApproved = $Stage -eq "target"
-$enforceCanaryGate = [bool]$FailOnCanaryWarn -or $releaseStageApproved
+$effectiveCanaryPolicy = if ($FailOnCanaryWarn) { "strict" } else { $CanaryPolicy }
+$enforceCanaryGate = [bool]$FailOnCanaryWarn -or (($effectiveCanaryPolicy -eq "strict") -and $releaseStageApproved)
 $canaryGatePass = -not ($clbCanaryAlert -or $crvCanaryAlert)
 $hardGatePass = $hardGatePass -and ((-not $enforceCanaryGate) -or $canaryGatePass)
 
@@ -335,6 +339,8 @@ $combined = [ordered]@{
     provenance = [ordered]@{
         release_stage_required = "target"
         release_stage_approved = $releaseStageApproved
+        canary_policy = $effectiveCanaryPolicy
+        canary_policy_source = if ($FailOnCanaryWarn) { "flag_override" } else { "param" }
         canary_gate_enforced = $enforceCanaryGate
     }
     hard_gate_status = if ($hardGatePass) { "PASS" } else { "FAIL" }

@@ -27,10 +27,11 @@ Gates are constraint checks: they don't prevent optimization, they ensure optimi
 | Bad actor holdout gate | `.\scripts\run_bad_actor_holdout_gate.ps1` | `configs/bad_actor_holdout_list.json` + `configs/usecase_checks.json` (`bad_actor_holdout_gate`) | `runs/bad_actor_holdout_latest/summary.json` |
 | UI same_label stub | `.\scripts\run_ui_same_label_stub.ps1` | `configs/usecase_checks.json` (`ui_same_label_gate`) | `runs/ui_same_label_gate.json` |
 | UI popup_overlay stub | `.\scripts\run_ui_popup_overlay_stub.ps1` | `configs/usecase_checks.json` (`ui_popup_overlay_gate`) | `runs/ui_popup_overlay_gate.json` |
+| Release reliability matrix | `.\scripts\run_release_reliability_matrix.ps1` (invoked by `.\scripts\run_release_check.ps1` in `release` profile) | `configs/release_gate_contract.json` (`strict_release.required_reliability_families`, freshness/status/canary policy) | `<release_run_dir>/release_reliability_matrix.json` (`runs/latest_release_reliability_matrix`) |
 | Unified reliability signal | `.\scripts\check_reliability_signal.ps1` (invoked by `.\scripts\run_release_check.ps1`) | strict + family reliability summaries; default requires `rpa_mode_switch`, `intent_spec_layer`, `noise_escalation`, `implication_coherence`, `agency_preserving_substitution`, and enforces `derived.reasoning/planning/intelligence >= 0.98` plus implication/agency component floors | `runs/reliability_signal_latest.json` |
 | Codex compatibility artifacts | `python .\scripts\build_codex_compat_report.py` (invoked by `.\scripts\run_release_check.ps1` after reliability PASS) | consistency across family scaffolds/docs + orthogonality export from latest reliability files | `runs/codex_compat/family_matrix.json`, `runs/codex_compat/orthogonality_matrix.json`, `runs/codex_compat/rpa_ablation_report.json` |
 | Codex next-step report | `python .\scripts\build_codex_next_step_report.py` (invoked by `.\scripts\run_release_check.ps1` after reliability PASS) | control readiness snapshot from reliability + RPA control contract | `runs/codex_next_step_report.json` |
-| Real-world utility eval (A/B) | `.\scripts\run_real_world_utility_eval.ps1` (invoked by `.\scripts\run_release_check.ps1` unless `-SkipRealWorldUtilityEval`) | baseline vs controlled task-pack delta (`false_commit`, `correction_turns`, `clarification_burden`) | `runs/real_world_utility_eval_latest.json` |
+| Real-world utility eval (A/B) | producer resolved by `configs/release_gate_contract.json` (`strict_release.utility_gate`) | baseline vs controlled task-pack delta (`false_commit`, `correction_turns`, `clarification_burden`) when utility gate is required | contract-defined artifact path (default: `runs/real_world_utility_eval_latest.json`) |
 
 Default release/nightly contract:
 
@@ -41,8 +42,18 @@ Default release/nightly contract:
   `reasoning_score >= 0.98`, `planning_score >= 0.98`,
   `intelligence_index >= 0.98`, `implication_coherence_core >= 0.945`,
   `agency_preservation_core >= 0.92`.
-- `run_release_check.ps1` now runs the real-world utility A/B gate by default
-  (`runs/real_world_utility_eval_latest.json` must be `PASS`).
+- `run_release_check.ps1` now loads strict release requirements from
+  `configs/release_gate_contract.json` and, in `release` profile, produces
+  `<release_run_dir>/release_reliability_matrix.json` before unified reliability.
+- Release canary policy is contract-driven: `strict_release.canary_policy` sets
+  the default and individual `required_reliability_families[]` rows can
+  override with `canary_policy` (`strict` or `triage`).
+- If contract freshness is `allow_latest`, matrix production uses existing
+  reliability artifacts (`-UseExistingArtifacts`) instead of regenerating.
+- Utility gate ownership is now contract-defined in
+  `strict_release.utility_gate` (required/deferred + producer + artifact path).
+- `run_release_reliability_matrix.ps1` now supports `-FailOnMatrixFail` for
+  independent CI jobs that require non-zero exit when matrix status is `FAIL`.
 - `run_release_check.ps1` now hard-fails on persona contract drift using the
   consolidated persona invariance gate (`row_invariance_rate == 1.0`).
 - `cross_app_intent_preservation_pack` is currently warn-only in release

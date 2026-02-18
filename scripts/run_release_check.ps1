@@ -178,6 +178,17 @@ after bootstrap.
  JSON config path for gate-profile defaults used by release and fastlocal
  policy modes.
 
+.PARAMETER ReleaseGateContractPath
+ Canonical strict-release contract definition (required reliability families,
+ status rules, freshness policy, and utility-gate ownership).
+
+.PARAMETER ReleaseGateContractSchemaPath
+ Schema used to validate `ReleaseGateContractPath` before release execution.
+
+.PARAMETER AllowReleaseFastLocalTriage
+ Allows mixed mode (`-GateProfile release -FastLocal`) for explicit triage.
+ Without this override, mixed mode is blocked.
+
 .PARAMETER ReuseInstructionOverrideMaxAgeMinutes
  Maximum artifact age (minutes) for reusing instruction-override gate outputs in
  FastLocal mode.
@@ -250,6 +261,9 @@ param(
     [ValidateSet("fastlocal", "release")]
     [string]$GateProfile = "",
     [string]$GateProfileConfigPath = "configs\\release_gate_profiles.json",
+    [string]$ReleaseGateContractPath = "configs\\release_gate_contract.json",
+    [string]$ReleaseGateContractSchemaPath = "schemas\\release_gate_contract.schema.json",
+    [switch]$AllowReleaseFastLocalTriage,
     [int]$ReuseInstructionOverrideMaxAgeMinutes = 240,
     [int]$ReuseUiBaselinesMaxAgeMinutes = 240,
     [int]$ReuseUtilityEvalMaxAgeMinutes = 240,
@@ -474,7 +488,11 @@ if ($GateProfile -eq "fastlocal" -and -not $FastLocal) {
     Write-Warning "GateProfile=fastlocal without -FastLocal. Proceeding with fastlocal policy semantics."
 }
 if ($GateProfile -eq "release" -and $FastLocal) {
-    Write-Warning "GateProfile=release with -FastLocal. Local artifact reuse remains enabled, but release-strict gate semantics apply."
+    if (-not $AllowReleaseFastLocalTriage) {
+        Write-Error "GateProfile=release with -FastLocal requires explicit -AllowReleaseFastLocalTriage override."
+        exit 1
+    }
+    Write-Warning "GateProfile=release with -FastLocal allowed by explicit triage override."
 }
 if (-not (Test-Path $GateProfileConfigPath)) {
     Write-Error ("GateProfileConfigPath does not exist: {0}" -f $GateProfileConfigPath)
@@ -518,6 +536,63 @@ if ($selectedGateProfileConfig.PSObject.Properties.Name -contains "allow_mock_ca
         $gateProfileAllowMockCanarySoftFail = $false
     }
 }
+if (-not (Test-Path $ReleaseGateContractPath)) {
+    Write-Error ("ReleaseGateContractPath does not exist: {0}" -f $ReleaseGateContractPath)
+    exit 1
+}
+if (-not (Test-Path $ReleaseGateContractSchemaPath)) {
+    Write-Error ("ReleaseGateContractSchemaPath does not exist: {0}" -f $ReleaseGateContractSchemaPath)
+    exit 1
+}
+python .\scripts\validate_artifact.py --schema $ReleaseGateContractSchemaPath --path $ReleaseGateContractPath | Out-Host
+if ($LASTEXITCODE -ne 0) {
+    Write-Error ("Release gate contract schema validation failed: {0}" -f $ReleaseGateContractPath)
+    exit 1
+}
+$releaseGateContractPayload = $null
+try {
+    $releaseGateContractPayload = Get-Content -Raw -Path $ReleaseGateContractPath | ConvertFrom-Json
+} catch {
+    Write-Error ("Unable to parse release gate contract: {0} ({1})" -f $ReleaseGateContractPath, $_.Exception.Message)
+    exit 1
+}
+if (-not $releaseGateContractPayload -or -not $releaseGateContractPayload.strict_release) {
+    Write-Error ("Release gate contract missing strict_release block: {0}" -f $ReleaseGateContractPath)
+    exit 1
+}
+$strictReleaseContract = $releaseGateContractPayload.strict_release
+$strictUtilityGate = $strictReleaseContract.utility_gate
+$strictUtilityRequired = $false
+$strictUtilityProducerMode = "deferred"
+$strictUtilityProducerScript = ".\\scripts\\run_real_world_utility_eval.ps1"
+$strictUtilityArtifactPath = "runs\\real_world_utility_eval_latest.json"
+if ($strictUtilityGate) {
+    if ($strictUtilityGate.PSObject.Properties.Name -contains "required") {
+        try {
+            $strictUtilityRequired = [bool]$strictUtilityGate.required
+        } catch {
+            $strictUtilityRequired = $false
+        }
+    }
+    if ($strictUtilityGate.PSObject.Properties.Name -contains "producer_mode") {
+        $candidateMode = "$($strictUtilityGate.producer_mode)".Trim()
+        if (-not [string]::IsNullOrWhiteSpace($candidateMode)) {
+            $strictUtilityProducerMode = $candidateMode
+        }
+    }
+    if ($strictUtilityGate.PSObject.Properties.Name -contains "producer_script") {
+        $candidateScript = "$($strictUtilityGate.producer_script)".Trim()
+        if (-not [string]::IsNullOrWhiteSpace($candidateScript)) {
+            $strictUtilityProducerScript = $candidateScript
+        }
+    }
+    if ($strictUtilityGate.PSObject.Properties.Name -contains "artifact_path") {
+        $candidateArtifactPath = "$($strictUtilityGate.artifact_path)".Trim()
+        if (-not [string]::IsNullOrWhiteSpace($candidateArtifactPath)) {
+            $strictUtilityArtifactPath = $candidateArtifactPath
+        }
+    }
+}
 if ($FastLocal -and -not $PSBoundParameters.ContainsKey("SkipWarningDebtGuard")) {
     $SkipWarningDebtGuard = $true
     Write-Host "[FAST] SkipWarningDebtGuard enabled by default in FastLocal mode."
@@ -540,6 +615,14 @@ $manifest = [ordered]@{
         gate_profile_threshold_profile = $gateProfileThresholdProfile
         gate_profile_require_full_matrix = [bool]$gateProfileRequireFullMatrix
         gate_profile_allow_mock_canary_soft_fail = [bool]$gateProfileAllowMockCanarySoftFail
+        allow_release_fastlocal_triage = [bool]$AllowReleaseFastLocalTriage
+        release_gate_contract_path = $ReleaseGateContractPath
+        release_gate_contract_schema_path = $ReleaseGateContractSchemaPath
+        release_gate_contract_version = "$($releaseGateContractPayload.version)"
+        strict_utility_required = [bool]$strictUtilityRequired
+        strict_utility_producer_mode = $strictUtilityProducerMode
+        strict_utility_producer_script = $strictUtilityProducerScript
+        strict_utility_artifact_path = $strictUtilityArtifactPath
         fast_local = [bool]$FastLocal
         reuse_instruction_override_max_age_minutes = $ReuseInstructionOverrideMaxAgeMinutes
         reuse_ui_baselines_max_age_minutes = $ReuseUiBaselinesMaxAgeMinutes
@@ -635,6 +718,8 @@ $manifest | ConvertTo-Json -Depth 6 | Set-Content -Path $manifestPath -Encoding 
 Write-Host "Release manifest: $manifestPath"
 Write-Host ("Gate profile: {0} (threshold_profile={1}, require_full_matrix={2}, allow_mock_canary_soft_fail={3})" -f `
     $GateProfile, $gateProfileThresholdProfile, $gateProfileRequireFullMatrix, $gateProfileAllowMockCanarySoftFail)
+Write-Host ("Release contract: {0} (version={1}, utility_required={2}, utility_mode={3})" -f `
+    $ReleaseGateContractPath, "$($releaseGateContractPayload.version)", $strictUtilityRequired, $strictUtilityProducerMode)
 
 $releaseIntegrityWarnings = New-Object System.Collections.Generic.List[string]
 $releaseRiskWarnings = New-Object System.Collections.Generic.List[string]
@@ -2151,9 +2236,141 @@ if ($true) {
         Write-Host "Skipping release threshold checks (-SkipThresholds)."
     }
     if (-not $SkipReliabilitySignal) {
+        $releaseReliabilityMatrix = $null
+        if ($GateProfile -eq "release") {
+            $releaseReliabilityMatrixPath = Join-Path $ReleaseRunDir "release_reliability_matrix.json"
+            $useExistingMatrixArtifacts = $false
+            if ("$($strictReleaseContract.freshness_policy)" -eq "allow_latest") {
+                $useExistingMatrixArtifacts = $true
+                Write-Host "Strict release contract freshness_policy=allow_latest; matrix will use existing artifacts."
+            }
+            Write-Host "Producing strict release reliability matrix..."
+            if ($useExistingMatrixArtifacts) {
+                .\scripts\run_release_reliability_matrix.ps1 `
+                    -ContractPath $ReleaseGateContractPath `
+                    -ContractSchemaPath $ReleaseGateContractSchemaPath `
+                    -Adapter $GateAdapter `
+                    -Out $releaseReliabilityMatrixPath `
+                    -UseExistingArtifacts `
+                    -RunPersonaTrap:$true `
+                    -ContinueOnRunFailure
+            } else {
+                .\scripts\run_release_reliability_matrix.ps1 `
+                    -ContractPath $ReleaseGateContractPath `
+                    -ContractSchemaPath $ReleaseGateContractSchemaPath `
+                    -Adapter $GateAdapter `
+                    -Out $releaseReliabilityMatrixPath `
+                    -RunPersonaTrap:$true `
+                    -ContinueOnRunFailure
+            }
+            if ($LASTEXITCODE -ne 0) {
+                Write-Error "Release reliability matrix producer failed."
+                exit 1
+            }
+            if (-not (Test-Path $releaseReliabilityMatrixPath)) {
+                Write-Error "Release reliability matrix artifact missing."
+                exit 1
+            }
+            $releaseReliabilityMatrix = Read-JsonObject -Path $releaseReliabilityMatrixPath
+            if (-not $releaseReliabilityMatrix) {
+                Write-Error "Unable to parse release reliability matrix artifact."
+                exit 1
+            }
+            .\scripts\set_latest_pointer.ps1 -RunDir $releaseReliabilityMatrixPath -PointerPath "runs\\latest_release_reliability_matrix" | Out-Host
+
+            if ("$($releaseReliabilityMatrix.status)" -ne "PASS") {
+                $matrixMissing = @()
+                if ($releaseReliabilityMatrix.coverage -and $releaseReliabilityMatrix.coverage.missing_families) {
+                    $matrixMissing = @($releaseReliabilityMatrix.coverage.missing_families | ForEach-Object { "$_" })
+                }
+                $matrixFailRows = @()
+                if ($releaseReliabilityMatrix.failing_families) {
+                    $matrixFailRows = @($releaseReliabilityMatrix.failing_families)
+                }
+                $matrixFailText = @()
+                foreach ($row in $matrixFailRows) {
+                    $matrixFailText += ("{0}({1}):{2}" -f "$($row.id)", "$($row.status)", "$($row.first_failure_reason)")
+                }
+                if ($matrixFailText.Count -eq 0) {
+                    $matrixFailText = @("none")
+                }
+                $matrixMissingText = if ($matrixMissing.Count -gt 0) { $matrixMissing -join ", " } else { "none" }
+                $utilityGateSummary = ("required={0}; producer_mode={1}; producer={2}; artifact={3}" -f `
+                    $strictUtilityRequired, $strictUtilityProducerMode, $strictUtilityProducerScript, $strictUtilityArtifactPath)
+                $matrixFailureReportPath = Join-Path $ReleaseRunDir "release_reliability_failure_report.txt"
+                $matrixFailureRowsDir = Join-Path $ReleaseRunDir "release_reliability_failed_rows"
+                if (Test-Path ".\scripts\render_release_matrix_failure_report.py") {
+                    python .\scripts\render_release_matrix_failure_report.py `
+                        --matrix $releaseReliabilityMatrixPath `
+                        --out $matrixFailureReportPath `
+                        --rows-out-dir $matrixFailureRowsDir `
+                        --sample-limit 5 | Out-Host
+                    if ($LASTEXITCODE -eq 0 -and (Test-Path $matrixFailureReportPath)) {
+                        Write-Host ("Release matrix failure report: {0}" -f $matrixFailureReportPath)
+                        if (Test-Path $matrixFailureRowsDir) {
+                            Write-Host ("Release matrix failed row ids: {0}" -f $matrixFailureRowsDir)
+                        }
+                    } else {
+                        Write-Warning "Failed to render release matrix failure report."
+                    }
+                }
+                Write-Error ("Release reliability matrix failed. missing_families=[{0}] failing_families=[{1}] utility_gate={2}" -f `
+                    $matrixMissingText, ($matrixFailText -join "; "), $utilityGateSummary)
+                exit 1
+            }
+        }
+
         Write-Host "Running unified reliability signal gate..."
         $reliabilityParams = @{
             Profile = $GateProfile
+        }
+        if ($releaseReliabilityMatrix -and $releaseReliabilityMatrix.families) {
+            $matrixFamilyById = @{}
+            foreach ($row in @($releaseReliabilityMatrix.families)) {
+                $matrixFamilyById["$($row.id)"] = $row
+            }
+            if ($matrixFamilyById.ContainsKey("compression")) {
+                $reliabilityParams.CompressionReliability = "$($matrixFamilyById["compression"].artifact_path)"
+            }
+            if ($matrixFamilyById.ContainsKey("novel_continuity")) {
+                $reliabilityParams.NovelReliability = "$($matrixFamilyById["novel_continuity"].artifact_path)"
+            }
+            if ($matrixFamilyById.ContainsKey("authority_under_interference")) {
+                $reliabilityParams.AuthorityInterferenceReliability = "$($matrixFamilyById["authority_under_interference"].artifact_path)"
+            }
+            if ($matrixFamilyById.ContainsKey("compression_roundtrip_generalization")) {
+                $reliabilityParams.CompressionRoundtripReliability = "$($matrixFamilyById["compression_roundtrip_generalization"].artifact_path)"
+            }
+            if ($matrixFamilyById.ContainsKey("novel_continuity_long_horizon")) {
+                $reliabilityParams.NovelLongHorizonReliability = "$($matrixFamilyById["novel_continuity_long_horizon"].artifact_path)"
+            }
+            if ($matrixFamilyById.ContainsKey("myopic_planning_traps")) {
+                $reliabilityParams.MyopicPlanningReliability = "$($matrixFamilyById["myopic_planning_traps"].artifact_path)"
+            }
+            if ($matrixFamilyById.ContainsKey("referential_indexing_suite")) {
+                $reliabilityParams.ReferentialIndexingReliability = "$($matrixFamilyById["referential_indexing_suite"].artifact_path)"
+            }
+            if ($matrixFamilyById.ContainsKey("epistemic_calibration_suite")) {
+                $reliabilityParams.EpistemicReliability = "$($matrixFamilyById["epistemic_calibration_suite"].artifact_path)"
+            }
+            if ($matrixFamilyById.ContainsKey("authority_under_interference_hardening")) {
+                $reliabilityParams.AuthorityHardeningReliability = "$($matrixFamilyById["authority_under_interference_hardening"].artifact_path)"
+            }
+            if ($matrixFamilyById.ContainsKey("rpa_mode_switch")) {
+                $reliabilityParams.RPAModeSwitchReliability = "$($matrixFamilyById["rpa_mode_switch"].artifact_path)"
+            }
+            if ($matrixFamilyById.ContainsKey("intent_spec_layer")) {
+                $reliabilityParams.IntentSpecReliability = "$($matrixFamilyById["intent_spec_layer"].artifact_path)"
+            }
+            if ($matrixFamilyById.ContainsKey("noise_escalation")) {
+                $reliabilityParams.NoiseEscalationReliability = "$($matrixFamilyById["noise_escalation"].artifact_path)"
+            }
+            if ($matrixFamilyById.ContainsKey("implication_coherence")) {
+                $reliabilityParams.ImplicationCoherenceReliability = "$($matrixFamilyById["implication_coherence"].artifact_path)"
+            }
+            if ($matrixFamilyById.ContainsKey("agency_preserving_substitution")) {
+                $reliabilityParams.AgencyPreservingSubstitutionReliability = "$($matrixFamilyById["agency_preserving_substitution"].artifact_path)"
+            }
         }
         if (-not $SkipRequireControlFamilies) {
             $reliabilityParams.RequireRPAModeSwitch = $true
@@ -2223,87 +2440,105 @@ if ($true) {
         $frontierReductionRate = $null
 
         if (-not $SkipRealWorldUtilityEval) {
-            Write-Host "Running real-world utility A/B gate..."
-            $utilityEvalPath = "runs\\real_world_utility_eval_latest.json"
-            $utilityEvalScript = ".\\scripts\\run_real_world_utility_eval.ps1"
-            $reuseUtilityEval = $false
-            if ($FastLocal -and (Test-ArtifactFresh -Path $utilityEvalPath -MaxAgeMinutes $ReuseUtilityEvalMaxAgeMinutes)) {
-                $reuseUtilityEval = $true
-                Write-Host ("[FAST] Reusing real-world utility eval artifact ({0}, max_age={1}m)." -f $utilityEvalPath, $ReuseUtilityEvalMaxAgeMinutes)
+            $utilityGateRequired = $true
+            if ($GateProfile -eq "release" -and -not $strictUtilityRequired) {
+                $utilityGateRequired = $false
             }
-            if (-not $reuseUtilityEval) {
-                if (Test-Path $utilityEvalScript) {
-                    & $utilityEvalScript -Adapter $GateAdapter -Protocol "closed_book"
-                    if ($LASTEXITCODE -ne 0) {
-                        Write-Error "Real-world utility A/B gate failed."
-                        exit 1
-                    }
-                } else {
-                    if ($GateProfile -eq "fastlocal" -and (Test-Path $utilityEvalPath)) {
-                        Write-Warning ("Real-world utility script missing ({0}); reusing existing artifact in fastlocal mode." -f $utilityEvalScript)
-                        $releaseIntegrityWarnings.Add("real_world_utility_script_missing_reused_artifact")
+            if (-not $utilityGateRequired) {
+                Write-Host "Utility gate deferred by strict release contract; skipping."
+            } else {
+                Write-Host "Running real-world utility A/B gate..."
+                $utilityEvalPath = $strictUtilityArtifactPath
+                $utilityEvalScript = $strictUtilityProducerScript
+                $reuseUtilityEval = $false
+                if ($FastLocal -and (Test-ArtifactFresh -Path $utilityEvalPath -MaxAgeMinutes $ReuseUtilityEvalMaxAgeMinutes)) {
+                    $reuseUtilityEval = $true
+                    Write-Host ("[FAST] Reusing real-world utility eval artifact ({0}, max_age={1}m)." -f $utilityEvalPath, $ReuseUtilityEvalMaxAgeMinutes)
+                }
+                if (-not $reuseUtilityEval) {
+                    if ($strictUtilityProducerMode -eq "script") {
+                        if (-not (Test-Path $utilityEvalScript)) {
+                            Write-Error ("Real-world utility producer script missing: {0}" -f $utilityEvalScript)
+                            exit 1
+                        }
+                        & $utilityEvalScript -Adapter $GateAdapter -Protocol "closed_book"
+                        if ($LASTEXITCODE -ne 0) {
+                            Write-Error "Real-world utility A/B gate failed."
+                            exit 1
+                        }
+                    } elseif ($strictUtilityProducerMode -eq "deferred") {
+                        if ($GateProfile -eq "release") {
+                            Write-Error "Utility gate is required but producer_mode=deferred in strict release contract."
+                            exit 1
+                        }
+                        if (Test-Path $utilityEvalPath) {
+                            Write-Warning "Utility producer deferred; reusing existing utility artifact."
+                        } else {
+                            Write-Error "Utility producer deferred and no existing utility artifact is available."
+                            exit 1
+                        }
                     } else {
-                        Write-Error ("Real-world utility script missing: {0}" -f $utilityEvalScript)
+                        Write-Error ("Unknown utility producer mode in release contract: {0}" -f $strictUtilityProducerMode)
                         exit 1
                     }
                 }
-            }
-            if (-not (Test-Path $utilityEvalPath)) {
-                Write-Error "Missing real-world utility artifact: runs\\real_world_utility_eval_latest.json"
-                exit 1
-            }
-            $utilityPayload = Read-JsonObject -Path $utilityEvalPath
-            if (-not $utilityPayload) {
-                Write-Error "Unable to parse real-world utility payload: runs\\real_world_utility_eval_latest.json"
-                exit 1
-            }
-            $utilityBurdenDelta = ConvertTo-NullableDouble $utilityPayload.comparison.clarification_burden_delta
-            if ($null -eq $utilityBurdenDelta) {
-                $baselineBurden = ConvertTo-NullableDouble $utilityPayload.baseline.clarification_burden
-                $controlledBurden = ConvertTo-NullableDouble $utilityPayload.controlled.clarification_burden
-                if ($null -ne $baselineBurden -and $null -ne $controlledBurden) {
-                    $utilityBurdenDelta = $controlledBurden - $baselineBurden
+                if (-not (Test-Path $utilityEvalPath)) {
+                    Write-Error ("Missing real-world utility artifact: {0}" -f $utilityEvalPath)
+                    exit 1
                 }
-            }
-            if ($null -eq $utilityBurdenDelta) {
-                Write-Error "Utility burden cap gate: missing clarification burden delta in runs\\real_world_utility_eval_latest.json"
-                exit 1
-            }
-            $utilityFalseCommitImprovement = ConvertTo-NullableDouble $utilityPayload.pass_inputs.false_commit_improvement
-            if ($null -eq $utilityFalseCommitImprovement) {
-                $baselineFalseCommit = ConvertTo-NullableDouble $utilityPayload.baseline.false_commit_rate
-                $controlledFalseCommit = ConvertTo-NullableDouble $utilityPayload.controlled.false_commit_rate
-                if ($null -ne $baselineFalseCommit -and $null -ne $controlledFalseCommit) {
-                    $utilityFalseCommitImprovement = $baselineFalseCommit - $controlledFalseCommit
+                $utilityPayload = Read-JsonObject -Path $utilityEvalPath
+                if (-not $utilityPayload) {
+                    Write-Error ("Unable to parse real-world utility payload: {0}" -f $utilityEvalPath)
+                    exit 1
                 }
-            }
-            $utilityCorrectionImprovement = ConvertTo-NullableDouble $utilityPayload.pass_inputs.correction_improvement
-            if ($null -eq $utilityCorrectionImprovement) {
-                $baselineCorrection = ConvertTo-NullableDouble $utilityPayload.baseline.correction_turns_per_task
-                $controlledCorrection = ConvertTo-NullableDouble $utilityPayload.controlled.correction_turns_per_task
-                if ($null -ne $baselineCorrection -and $null -ne $controlledCorrection) {
-                    $utilityCorrectionImprovement = $baselineCorrection - $controlledCorrection
+                $utilityBurdenDelta = ConvertTo-NullableDouble $utilityPayload.comparison.clarification_burden_delta
+                if ($null -eq $utilityBurdenDelta) {
+                    $baselineBurden = ConvertTo-NullableDouble $utilityPayload.baseline.clarification_burden
+                    $controlledBurden = ConvertTo-NullableDouble $utilityPayload.controlled.clarification_burden
+                    if ($null -ne $baselineBurden -and $null -ne $controlledBurden) {
+                        $utilityBurdenDelta = $controlledBurden - $baselineBurden
+                    }
                 }
-            }
-            if ($utilityBurdenDelta -gt $MaxReleaseUtilityBurdenDelta) {
-                Write-Error ("Utility burden cap gate failed: burden_delta={0:N6} > cap={1:N6}" -f $utilityBurdenDelta, $MaxReleaseUtilityBurdenDelta)
-                exit 1
-            }
-            Write-Host ("[PASS] utility_burden_delta={0:N6} <= {1:N6}" -f $utilityBurdenDelta, $MaxReleaseUtilityBurdenDelta)
-            if ($utilityBurdenDelta -gt $WarnReleaseUtilityBurdenDelta) {
-                $utilityBurdenCompensated = $false
-                if ($null -ne $utilityFalseCommitImprovement -and $null -ne $utilityCorrectionImprovement) {
-                    $utilityBurdenCompensated = `
-                        ($utilityFalseCommitImprovement -ge $MinUtilityWarningFalseCommitImprovement) -and `
-                        ($utilityCorrectionImprovement -ge $MinUtilityWarningCorrectionImprovement)
+                if ($null -eq $utilityBurdenDelta) {
+                    Write-Error ("Utility burden cap gate: missing clarification burden delta in {0}" -f $utilityEvalPath)
+                    exit 1
                 }
-                if ($utilityBurdenCompensated) {
-                    Write-Host ("[INFO] Utility burden in warning zone is compensated by gains: false_commit_improvement={0:N6} (>= {1:N6}), correction_improvement={2:N6} (>= {3:N6})" -f `
-                        $utilityFalseCommitImprovement, $MinUtilityWarningFalseCommitImprovement, $utilityCorrectionImprovement, $MinUtilityWarningCorrectionImprovement)
-                } else {
-                    $utilityBurdenWarnTriggered = $true
-                    Write-Warning ("Utility burden warning zone: burden_delta={0:N6} > warn={1:N6}" -f $utilityBurdenDelta, $WarnReleaseUtilityBurdenDelta)
-                    $releaseRiskWarnings.Add("utility_burden_warning_zone")
+                $utilityFalseCommitImprovement = ConvertTo-NullableDouble $utilityPayload.pass_inputs.false_commit_improvement
+                if ($null -eq $utilityFalseCommitImprovement) {
+                    $baselineFalseCommit = ConvertTo-NullableDouble $utilityPayload.baseline.false_commit_rate
+                    $controlledFalseCommit = ConvertTo-NullableDouble $utilityPayload.controlled.false_commit_rate
+                    if ($null -ne $baselineFalseCommit -and $null -ne $controlledFalseCommit) {
+                        $utilityFalseCommitImprovement = $baselineFalseCommit - $controlledFalseCommit
+                    }
+                }
+                $utilityCorrectionImprovement = ConvertTo-NullableDouble $utilityPayload.pass_inputs.correction_improvement
+                if ($null -eq $utilityCorrectionImprovement) {
+                    $baselineCorrection = ConvertTo-NullableDouble $utilityPayload.baseline.correction_turns_per_task
+                    $controlledCorrection = ConvertTo-NullableDouble $utilityPayload.controlled.correction_turns_per_task
+                    if ($null -ne $baselineCorrection -and $null -ne $controlledCorrection) {
+                        $utilityCorrectionImprovement = $baselineCorrection - $controlledCorrection
+                    }
+                }
+                if ($utilityBurdenDelta -gt $MaxReleaseUtilityBurdenDelta) {
+                    Write-Error ("Utility burden cap gate failed: burden_delta={0:N6} > cap={1:N6}" -f $utilityBurdenDelta, $MaxReleaseUtilityBurdenDelta)
+                    exit 1
+                }
+                Write-Host ("[PASS] utility_burden_delta={0:N6} <= {1:N6}" -f $utilityBurdenDelta, $MaxReleaseUtilityBurdenDelta)
+                if ($utilityBurdenDelta -gt $WarnReleaseUtilityBurdenDelta) {
+                    $utilityBurdenCompensated = $false
+                    if ($null -ne $utilityFalseCommitImprovement -and $null -ne $utilityCorrectionImprovement) {
+                        $utilityBurdenCompensated = `
+                            ($utilityFalseCommitImprovement -ge $MinUtilityWarningFalseCommitImprovement) -and `
+                            ($utilityCorrectionImprovement -ge $MinUtilityWarningCorrectionImprovement)
+                    }
+                    if ($utilityBurdenCompensated) {
+                        Write-Host ("[INFO] Utility burden in warning zone is compensated by gains: false_commit_improvement={0:N6} (>= {1:N6}), correction_improvement={2:N6} (>= {3:N6})" -f `
+                            $utilityFalseCommitImprovement, $MinUtilityWarningFalseCommitImprovement, $utilityCorrectionImprovement, $MinUtilityWarningCorrectionImprovement)
+                    } else {
+                        $utilityBurdenWarnTriggered = $true
+                        Write-Warning ("Utility burden warning zone: burden_delta={0:N6} > warn={1:N6}" -f $utilityBurdenDelta, $WarnReleaseUtilityBurdenDelta)
+                        $releaseRiskWarnings.Add("utility_burden_warning_zone")
+                    }
                 }
             }
         } else {

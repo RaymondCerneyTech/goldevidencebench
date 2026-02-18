@@ -79,9 +79,45 @@ Release check (runs pinned gates and UI stubs):
 .\scripts\run_release_check.ps1 -ModelPath "<MODEL_PATH>"
 ```
 
+Fast iterative reliability loop (no heavy gate sweep):
+
+```powershell
+.\scripts\run_test_check.ps1 `
+  -Adapter "goldevidencebench.adapters.llama_server_adapter:create_adapter"
+```
+
+`run_test_check.ps1` uses the release contract matrix in `-UseExistingArtifacts`
+mode to find failing families, reruns only those families, and repeats for a
+bounded number of rounds. Useful when strict release is too slow for edit/test
+cycles.
+
+`run_test_check.ps1` also emits `artifact_audit.json` for release-adjacent
+artifacts, including the full strict-release reliability family set. The drift
+holdout gate artifact is still audited, but its `FAIL` status is treated as
+non-blocking in this iterative loop (missing/invalid artifact still fails).
+
 `run_release_check.ps1` now executes `scripts/check_reliability_signal.ps1` as
 its final gate. The script exit code is the ship/no-ship signal. Use
 `-SkipReliabilitySignal` only for diagnostics.
+
+Strict release contract source of truth:
+- `configs/release_gate_contract.json`
+- schema: `schemas/release_gate_contract.schema.json`
+- `strict_release.canary_policy` sets the default release canary behavior.
+- `required_reliability_families[].canary_policy` optionally overrides per family
+  (`strict` or `triage`).
+
+In `release` profile, `run_release_check.ps1` first produces a deterministic
+reliability matrix from that contract:
+- script: `scripts/run_release_reliability_matrix.ps1`
+- artifact: `<release_run_dir>/release_reliability_matrix.json`
+- latest pointer: `runs/latest_release_reliability_matrix`
+- if contract freshness is `allow_latest`, matrix uses existing artifacts
+- standalone matrix runs can use `-FailOnMatrixFail` to return non-zero on matrix `FAIL`
+
+Mixed mode guardrail:
+- `-GateProfile release -FastLocal` is blocked unless you pass
+  `-AllowReleaseFastLocalTriage`.
 
 Release check also runs persona invariance aggregation before threshold checks:
 - `runs/release_gates/persona_invariance/summary.json`
@@ -106,7 +142,11 @@ By default, the final gate also enforces:
 - `derived.intelligence_index >= 0.98`
 - `derived.implication_coherence_core >= 0.945`
 - `derived.agency_preservation_core >= 0.92`
-- real-world utility A/B eval `status=PASS` (`runs/real_world_utility_eval_latest.json`)
+
+Utility gate ownership is contract-driven from
+`strict_release.utility_gate` in `configs/release_gate_contract.json`
+(required/deferred + producer + artifact path). Current default contract is
+deferred (`required=false`).
 
 Diagnostic-only override:
 

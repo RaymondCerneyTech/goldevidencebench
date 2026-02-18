@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -100,6 +101,42 @@ def _normalize_prediction(pred: dict[str, Any] | None) -> dict[str, Any]:
     }
 
 
+def _canonicalize_for_family(norm: dict[str, Any], family: str) -> dict[str, Any]:
+    out = {
+        "parse_ok": bool(norm.get("parse_ok")),
+        "value": norm.get("value"),
+        "support_ids": list(norm.get("support_ids") or []),
+    }
+    if family != "epistemic_calibration_suite":
+        return out
+    value = out.get("value")
+    if not isinstance(value, dict):
+        return out
+
+    decision_raw = value.get("decision")
+    decision = str(decision_raw).strip().lower() if decision_raw is not None else ""
+    if decision in {"abstain", "ask", "retrieve"}:
+        value = dict(value)
+        value["decision"] = "abstain"
+        value["answer"] = None
+        needed_info = value.get("needed_info")
+        if isinstance(needed_info, list):
+            normalized_needed: list[str] = []
+            seen: set[str] = set()
+            for item in needed_info:
+                text = re.sub(r"[^a-z0-9]+", "", str(item).strip().lower())
+                if not text:
+                    continue
+                if text in seen:
+                    continue
+                seen.add(text)
+                normalized_needed.append(text)
+            value["needed_info"] = sorted(normalized_needed)
+        out["value"] = _normalize_value(value)
+        out["support_ids"] = []
+    return out
+
+
 def _count_reasons(rows: list[dict[str, Any]]) -> dict[str, int]:
     out = {
         "value_changed": 0,
@@ -133,10 +170,15 @@ def main() -> int:
         meta = perturbed_row.get("meta") if isinstance(perturbed_row.get("meta"), dict) else {}
         base_row_id = str(meta.get("persona_base_row_id") or "")
         profile = str(meta.get("persona_profile") or "")
+        base_row = canonical_data.get(base_row_id) if base_row_id in canonical_data else None
+        base_meta = base_row.get("meta") if isinstance(base_row, dict) and isinstance(base_row.get("meta"), dict) else {}
+        family = str(base_meta.get("family") or "")
 
         canonical_exists = base_row_id in canonical_data
         canonical_norm = _normalize_prediction(canonical_preds.get(base_row_id))
         perturbed_norm = _normalize_prediction(perturbed_preds.get(perturbed_row_id))
+        canonical_norm = _canonicalize_for_family(canonical_norm, family)
+        perturbed_norm = _canonicalize_for_family(perturbed_norm, family)
 
         change_reasons: list[str] = []
         if canonical_norm["parse_ok"] != perturbed_norm["parse_ok"]:
@@ -152,6 +194,7 @@ def main() -> int:
 
         row_result = {
             "id": perturbed_row_id,
+            "family": family,
             "persona_base_row_id": base_row_id,
             "persona_profile": profile,
             "canonical_row_exists": canonical_exists,

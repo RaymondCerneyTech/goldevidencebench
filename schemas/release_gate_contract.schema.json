@@ -1,0 +1,137 @@
+{
+  "type": "object",
+  "required": [
+    "contract_id",
+    "version",
+    "strict_release"
+  ],
+  "properties": {
+    "contract_id": {
+      "type": "string",
+      "enum": [
+        "release_gate_contract"
+      ]
+    },
+    "version": {
+      "type": "string"
+    },
+    "strict_release": {
+      "type": "object",
+      "required": [
+        "freshness_policy",
+        "canary_policy",
+        "required_reliability_families",
+        "utility_gate"
+      ],
+      "properties": {
+        "freshness_policy": {
+          "type": "string",
+          "enum": [
+            "must_regenerate_this_run",
+            "allow_latest"
+          ]
+        },
+        "canary_policy": {
+          "type": "string",
+          "enum": [
+            "strict",
+            "triage"
+          ]
+        },
+        "required_reliability_families": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "artifact_path",
+              "allowed_statuses"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "enum": [
+                  "compression",
+                  "compression_roundtrip_generalization",
+                  "novel_continuity",
+                  "novel_continuity_long_horizon",
+                  "myopic_planning_traps",
+                  "referential_indexing_suite",
+                  "epistemic_calibration_suite",
+                  "authority_under_interference",
+                  "authority_under_interference_hardening",
+                  "rpa_mode_switch",
+                  "intent_spec_layer",
+                  "noise_escalation",
+                  "implication_coherence",
+                  "agency_preserving_substitution"
+                ]
+              },
+              "artifact_path": {
+                "type": "string"
+              },
+              "stage": {
+                "type": "string",
+                "enum": [
+                  "observe",
+                  "ramp",
+                  "target",
+                  "custom"
+                ]
+              },
+              "canary_policy": {
+                "type": "string",
+                "enum": [
+                  "strict",
+                  "triage"
+                ]
+              },
+              "allowed_statuses": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "PASS",
+                    "WARN",
+                    "FAIL"
+                  ]
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "utility_gate": {
+          "type": "object",
+          "required": [
+            "required",
+            "producer_mode",
+            "producer_script",
+            "artifact_path"
+          ],
+          "properties": {
+            "required": {
+              "type": "boolean"
+            },
+            "producer_mode": {
+              "type": "string",
+              "enum": [
+                "script",
+                "deferred"
+              ]
+            },
+            "producer_script": {
+              "type": "string"
+            },
+            "artifact_path": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

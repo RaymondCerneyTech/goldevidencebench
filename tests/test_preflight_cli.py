@@ -9,9 +9,13 @@ from pathlib import Path
 import pytest
 
 
+def _powershell_executable() -> str | None:
+    return shutil.which("pwsh") or shutil.which("powershell")
+
+
 def test_preflight_output_json_schema(tmp_path: Path) -> None:
-    if not shutil.which("powershell"):
-        pytest.skip("powershell executable is required for preflight CLI integration tests")
+    if not _powershell_executable():
+        pytest.skip("pwsh/powershell executable is required for preflight CLI integration tests")
 
     out_path = tmp_path / "preflight_latest.json"
     result = subprocess.run(

@@ -10,6 +10,10 @@ from pathlib import Path
 import pytest
 
 
+def _powershell_executable() -> str | None:
+    return shutil.which("pwsh") or shutil.which("powershell")
+
+
 def _write_jsonl(path: Path, rows: list[dict]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as handle:
@@ -39,9 +43,9 @@ def _run_script(script: Path, args: list[str]) -> subprocess.CompletedProcess[st
 
 
 def _run_powershell_file(script: Path, args: list[str]) -> subprocess.CompletedProcess[str]:
-    powershell = shutil.which("powershell")
+    powershell = _powershell_executable()
     if not powershell:
-        pytest.skip("powershell executable is required for runner integration tests")
+        pytest.skip("pwsh/powershell executable is required for runner integration tests")
     return subprocess.run(
         [powershell, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(script), *args],
         capture_output=True,
@@ -313,6 +317,89 @@ def test_score_persona_invariance_parse_change_classified(tmp_path: Path) -> Non
     rows = _read_jsonl(rows_out)
     assert rows[0]["invariant"] is False
     assert "parse_changed" in rows[0]["change_reasons"]
+
+
+def test_score_persona_invariance_epistemic_abstain_equivalence_passes(tmp_path: Path) -> None:
+    canonical_data = tmp_path / "canonical_data.jsonl"
+    perturbed_data = tmp_path / "perturbed_data.jsonl"
+    canonical_preds = tmp_path / "canonical_preds.jsonl"
+    perturbed_preds = tmp_path / "perturbed_preds.jsonl"
+    out_path = tmp_path / "persona_invariance_summary.json"
+    rows_out = tmp_path / "persona_invariance_rows.jsonl"
+
+    _write_jsonl(
+        canonical_data,
+        [
+            {
+                "id": "E1",
+                "question": "Q",
+                "gold": {"value": None, "support_ids": []},
+                "meta": {"family": "epistemic_calibration_suite"},
+            }
+        ],
+    )
+    _write_jsonl(
+        perturbed_data,
+        [
+            {
+                "id": "E1_persona_persona_confident_expert",
+                "question": "persona Q",
+                "gold": {"value": None, "support_ids": []},
+                "meta": {
+                    "family": "epistemic_calibration_suite",
+                    "persona_variant": True,
+                    "persona_base_row_id": "E1",
+                    "persona_profile": "persona_confident_expert",
+                    "persona_profile_version": "v1",
+                },
+            }
+        ],
+    )
+    _write_jsonl(
+        canonical_preds,
+        [
+            {
+                "id": "E1",
+                "value": {
+                    "decision": "retrieve",
+                    "answer": None,
+                    "confidence": 1.0,
+                    "needed_info": ["policy.region_override_cap"],
+                    "support_ids": [],
+                },
+                "support_ids": [],
+            }
+        ],
+    )
+    _write_jsonl(
+        perturbed_preds,
+        [
+            {
+                "id": "E1_persona_persona_confident_expert",
+                "value": {
+                    "decision": "abstain",
+                    "answer": None,
+                    "confidence": 1.0,
+                    "needed_info": ["policy region override cap"],
+                    "support_ids": [],
+                },
+                "support_ids": [],
+            }
+        ],
+    )
+
+    result = _run_score_persona_invariance(
+        canonical_data=canonical_data,
+        perturbed_data=perturbed_data,
+        canonical_preds=canonical_preds,
+        perturbed_preds=perturbed_preds,
+        out_path=out_path,
+        rows_out=rows_out,
+    )
+    assert result.returncode == 0, result.stderr
+    summary = _read_json(out_path)
+    assert summary["status"] == "PASS"
+    assert summary["rows_changed"] == 0
 
 
 def _write_family_summary(run_dir: Path, family: str, rate: float) -> None:
