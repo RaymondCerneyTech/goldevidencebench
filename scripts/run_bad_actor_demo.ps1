@@ -29,6 +29,7 @@ Optional override for the drift wall max threshold.
 #>
 param(
     [string]$ModelPath = $env:GOLDEVIDENCEBENCH_MODEL,
+    [string]$Adapter = "goldevidencebench.adapters.retrieval_llama_cpp_adapter:create_adapter",
     [ValidateSet("stale_tab_state", "focus_drift")]
     [string]$HoldoutName = "stale_tab_state",
     [int[]]$WallSteps = @(80),
@@ -38,9 +39,13 @@ param(
     [double]$WallMaxOverride = [double]::NaN
 )
 
-if (-not $ModelPath) {
-    Write-Error "Set -ModelPath or GOLDEVIDENCEBENCH_MODEL before running."
+$requiresModelPath = $Adapter -like "*llama_cpp*"
+if ($requiresModelPath -and -not $ModelPath) {
+    Write-Error "Set -ModelPath or GOLDEVIDENCEBENCH_MODEL before running with llama_cpp adapters."
     exit 1
+}
+if ($ModelPath) {
+    $env:GOLDEVIDENCEBENCH_MODEL = $ModelPath
 }
 
 function Get-DriftMax {
@@ -74,7 +79,15 @@ if ($OutRoot) {
 }
 
 Write-Host "Bad actor demo: drift wall (general coverage)"
-.\scripts\run_drift_wall.ps1 -ModelPath $ModelPath -RunsDir $wallDir -Steps $WallSteps | Out-Host
+$wallArgs = @{
+    Adapter = $Adapter
+    RunsDir = $wallDir
+    Steps = $WallSteps
+}
+if ($ModelPath) {
+    $wallArgs.ModelPath = $ModelPath
+}
+.\scripts\run_drift_wall.ps1 @wallArgs | Out-Host
 if ($LASTEXITCODE -ne 0) {
     Write-Error "Drift wall run failed."
     exit 1
@@ -112,9 +125,19 @@ $badGateArtifact = Join-Path $badRunsDir "drift_holdout_gate.json"
 $badLatestDir = Join-Path $badRunsDir "drift_holdout_latest"
 
 Write-Host "Bad actor demo: drift holdout (FAIL expected; fixes disabled)"
-& $gateScript -ModelPath $ModelPath -HoldoutName $HoldoutName -RunsDir $badRunsDir `
-    -GateArtifactPath $badGateArtifact -LatestDir $badLatestDir `
-    -FixAuthorityFilter:$false -FixPreferRerank "latest_step" | Out-Host
+$gateArgs = @{
+    Adapter = $Adapter
+    HoldoutName = $HoldoutName
+    RunsDir = $badRunsDir
+    GateArtifactPath = $badGateArtifact
+    LatestDir = $badLatestDir
+    FixAuthorityFilter = $false
+    FixPreferRerank = "latest_step"
+}
+if ($ModelPath) {
+    $gateArgs.ModelPath = $ModelPath
+}
+& $gateScript @gateArgs | Out-Host
 $badCode = $LASTEXITCODE
 
 if ($GenerateReports) {

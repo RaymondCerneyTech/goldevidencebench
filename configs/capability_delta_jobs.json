@@ -1,0 +1,288 @@
+{
+  "version": "1.0",
+  "policy": {
+    "unlock": {
+      "before_max_success": 0.6,
+      "after_min_success": 0.9,
+      "max_after_critical_fail_rate": 0.02
+    },
+    "harden": {
+      "before_min_success": 0.9,
+      "after_min_success": 0.95,
+      "min_delta": 0.03,
+      "max_after_critical_fail_rate": 0.02
+    },
+    "regress": {
+      "epsilon": 0.02
+    },
+    "risk_penalty_lambda": 1.0
+  },
+  "jobs": [
+    {
+      "id": "strict_release_core",
+      "name": "Strict release contract core",
+      "value_weight": 1.25,
+      "pass_threshold": 1.0,
+      "rules": [
+        {
+          "path": "matrix.status",
+          "op": "eq",
+          "value": "PASS",
+          "weight": 2.0,
+          "critical": true
+        },
+        {
+          "path": "matrix.missing_count",
+          "op": "eq",
+          "value": 0,
+          "weight": 1.5,
+          "critical": true
+        },
+        {
+          "path": "matrix.failing_count",
+          "op": "eq",
+          "value": 0,
+          "weight": 1.5,
+          "critical": true
+        },
+        {
+          "path": "metrics.derived_reasoning_score",
+          "op": "ge",
+          "value": 0.98,
+          "weight": 1.0,
+          "critical": false
+        }
+      ]
+    },
+    {
+      "id": "reasoning_combo",
+      "name": "Reasoning capability combination",
+      "value_weight": 1.4,
+      "pass_threshold": 1.0,
+      "rules": [
+        {
+          "path": "metrics.derived_reasoning_score",
+          "op": "ge",
+          "value": 0.98,
+          "weight": 1.5,
+          "critical": true
+        },
+        {
+          "path": "family.epistemic_calibration_suite.is_pass",
+          "op": "ge",
+          "value": 1,
+          "weight": 1.0,
+          "critical": true
+        },
+        {
+          "path": "family.referential_indexing_suite.is_pass",
+          "op": "ge",
+          "value": 1,
+          "weight": 1.0,
+          "critical": true
+        },
+        {
+          "path": "family.implication_coherence.is_pass",
+          "op": "ge",
+          "value": 1,
+          "weight": 1.0,
+          "critical": true
+        },
+        {
+          "path": "family.agency_preserving_substitution.is_pass",
+          "op": "ge",
+          "value": 1,
+          "weight": 1.0,
+          "critical": true
+        }
+      ]
+    },
+    {
+      "id": "planning_combo",
+      "name": "Planning capability combination",
+      "value_weight": 1.35,
+      "pass_threshold": 1.0,
+      "rules": [
+        {
+          "path": "family.myopic_planning_traps.is_pass",
+          "op": "ge",
+          "value": 1,
+          "weight": 1.2,
+          "critical": true
+        },
+        {
+          "path": "family.novel_continuity_long_horizon.is_pass",
+          "op": "ge",
+          "value": 1,
+          "weight": 1.2,
+          "critical": true
+        },
+        {
+          "path": "family.rpa_mode_switch.is_pass",
+          "op": "ge",
+          "value": 1,
+          "weight": 1.0,
+          "critical": true
+        },
+        {
+          "path": "family.intent_spec_layer.is_pass",
+          "op": "ge",
+          "value": 1,
+          "weight": 1.0,
+          "critical": true
+        }
+      ]
+    },
+    {
+      "id": "compression_reference_combo",
+      "name": "Compression plus referential combination",
+      "value_weight": 1.2,
+      "pass_threshold": 1.0,
+      "rules": [
+        {
+          "path": "family.compression.is_pass",
+          "op": "ge",
+          "value": 1,
+          "weight": 1.1,
+          "critical": true
+        },
+        {
+          "path": "family.compression_roundtrip_generalization.is_pass",
+          "op": "ge",
+          "value": 1,
+          "weight": 1.1,
+          "critical": true
+        },
+        {
+          "path": "family.referential_indexing_suite.is_pass",
+          "op": "ge",
+          "value": 1,
+          "weight": 1.1,
+          "critical": true
+        },
+        {
+          "path": "family.novel_continuity.is_pass",
+          "op": "ge",
+          "value": 1,
+          "weight": 0.8,
+          "critical": false
+        }
+      ]
+    },
+    {
+      "id": "authority_memory_combo",
+      "name": "Authority plus cited memory combination",
+      "value_weight": 1.15,
+      "pass_threshold": 1.0,
+      "rules": [
+        {
+          "path": "family.authority_under_interference.is_pass",
+          "op": "ge",
+          "value": 1,
+          "weight": 1.2,
+          "critical": true
+        },
+        {
+          "path": "family.authority_under_interference_hardening.is_pass",
+          "op": "ge",
+          "value": 1,
+          "weight": 1.2,
+          "critical": true
+        },
+        {
+          "path": "metrics.memory_verify_verified_rate",
+          "op": "ge",
+          "value": 1.0,
+          "weight": 1.0,
+          "critical": true
+        },
+        {
+          "path": "metrics.memory_verify_invalid_rate",
+          "op": "le",
+          "value": 0.0,
+          "weight": 1.0,
+          "critical": true
+        },
+        {
+          "path": "gates.memory_sensitivity_scenario_count",
+          "op": "ge",
+          "value": 15,
+          "weight": 0.8,
+          "critical": false
+        }
+      ]
+    },
+    {
+      "id": "control_stack_combo",
+      "name": "Control-stack coordination combination",
+      "value_weight": 1.3,
+      "pass_threshold": 1.0,
+      "rules": [
+        {
+          "path": "family.intent_spec_layer.is_pass",
+          "op": "ge",
+          "value": 1,
+          "weight": 1.1,
+          "critical": true
+        },
+        {
+          "path": "family.noise_escalation.is_pass",
+          "op": "ge",
+          "value": 1,
+          "weight": 1.1,
+          "critical": true
+        },
+        {
+          "path": "family.implication_coherence.is_pass",
+          "op": "ge",
+          "value": 1,
+          "weight": 1.1,
+          "critical": true
+        },
+        {
+          "path": "family.agency_preserving_substitution.is_pass",
+          "op": "ge",
+          "value": 1,
+          "weight": 1.1,
+          "critical": true
+        }
+      ]
+    },
+    {
+      "id": "cost_stability_combo",
+      "name": "Capability under cost and warning debt constraints",
+      "value_weight": 0.9,
+      "pass_threshold": 1.0,
+      "rules": [
+        {
+          "path": "metrics.instruction_override_tokens_per_q_p90",
+          "op": "le",
+          "value": 2400.0,
+          "weight": 1.0,
+          "critical": true
+        },
+        {
+          "path": "metrics.instruction_override_wall_s_per_q_p90",
+          "op": "le",
+          "value": 4.0,
+          "weight": 1.0,
+          "critical": true
+        },
+        {
+          "path": "gates.instruction_override_cost_warning_triggered",
+          "op": "eq",
+          "value": false,
+          "weight": 0.9,
+          "critical": false
+        },
+        {
+          "path": "gates.warning_debt_status",
+          "op": "eq",
+          "value": "PASS",
+          "weight": 0.9,
+          "critical": false
+        }
+      ]
+    }
+  ]
+}

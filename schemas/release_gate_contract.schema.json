@@ -64,7 +64,9 @@
                   "intent_spec_layer",
                   "noise_escalation",
                   "implication_coherence",
-                  "agency_preserving_substitution"
+                  "agency_preserving_substitution",
+                  "persona_amalgamation",
+                  "rag_prompt_injection"
                 ]
               },
               "artifact_path": {

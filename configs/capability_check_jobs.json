@@ -1,0 +1,173 @@
+{
+  "version": "1.0",
+  "policy": {
+    "unlock": {
+      "before_max_success": 0.6,
+      "after_min_success": 0.9,
+      "max_after_critical_fail_rate": 0.02
+    },
+    "harden": {
+      "before_min_success": 0.9,
+      "after_min_success": 0.95,
+      "min_delta": 0.03,
+      "max_after_critical_fail_rate": 0.02
+    },
+    "regress": {
+      "epsilon": 0.02
+    },
+    "risk_penalty_lambda": 1.0
+  },
+  "jobs": [
+    {
+      "id": "utility_net_gain",
+      "name": "External utility net gain",
+      "value_weight": 1.5,
+      "pass_threshold": 1.0,
+      "rules": [
+        {
+          "path": "metrics.utility.status",
+          "op": "eq",
+          "value": "PASS",
+          "weight": 1.2,
+          "critical": true
+        },
+        {
+          "path": "metrics.utility.task_count",
+          "op": "ge",
+          "value": 20,
+          "weight": 0.8,
+          "critical": true
+        },
+        {
+          "path": "metrics.utility.pass_inputs.false_commit_improvement",
+          "op": "ge",
+          "value": 0.05,
+          "weight": 1.0,
+          "critical": true
+        },
+        {
+          "path": "metrics.utility.pass_inputs.correction_improvement",
+          "op": "ge",
+          "value": 0.5,
+          "weight": 1.0,
+          "critical": true
+        },
+        {
+          "path": "metrics.utility.comparison.first_pass_usable_delta",
+          "op": "ge",
+          "value": 0.2,
+          "weight": 1.0,
+          "critical": true
+        }
+      ]
+    },
+    {
+      "id": "utility_burden_guard",
+      "name": "External utility burden guard",
+      "value_weight": 1.2,
+      "pass_threshold": 1.0,
+      "rules": [
+        {
+          "path": "metrics.utility.comparison.clarification_burden_delta",
+          "op": "le",
+          "value": 0.6,
+          "weight": 1.0,
+          "critical": true
+        },
+        {
+          "path": "metrics.utility.checks.base_requirements",
+          "op": "eq",
+          "value": true,
+          "weight": 1.0,
+          "critical": true
+        },
+        {
+          "path": "metrics.utility.checks.burden_tradeoff_requirements",
+          "op": "eq",
+          "value": true,
+          "weight": 1.0,
+          "critical": true
+        }
+      ]
+    },
+    {
+      "id": "ui_notepad_execution",
+      "name": "UI Notepad execution reliability",
+      "value_weight": 1.1,
+      "pass_threshold": 1.0,
+      "rules": [
+        {
+          "path": "metrics.ui_notepad.sequence.task_pass_rate",
+          "op": "ge",
+          "value": 0.95,
+          "weight": 1.0,
+          "critical": true
+        },
+        {
+          "path": "metrics.ui_notepad.metrics.wrong_action_rate",
+          "op": "le",
+          "value": 0.05,
+          "weight": 1.0,
+          "critical": true
+        },
+        {
+          "path": "metrics.ui_notepad.metrics.post_action_verify_rate",
+          "op": "ge",
+          "value": 0.95,
+          "weight": 1.0,
+          "critical": true
+        }
+      ]
+    },
+    {
+      "id": "coordination_readiness",
+      "name": "Cross-system coordination readiness",
+      "value_weight": 1.2,
+      "pass_threshold": 1.0,
+      "rules": [
+        {
+          "path": "metrics.codex_next_step.status",
+          "op": "eq",
+          "value": "PASS",
+          "weight": 1.0,
+          "critical": true
+        },
+        {
+          "path": "metrics.codex_next_step.blocker_count",
+          "op": "le",
+          "value": 0,
+          "weight": 1.0,
+          "critical": true
+        },
+        {
+          "path": "metrics.codex_next_step.foundation_pass_rate",
+          "op": "ge",
+          "value": 1.0,
+          "weight": 1.0,
+          "critical": true
+        },
+        {
+          "path": "metrics.rpa_control.mode_valid",
+          "op": "eq",
+          "value": true,
+          "weight": 0.8,
+          "critical": false
+        },
+        {
+          "path": "metrics.rpa_control.decision_not_defer",
+          "op": "eq",
+          "value": true,
+          "weight": 0.8,
+          "critical": false
+        },
+        {
+          "path": "metrics.rpa_control.confidence",
+          "op": "ge",
+          "value": 0.7,
+          "weight": 0.8,
+          "critical": false
+        }
+      ]
+    }
+  ]
+}

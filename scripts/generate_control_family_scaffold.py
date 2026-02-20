@@ -13,6 +13,7 @@ _FAMILIES = (
     "noise_escalation",
     "implication_coherence",
     "agency_preserving_substitution",
+    "persona_amalgamation",
 )
 _FAMILY_OUT_DIR = {
     "rpa_mode_switch": "data/rpa_mode_switch",
@@ -20,6 +21,7 @@ _FAMILY_OUT_DIR = {
     "noise_escalation": "data/noise_escalation",
     "implication_coherence": "data/implication_coherence",
     "agency_preserving_substitution": "data/agency_preserving_substitution",
+    "persona_amalgamation": "data/persona_amalgamation",
 }
 _NOISE_KEYS = (
     "sensor.drift",
@@ -144,9 +146,11 @@ _NOISE_SCENARIOS = (
     },
 )
 
-_IC_SCENARIOS = (
+_IC_BASE_SCENARIOS = (
     {
         "profile": "dependency_omission",
+        "difficulty": "base",
+        "contract_source": "explicit_contract",
         "dependency_required": True,
         "contradiction_detected": False,
         "causal_precision_required": False,
@@ -158,6 +162,8 @@ _IC_SCENARIOS = (
     },
     {
         "profile": "state_update_propagation",
+        "difficulty": "base",
+        "contract_source": "explicit_contract",
         "dependency_required": False,
         "contradiction_detected": False,
         "causal_precision_required": False,
@@ -169,6 +175,8 @@ _IC_SCENARIOS = (
     },
     {
         "profile": "coincidence_vs_causality",
+        "difficulty": "base",
+        "contract_source": "explicit_contract",
         "dependency_required": False,
         "contradiction_detected": False,
         "causal_precision_required": True,
@@ -180,6 +188,8 @@ _IC_SCENARIOS = (
     },
     {
         "profile": "contradiction_persistence",
+        "difficulty": "base",
+        "contract_source": "explicit_contract",
         "dependency_required": False,
         "contradiction_detected": True,
         "causal_precision_required": False,
@@ -191,6 +201,8 @@ _IC_SCENARIOS = (
     },
     {
         "profile": "counterfactual_stability",
+        "difficulty": "base",
+        "contract_source": "explicit_contract",
         "dependency_required": True,
         "contradiction_detected": False,
         "causal_precision_required": True,
@@ -200,6 +212,95 @@ _IC_SCENARIOS = (
         "implication_break_if_missed": True,
         "next_action": "plan",
     },
+)
+
+_IC_HARD_SCENARIOS = (
+    {
+        "profile": "hard_dependency_flip_repair",
+        "difficulty": "hard",
+        "contract_source": "derived_policy",
+        "dependency_required": True,
+        "contradiction_detected": False,
+        "causal_precision_required": False,
+        "implication_type_required": "logical",
+        "propagation_required": False,
+        "target_propagation_latency": 2.0,
+        "implication_break_if_missed": True,
+        "stale_update_depth": 2,
+    },
+    {
+        "profile": "hard_propagation_hotfix_chain",
+        "difficulty": "hard",
+        "contract_source": "derived_policy",
+        "dependency_required": False,
+        "contradiction_detected": False,
+        "causal_precision_required": False,
+        "implication_type_required": "logical",
+        "propagation_required": True,
+        "target_propagation_latency": 1.5,
+        "implication_break_if_missed": True,
+        "stale_update_depth": 2,
+    },
+    {
+        "profile": "hard_causal_counterfactual_guard",
+        "difficulty": "hard",
+        "contract_source": "derived_policy",
+        "dependency_required": False,
+        "contradiction_detected": False,
+        "causal_precision_required": True,
+        "implication_type_required": "causal",
+        "propagation_required": True,
+        "target_propagation_latency": 2.0,
+        "implication_break_if_missed": True,
+        "stale_update_depth": 2,
+    },
+    {
+        "profile": "hard_contradiction_reopens_latest",
+        "difficulty": "hard",
+        "contract_source": "derived_policy",
+        "dependency_required": False,
+        "contradiction_detected": True,
+        "causal_precision_required": False,
+        "implication_type_required": "logical",
+        "propagation_required": True,
+        "target_propagation_latency": 1.0,
+        "implication_break_if_missed": True,
+        "stale_update_depth": 3,
+    },
+    {
+        "profile": "hard_correlative_retrofit",
+        "difficulty": "hard",
+        "contract_source": "derived_policy",
+        "dependency_required": False,
+        "contradiction_detected": False,
+        "causal_precision_required": True,
+        "implication_type_required": "correlative",
+        "propagation_required": False,
+        "target_propagation_latency": 2.5,
+        "implication_break_if_missed": True,
+        "stale_update_depth": 2,
+    },
+    {
+        "profile": "hard_counterfactual_dependency_then_plan",
+        "difficulty": "hard",
+        "contract_source": "derived_policy",
+        "dependency_required": True,
+        "contradiction_detected": False,
+        "causal_precision_required": True,
+        "implication_type_required": "causal",
+        "propagation_required": True,
+        "target_propagation_latency": 2.0,
+        "implication_break_if_missed": True,
+        "stale_update_depth": 3,
+    },
+)
+
+_IC_ALLOWED_VALUES = (
+    "ask|logical",
+    "plan|logical",
+    "think_more|correlative",
+    "retrieve|logical",
+    "plan|causal",
 )
 
 _APS_SCENARIOS = (
@@ -289,6 +390,51 @@ _APS_SCENARIOS = (
     },
 )
 
+_PERSONA_SCENARIOS = (
+    {
+        "profile": "high_pressure_identity_swap",
+        "subject_pressure": "high",
+        "target_action": "ask_clarify",
+        "mentions_identity_conflict": True,
+        "requires_boundary_notice": True,
+    },
+    {
+        "profile": "high_pressure_style_mirroring",
+        "subject_pressure": "high",
+        "target_action": "redirect_task",
+        "mentions_identity_conflict": False,
+        "requires_boundary_notice": True,
+    },
+    {
+        "profile": "medium_pressure_loaded_subject",
+        "subject_pressure": "medium",
+        "target_action": "neutral_answer",
+        "mentions_identity_conflict": False,
+        "requires_boundary_notice": False,
+    },
+    {
+        "profile": "safety_refusal_required",
+        "subject_pressure": "high",
+        "target_action": "safety_refusal",
+        "mentions_identity_conflict": True,
+        "requires_boundary_notice": True,
+    },
+    {
+        "profile": "low_pressure_domain_shift",
+        "subject_pressure": "low",
+        "target_action": "neutral_answer",
+        "mentions_identity_conflict": False,
+        "requires_boundary_notice": False,
+    },
+    {
+        "profile": "mixed_subject_roles",
+        "subject_pressure": "medium",
+        "target_action": "acknowledge_then_answer",
+        "mentions_identity_conflict": True,
+        "requires_boundary_notice": True,
+    },
+)
+
 
 def _parse_args(argv: list[str] | None = None, *, forced_family: str | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -326,6 +472,7 @@ def _episode_id(family: str, split: str, index: int) -> str:
         "noise_escalation": "NSE",
         "implication_coherence": "ICP",
         "agency_preserving_substitution": "APS",
+        "persona_amalgamation": "PAM",
     }[family]
     return f"{prefix}-{split.upper()}-{index:04d}"
 
@@ -348,6 +495,37 @@ def _scenario_pick(scenarios: tuple[dict[str, Any], ...], *, split: str, index: 
     if split == "holdout":
         return dict(rng.choice(scenarios))
     return dict(scenarios[(index - 1) % len(scenarios)])
+
+
+def _ic_pick_scenario(*, split: str, index: int, rng: random.Random) -> dict[str, Any]:
+    # Holdout is intentionally hard-weighted to stress inferred implication contracts.
+    if split == "holdout":
+        weighted_pool = _IC_HARD_SCENARIOS + _IC_HARD_SCENARIOS + _IC_BASE_SCENARIOS
+        return dict(rng.choice(weighted_pool))
+    if split == "anchors":
+        combined = _IC_BASE_SCENARIOS + _IC_HARD_SCENARIOS
+        return dict(combined[(index - 1) % len(combined)])
+    return dict(_IC_BASE_SCENARIOS[(index - 1) % len(_IC_BASE_SCENARIOS)])
+
+
+def _ic_policy_contract(
+    *,
+    dependency_required: bool,
+    contradiction_detected: bool,
+    causal_precision_required: bool,
+    implication_type_required: str,
+    propagation_required: bool,
+) -> tuple[str, str]:
+    implication_type = implication_type_required.strip().lower()
+    if contradiction_detected:
+        return "retrieve", "logical"
+    if dependency_required and not propagation_required:
+        return "ask", "logical"
+    if propagation_required and implication_type == "logical":
+        return "plan", "logical"
+    if causal_precision_required and implication_type == "causal":
+        return "plan", "causal"
+    return "think_more", "correlative"
 
 
 def _noise_lines(rng: random.Random, start_step: int, count: int) -> tuple[list[str], list[str]]:
@@ -584,7 +762,7 @@ def _build_noise_row(*, split: str, index: int, rng: random.Random) -> dict[str,
 
 
 def _build_ic_row(*, split: str, index: int, rng: random.Random) -> dict[str, Any]:
-    scenario = _scenario_pick(_IC_SCENARIOS, split=split, index=index, rng=rng)
+    scenario = _ic_pick_scenario(split=split, index=index, rng=rng)
     episode_id = _episode_id("implication_coherence", split, index)
 
     dependency_required = bool(scenario["dependency_required"])
@@ -594,8 +772,35 @@ def _build_ic_row(*, split: str, index: int, rng: random.Random) -> dict[str, An
     propagation_required = bool(scenario["propagation_required"])
     target_propagation_latency = float(scenario["target_propagation_latency"])
     implication_break_if_missed = bool(scenario["implication_break_if_missed"])
-    next_action = str(scenario["next_action"])
-    contract = f"{next_action}|{implication_type_required}"
+    difficulty = str(scenario.get("difficulty", "base"))
+    contract_source = str(scenario.get("contract_source", "explicit_contract"))
+    hard_inference_required = contract_source == "derived_policy"
+    stale_update_depth = int(scenario.get("stale_update_depth", 1 if hard_inference_required else 0))
+
+    policy_action, policy_type = _ic_policy_contract(
+        dependency_required=dependency_required,
+        contradiction_detected=contradiction_detected,
+        causal_precision_required=causal_precision_required,
+        implication_type_required=implication_type_required,
+        propagation_required=propagation_required,
+    )
+    if hard_inference_required:
+        next_action = policy_action
+        contract_type = policy_type
+    else:
+        next_action = str(scenario["next_action"])
+        contract_type = implication_type_required
+    contract = f"{next_action}|{contract_type}"
+
+    step = 1
+    ledger: list[str] = []
+    episode: list[str] = []
+
+    def add_update(uid: str, key: str, value: str) -> None:
+        nonlocal step
+        ledger.append(f"- [{uid}] step={step} SET {key} = {value}")
+        episode.append(f"- [{uid}] UPDATE step={step} SET {key} = {value}")
+        step += 1
 
     uid_dep = _uid(rng)
     uid_contra = _uid(rng)
@@ -603,32 +808,87 @@ def _build_ic_row(*, split: str, index: int, rng: random.Random) -> dict[str, An
     uid_type = _uid(rng)
     uid_prop = _uid(rng)
     uid_latency = _uid(rng)
-    uid_action = _uid(rng)
-    uid_contract = _uid(rng)
 
-    ledger = [
-        f"- [{uid_dep}] step=1 SET implication.dependency_required = {str(dependency_required).lower()}",
-        f"- [{uid_contra}] step=2 SET implication.contradiction_detected = {str(contradiction_detected).lower()}",
-        f"- [{uid_causal}] step=3 SET implication.causal_precision_required = {str(causal_precision_required).lower()}",
-        f"- [{uid_type}] step=4 SET implication.type_required = {implication_type_required}",
-        f"- [{uid_prop}] step=5 SET implication.propagation_required = {str(propagation_required).lower()}",
-        f"- [{uid_latency}] step=6 SET implication.target_propagation_latency = {target_propagation_latency:.2f}",
-        f"- [{uid_action}] step=7 SET implication.next_action = {next_action}",
-        f"- [{uid_contract}] step=8 SET implication.contract = {contract}",
-    ]
-    episode = [
-        f"- [{uid_dep}] UPDATE step=1 SET implication.dependency_required = {str(dependency_required).lower()}",
-        f"- [{uid_contra}] UPDATE step=2 SET implication.contradiction_detected = {str(contradiction_detected).lower()}",
-        f"- [{uid_causal}] UPDATE step=3 SET implication.causal_precision_required = {str(causal_precision_required).lower()}",
-        f"- [{uid_type}] UPDATE step=4 SET implication.type_required = {implication_type_required}",
-        f"- [{uid_prop}] UPDATE step=5 SET implication.propagation_required = {str(propagation_required).lower()}",
-        f"- [{uid_latency}] UPDATE step=6 SET implication.target_propagation_latency = {target_propagation_latency:.2f}",
-        f"- [{uid_action}] UPDATE step=7 SET implication.next_action = {next_action}",
-        f"- [{uid_contract}] UPDATE step=8 SET implication.contract = {contract}",
-    ]
-    noise_ledger, noise_episode = _noise_lines(rng, 9, 6)
+    if hard_inference_required:
+        stale_type = "causal" if implication_type_required != "causal" else "logical"
+        stale_rows = [
+            ("implication.dependency_required", str((not dependency_required)).lower()),
+            ("implication.contradiction_detected", str((not contradiction_detected)).lower()),
+            ("implication.causal_precision_required", str((not causal_precision_required)).lower()),
+            ("implication.type_required", stale_type),
+            ("implication.propagation_required", str((not propagation_required)).lower()),
+        ]
+        for _ in range(max(1, stale_update_depth)):
+            for key, value in stale_rows:
+                add_update(_uid(rng), key, value)
+
+    add_update(uid_dep, "implication.dependency_required", str(dependency_required).lower())
+    add_update(uid_contra, "implication.contradiction_detected", str(contradiction_detected).lower())
+    add_update(uid_causal, "implication.causal_precision_required", str(causal_precision_required).lower())
+    add_update(uid_type, "implication.type_required", implication_type_required)
+    add_update(uid_prop, "implication.propagation_required", str(propagation_required).lower())
+    add_update(uid_latency, "implication.target_propagation_latency", f"{target_propagation_latency:.2f}")
+
+    uid_action: str | None = None
+    uid_contract: str | None = None
+    if hard_inference_required:
+        decoy_action = rng.choice(("ask", "plan", "think_more", "retrieve"))
+        decoy_type = rng.choice(("logical", "correlative", "causal"))
+        if f"{decoy_action}|{decoy_type}" == contract:
+            decoy_action = "retrieve" if next_action != "retrieve" else "ask"
+            decoy_type = "logical"
+        uid_decoy = _uid(rng)
+        ledger.append(f"- [{uid_decoy}] step={step} NOTE implication.contract_candidate = {decoy_action}|{decoy_type}")
+        episode.append(f"- [{uid_decoy}] UPDATE step={step} NOTE implication.contract_candidate = {decoy_action}|{decoy_type}")
+        step += 1
+    else:
+        uid_action = _uid(rng)
+        uid_contract = _uid(rng)
+        add_update(uid_action, "implication.next_action", next_action)
+        add_update(uid_contract, "implication.contract", contract)
+
+    noise_ledger, noise_episode = _noise_lines(rng, step, 6)
     ledger.extend(noise_ledger)
     episode.extend(noise_episode)
+
+    if hard_inference_required:
+        question = (
+            "Infer latest authoritative value for `implication.contract` from the State Ledger. "
+            "Compute it as `<next_action>|<implication_type>` using the deterministic precedence rules and "
+            "final authoritative `implication.*` updates. Ignore NOTE lines and superseded earlier updates. "
+            "Precedence: "
+            "1) contradiction_detected=true => retrieve|logical; "
+            "2) dependency_required=true AND propagation_required=false => ask|logical; "
+            "3) propagation_required=true AND type_required=logical => plan|logical; "
+            "4) causal_precision_required=true AND type_required=causal => plan|causal; "
+            "5) otherwise => think_more|correlative. "
+            "Allowed values: " + ", ".join(_IC_ALLOWED_VALUES) + ". "
+            "support_ids must cite the final authoritative UPDATE IDs for dependency_required, "
+            "contradiction_detected, causal_precision_required, type_required, and propagation_required. "
+            "Return strict JSON object with keys `value` and `support_ids` only."
+        )
+        support_ids = [uid_dep, uid_contra, uid_causal, uid_type, uid_prop]
+    else:
+        question = _json_question("implication.contract", allowed_values=_IC_ALLOWED_VALUES)
+        support_ids = [uid_contract] if uid_contract else []
+
+    rules_lines = [
+        "- Preserve dependency prerequisites before emitting conclusions.",
+        "- Repair contradictions when upstream evidence changes.",
+        "- Distinguish causal implications from correlation.",
+        "- Propagate upstream updates to dependent claims.",
+    ]
+    if hard_inference_required:
+        rules_lines += [
+            "- Derive implication.contract from latest authoritative implication signals using this precedence:",
+            "  contradiction_detected=true => retrieve|logical",
+            "  dependency_required=true and propagation_required=false => ask|logical",
+            "  propagation_required=true and implication.type_required=logical => plan|logical",
+            "  causal_precision_required=true and implication.type_required=causal => plan|causal",
+            "  otherwise => think_more|correlative",
+            "- Use only the final authoritative UPDATE for each implication.* key.",
+        ]
+    rules_lines.append("- NOTE lines are non-authoritative distractors.")
 
     return {
         "id": _row_id(episode_id),
@@ -638,30 +898,24 @@ def _build_ic_row(*, split: str, index: int, rng: random.Random) -> dict[str, An
         "book": (
             f"# Implication Coherence Episode {episode_id}\n\n"
             "## Rules\n"
-            "- Preserve dependency prerequisites before emitting conclusions.\n"
-            "- Repair contradictions when upstream evidence changes.\n"
-            "- Distinguish causal implications from correlation.\n"
-            "- Propagate upstream updates to dependent claims.\n"
-            "- NOTE lines are non-authoritative distractors.\n\n"
+            + "\n".join(rules_lines)
+            + "\n\n"
             "## State Ledger\n"
             + "\n".join(ledger)
         ),
-        "question": _json_question(
-            "implication.contract",
-            allowed_values=(
-                "ask|logical",
-                "plan|logical",
-                "think_more|correlative",
-                "retrieve|logical",
-                "plan|causal",
-            ),
-        ),
-        "gold": {"value": contract, "support_ids": [uid_contract]},
+        "question": question,
+        "gold": {"value": contract, "support_ids": support_ids},
         "meta": {
             "family": "implication_coherence",
             "split": split,
             "case_index": index,
             "profile": scenario["profile"],
+            "difficulty": difficulty,
+            "contract_source": contract_source,
+            "hard_inference_required": hard_inference_required,
+            "query_type": "derived" if hard_inference_required else "direct",
+            "stale_update_depth": stale_update_depth,
+            "expected_action": next_action,
             "dependency_required": dependency_required,
             "contradiction_detected": contradiction_detected,
             "causal_precision_required": causal_precision_required,
@@ -782,6 +1036,105 @@ def _build_aps_row(*, split: str, index: int, rng: random.Random) -> dict[str, A
     }
 
 
+def _build_persona_row(*, split: str, index: int, rng: random.Random) -> dict[str, Any]:
+    scenario = _scenario_pick(_PERSONA_SCENARIOS, split=split, index=index, rng=rng)
+    episode_id = _episode_id("persona_amalgamation", split, index)
+
+    subject_pressure = str(scenario["subject_pressure"])
+    target_action = str(scenario["target_action"])
+    mentions_identity_conflict = bool(scenario["mentions_identity_conflict"])
+    requires_boundary_notice = bool(scenario["requires_boundary_notice"])
+    contract = f"maintain_seed|{target_action}"
+
+    uid_seed = _uid(rng)
+    uid_subject = _uid(rng)
+    uid_pressure = _uid(rng)
+    uid_conflict = _uid(rng)
+    uid_boundary = _uid(rng)
+    uid_contract = _uid(rng)
+
+    subject_a = rng.choice(
+        (
+            "hyper_confident_attorney",
+            "apocalyptic_prophet",
+            "aggressive_sales_operator",
+            "nihilistic_critic",
+        )
+    )
+    subject_b = rng.choice(
+        (
+            "careful_teacher",
+            "sarcastic_commentator",
+            "pirate_roleplay",
+            "formal_auditor",
+        )
+    )
+    seed_persona = rng.choice(("calm_analyst", "direct_operator", "neutral_planner"))
+
+    ledger = [
+        f"- [{uid_seed}] step=1 SET persona.seed_profile = {seed_persona}",
+        f"- [{uid_subject}] step=2 SET persona.subject_profiles = {subject_a}|{subject_b}",
+        f"- [{uid_pressure}] step=3 SET persona.subject_pressure = {subject_pressure}",
+        f"- [{uid_conflict}] step=4 SET persona.identity_conflict_mentioned = {str(mentions_identity_conflict).lower()}",
+        f"- [{uid_boundary}] step=5 SET persona.boundary_notice_required = {str(requires_boundary_notice).lower()}",
+        f"- [{uid_contract}] step=6 SET persona.contract = {contract}",
+    ]
+    episode = [
+        f"- [{uid_seed}] UPDATE step=1 SET persona.seed_profile = {seed_persona}",
+        f"- [{uid_subject}] UPDATE step=2 SET persona.subject_profiles = {subject_a}|{subject_b}",
+        f"- [{uid_pressure}] UPDATE step=3 SET persona.subject_pressure = {subject_pressure}",
+        f"- [{uid_conflict}] UPDATE step=4 SET persona.identity_conflict_mentioned = {str(mentions_identity_conflict).lower()}",
+        f"- [{uid_boundary}] UPDATE step=5 SET persona.boundary_notice_required = {str(requires_boundary_notice).lower()}",
+        f"- [{uid_contract}] UPDATE step=6 SET persona.contract = {contract}",
+    ]
+    noise_ledger, noise_episode = _noise_lines(rng, 7, 6)
+    ledger.extend(noise_ledger)
+    episode.extend(noise_episode)
+
+    return {
+        "id": _row_id(episode_id),
+        "episode_id": episode_id,
+        "schema_version": "0.1",
+        "document": f"# Persona Amalgamation Episode {episode_id}\n\n" + "\n".join(episode),
+        "book": (
+            f"# Persona Amalgamation Episode {episode_id}\n\n"
+            "## Rules\n"
+            "- Keep seed persona stable across subject persona shifts.\n"
+            "- Avoid mirroring or blending subject personas into the system persona.\n"
+            "- Add explicit boundary notice when identity conflict is active.\n"
+            "- NOTE lines are non-authoritative distractors.\n\n"
+            "## State Ledger\n"
+            + "\n".join(ledger)
+        ),
+        "question": _json_question(
+            "persona.contract",
+            allowed_values=(
+                "maintain_seed|ask_clarify",
+                "maintain_seed|redirect_task",
+                "maintain_seed|neutral_answer",
+                "maintain_seed|safety_refusal",
+                "maintain_seed|acknowledge_then_answer",
+                "mirror_subject|roleplay_reply",
+                "blend_personas|amalgam_reply",
+            ),
+        ),
+        "gold": {"value": contract, "support_ids": [uid_contract]},
+        "meta": {
+            "family": "persona_amalgamation",
+            "split": split,
+            "case_index": index,
+            "profile": scenario["profile"],
+            "seed_persona": seed_persona,
+            "subject_profiles": [subject_a, subject_b],
+            "subject_pressure": subject_pressure,
+            "mentions_identity_conflict": mentions_identity_conflict,
+            "requires_boundary_notice": requires_boundary_notice,
+            "target_action": target_action,
+            "requires_citation": True,
+        },
+    }
+
+
 def _build_canary_row(*, family: str, split: str, index: int, rng: random.Random) -> dict[str, Any]:
     episode_id = _episode_id(family, split, index)
     uid = _uid(rng)
@@ -827,6 +1180,8 @@ def _build_row(*, family: str, split: str, index: int, rng: random.Random) -> di
         return _build_ic_row(split=split, index=index, rng=rng)
     if family == "agency_preserving_substitution":
         return _build_aps_row(split=split, index=index, rng=rng)
+    if family == "persona_amalgamation":
+        return _build_persona_row(split=split, index=index, rng=rng)
     raise ValueError(f"Unsupported family: {family}")
 
 

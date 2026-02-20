@@ -5,6 +5,52 @@ Keep the Summary section short and move older entries to [RUN_LOG_ARCHIVE.md](RU
 
 ## Summary entries
 
+## 2026-02-19 - Implication coherence hard-pack hardening (llama-server)
+
+Run artifact: `runs\implication_coherence_20260219_193501\implication_coherence_summary.json`
+
+- Status: PASS (`hard_gate_status=PASS`)
+- Anchors: PASS (`value_acc=1.0`, `cite_f1=1.0`, `hard_ic_score=1.0`)
+- Holdout: PASS (`value_acc=1.0`, `cite_f1=1.0`, `hard_ic_score=1.0`)
+- Persona invariance: PASS (`row_invariance_rate=1.0`)
+- Canary behavior preserved (expected-fail): `value_acc=0.0`, gate status PASS
+
+Key findings/fixes captured in:
+- `docs/PROJECT_STATUS.md`
+
+## 2026-02-19 - Agency preserving substitution hardening refresh (llama-server)
+
+Run artifact: `runs\agency_preserving_substitution_20260219_205407\agency_preserving_substitution_summary.json`
+
+- Status: PASS (`hard_gate_status=PASS`)
+- Anchors: PASS (`value_acc=1.0`, `cite_f1=1.0`)
+- Holdout: PASS (`value_acc=1.0`, `cite_f1=1.0`, `intent_preservation_score=0.930926`)
+- Persona invariance: PASS (`row_invariance_rate=1.0`)
+- Canary behavior preserved (expected-fail): `value_acc=0.0`, gate status PASS
+- Reliability artifact refreshed: `runs\agency_preserving_substitution_reliability_latest.json`
+
+## 2026-02-19 - Authority under interference hardening refresh (llama-server)
+
+Run artifact: `runs\authority_under_interference_20260219_212702\authority_under_interference_summary.json`
+
+- Status: PASS (`hard_gate_status=PASS`)
+- Anchors: PASS (`value_acc=1.0`, `exact_acc=1.0`, `cite_f1=1.0`)
+- Holdout: PASS (`value_acc=1.0`, `exact_acc=1.0`, `cite_f1=1.0`)
+- Persona invariance: PASS (`row_invariance_rate=1.0`)
+- Canary behavior preserved (expected-fail): `value_acc=0.5`, gate status PASS
+- Reliability artifact refreshed: `runs\authority_under_interference_reliability_latest.json`
+
+## 2026-02-19 - Intent spec layer hardening refresh (llama-server)
+
+Run artifact: `runs\intent_spec_layer_20260219_214456\intent_spec_layer_summary.json`
+
+- Status: PASS (`hard_gate_status=PASS`)
+- Anchors: PASS (`value_acc=1.0`, `cite_f1=1.0`, `clar_precision=1.0`, `clar_recall=1.0`)
+- Holdout: PASS (`value_acc=1.0`, `cite_f1=1.0`, `clar_precision=1.0`, `clar_recall=1.0`, `user_burden=0.181`)
+- Persona invariance: PASS (`row_invariance_rate=1.0`)
+- Canary behavior preserved (expected-fail): `value_acc=0.0`, gate status PASS
+- Reliability artifact refreshed: `runs\intent_spec_layer_reliability_latest.json`
+
 ## 2026-02-08 - Unified reliability signal (strict + orthogonal families)
 
 Run artifact: `runs\reliability_signal_latest.json`

@@ -1,5 +1,6 @@
 param(
     [string]$ModelPath = $env:GOLDEVIDENCEBENCH_MODEL,
+    [string]$Adapter = "goldevidencebench.adapters.retrieval_llama_cpp_adapter:create_adapter",
     [string]$PdfPath = "",
     [string]$OutRoot = "",
     [int]$MaxRows = 24,
@@ -17,9 +18,13 @@ if ($resolvedModelPath -and $resolvedModelPath.Contains("<")) {
 if ($resolvedModelPath -and $resolvedModelPath.Contains("<")) {
     $resolvedModelPath = ""
 }
-if (-not $resolvedModelPath) {
-    Write-Error "Set -ModelPath or GOLDEVIDENCEBENCH_MODEL before running."
+$adapterRequiresModelPath = $Adapter -like "*llama_cpp*"
+if ($adapterRequiresModelPath -and -not $resolvedModelPath) {
+    Write-Error "Set -ModelPath or GOLDEVIDENCEBENCH_MODEL before running with llama_cpp adapters."
     exit 1
+}
+if ($resolvedModelPath) {
+    $env:GOLDEVIDENCEBENCH_MODEL = $resolvedModelPath
 }
 
 if (-not $OutRoot) {
@@ -50,10 +55,21 @@ function Format-Num {
     }
 }
 
+function Join-OptionalPath {
+    param(
+        [string]$BasePath,
+        [string]$RelativePath
+    )
+    if ([string]::IsNullOrWhiteSpace($BasePath) -or [string]::IsNullOrWhiteSpace($RelativePath)) {
+        return "n/a"
+    }
+    return (Join-Path $BasePath $RelativePath)
+}
+
 $summary = [ordered]@{
     artifact_version = "1.0"
     out_root = $OutRoot
-    model_id = (Split-Path -Leaf $resolvedModelPath)
+    model_id = $(if ($resolvedModelPath) { Split-Path -Leaf $resolvedModelPath } else { $Adapter })
     generated_at = (Get-Date).ToString("o")
     status = "PASS"
     steps = @()
@@ -82,6 +98,21 @@ function Add-Step {
 
 Write-Host "Case pack"
 Write-Host "OutRoot: $OutRoot"
+Write-Host "Adapter: $Adapter"
+
+$supportsDriftTrap = $Adapter -like "*retrieval_llama_cpp_adapter*"
+$runRegressionCase = -not $SkipRegressionCase
+$runBadActor = -not $SkipBadActor
+if (-not $supportsDriftTrap) {
+    if ($runRegressionCase) {
+        Write-Warning "Adapter does not expose retrieval drift diagnostics; skipping regression_case step."
+    }
+    if ($runBadActor) {
+        Write-Warning "Adapter does not expose retrieval drift diagnostics; skipping bad_actor_demo step."
+    }
+    $runRegressionCase = $false
+    $runBadActor = $false
+}
 
 $resolvedPdfPath = $PdfPath
 if ($resolvedPdfPath -and $resolvedPdfPath.Contains("<")) {
@@ -109,7 +140,16 @@ if ($resolvedPdfPath -and -not (Test-Path -LiteralPath $resolvedPdfPath)) {
 # RAG closed-book strict
 $ragClosedDir = Join-Path $OutRoot "rag_closed_book_strict"
 Write-Host "Step 1/4: RAG closed-book strict (expected FAIL)"
-.\scripts\run_rag_benchmark.ps1 -Preset strict -ModelPath $resolvedModelPath -OutRoot $ragClosedDir -MaxRows $MaxRows | Out-Host
+$ragClosedArgs = @{
+    Preset = "strict"
+    Adapter = $Adapter
+    OutRoot = $ragClosedDir
+    MaxRows = $MaxRows
+}
+if ($resolvedModelPath) {
+    $ragClosedArgs.ModelPath = $resolvedModelPath
+}
+.\scripts\run_rag_benchmark.ps1 @ragClosedArgs | Out-Host
 $ragClosedCode = $LASTEXITCODE
 $ragClosedSummary = Read-Json (Join-Path $ragClosedDir "summary.json")
 $ragClosedMeans = if ($ragClosedSummary) { $ragClosedSummary.means } else { $null }
@@ -153,10 +193,19 @@ if (-not $SkipOpenBook -and $openBookReady) {
 }
 
 # Regression case (internal tooling)
-if (-not $SkipRegressionCase) {
+if ($runRegressionCase) {
     $regDir = Join-Path $OutRoot "regression_case"
     Write-Host "Step 3/4: Regression case (internal tooling)"
-    .\scripts\run_regression_case.ps1 -ModelPath $resolvedModelPath -OutRoot $regDir -GenerateReports -ComparePassFail | Out-Host
+    $regArgs = @{
+        Adapter = $Adapter
+        OutRoot = $regDir
+        GenerateReports = $true
+        ComparePassFail = $true
+    }
+    if ($resolvedModelPath) {
+        $regArgs.ModelPath = $resolvedModelPath
+    }
+    .\scripts\run_regression_case.ps1 @regArgs | Out-Host
     $regCode = $LASTEXITCODE
     Add-Step -Name "regression_case" -Status ($(if ($regCode -eq 0) { "PASS" } else { "FAIL" })) `
         -RunDir $regDir -Required $true -Details @{
@@ -168,10 +217,19 @@ if (-not $SkipRegressionCase) {
 }
 
 # Bad actor demo (compliance/safety)
-if (-not $SkipBadActor) {
+if ($runBadActor) {
     $badDir = Join-Path $OutRoot "bad_actor"
     Write-Host "Step 4/4: Bad actor demo (compliance/safety)"
-    .\scripts\run_bad_actor_demo.ps1 -ModelPath $resolvedModelPath -OutRoot $badDir -GenerateReports -AllowWallFail | Out-Host
+    $badArgs = @{
+        Adapter = $Adapter
+        OutRoot = $badDir
+        GenerateReports = $true
+        AllowWallFail = $true
+    }
+    if ($resolvedModelPath) {
+        $badArgs.ModelPath = $resolvedModelPath
+    }
+    .\scripts\run_bad_actor_demo.ps1 @badArgs | Out-Host
     $badCode = $LASTEXITCODE
     $badExpectedFail = $true
     $badGateStatus = $null
@@ -268,8 +326,12 @@ $regMetrics = $summary.steps | Where-Object { $_.name -eq "regression_case" } | 
 if ($regMetrics) {
     $lines += "## Internal tooling: regression case"
     $lines += "- status: $($regMetrics.status)"
-    $lines += "- pass gate: $(Join-Path $regMetrics.run_dir $regMetrics.details.pass_gate)"
-    $lines += "- fail gate: $(Join-Path $regMetrics.run_dir $regMetrics.details.fail_gate)"
+    if ($regMetrics.status -eq "SKIP") {
+        $lines += "- artifacts: skipped (adapter does not expose retrieval drift diagnostics or step disabled)"
+    } else {
+        $lines += "- pass gate: $(Join-OptionalPath -BasePath $regMetrics.run_dir -RelativePath $regMetrics.details.pass_gate)"
+        $lines += "- fail gate: $(Join-OptionalPath -BasePath $regMetrics.run_dir -RelativePath $regMetrics.details.fail_gate)"
+    }
     $lines += ""
 }
 
@@ -285,7 +347,11 @@ if ($badMetrics) {
         }
     }
     $lines += "- status: $badStatus"
-    $lines += "- holdout gate: $(Join-Path $badMetrics.run_dir $badMetrics.details.holdout_gate)"
+    if ($badMetrics.status -eq "SKIP") {
+        $lines += "- holdout gate: skipped (adapter does not expose retrieval drift diagnostics or step disabled)"
+    } else {
+        $lines += "- holdout gate: $(Join-OptionalPath -BasePath $badMetrics.run_dir -RelativePath $badMetrics.details.holdout_gate)"
+    }
     $lines += "- wall summary: $($badMetrics.details.wall_summary)"
     $lines += ""
 }

@@ -28,6 +28,8 @@ param(
     [switch]$RequireImplicationCoherence,
     [string]$AgencyPreservingSubstitutionReliability = "runs\agency_preserving_substitution_reliability_latest.json",
     [switch]$RequireAgencyPreservingSubstitution,
+    [string]$RagPromptInjectionReliability = "runs\rag_prompt_injection_reliability_latest.json",
+    [switch]$RequireRagPromptInjection,
     [double]$MinValueAcc = 0.95,
     [double]$MinExactAcc = 0.95,
     [double]$MinCiteF1 = 0.95,
@@ -60,6 +62,7 @@ $args = @(
     "--noise-escalation-reliability", $NoiseEscalationReliability,
     "--implication-coherence-reliability", $ImplicationCoherenceReliability,
     "--agency-preserving-substitution-reliability", $AgencyPreservingSubstitutionReliability,
+    "--rag-prompt-injection-reliability", $RagPromptInjectionReliability,
     "--min-value-acc", "$MinValueAcc",
     "--min-exact-acc", "$MinExactAcc",
     "--min-cite-f1", "$MinCiteF1",
@@ -111,6 +114,9 @@ if ($RequireImplicationCoherence) {
 }
 if ($RequireAgencyPreservingSubstitution) {
     $args += "--require-agency-preserving-substitution"
+}
+if ($RequireRagPromptInjection) {
+    $args += "--require-rag-prompt-injection"
 }
 if ($AllowMockCanarySoftFail) {
     $args += "--allow-mock-canary-soft-fail"

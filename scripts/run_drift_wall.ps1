@@ -18,8 +18,9 @@ param(
     [string]$LatestTag = ""
 )
 
-if (-not $ModelPath) {
-    Write-Error "Set -ModelPath or GOLDEVIDENCEBENCH_MODEL before running."
+$requiresModelPath = $Adapter -like "*llama_cpp*"
+if ($requiresModelPath -and -not $ModelPath) {
+    Write-Error "Set -ModelPath or GOLDEVIDENCEBENCH_MODEL before running with llama_cpp adapters."
     exit 1
 }
 
@@ -30,7 +31,9 @@ if (-not $finalRunsDir) {
 }
 New-Item -ItemType Directory -Path $finalRunsDir -Force | Out-Null
 
-$env:GOLDEVIDENCEBENCH_MODEL = $ModelPath
+if ($ModelPath) {
+    $env:GOLDEVIDENCEBENCH_MODEL = $ModelPath
+}
 if ($SafetyMode) {
     if (-not $PSBoundParameters.ContainsKey("Rerank") -or $Rerank -eq "none") {
         $Rerank = "prefer_update_latest"

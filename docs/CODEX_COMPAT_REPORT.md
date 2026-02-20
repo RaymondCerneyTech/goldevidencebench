@@ -1,6 +1,6 @@
 # CODEX Compatibility Report
 
-Generated: 2026-02-18T21:57:40.041590+00:00
+Generated: 2026-02-19T20:25:01.935625+00:00
 
 ## Scope
 - Verify family lifecycle compatibility (generator -> scorer -> wrapper -> reliability checker).

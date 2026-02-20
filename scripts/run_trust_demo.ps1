@@ -1,5 +1,6 @@
 param(
     [string]$ModelPath = $env:GOLDEVIDENCEBENCH_MODEL,
+    [string]$Adapter = "goldevidencebench.adapters.retrieval_llama_cpp_adapter:create_adapter",
     [string]$OutRoot = "",
     [double]$MinPolicyPass = 1.0,
     [double]$RagMinValueAcc = [double]::NaN,
@@ -7,9 +8,13 @@ param(
     [switch]$FailOnRagStrict
 )
 
-if (-not $ModelPath) {
-    Write-Error "Set -ModelPath or GOLDEVIDENCEBENCH_MODEL before running the trust demo."
+$requiresModelPath = $Adapter -like "*llama_cpp*"
+if ($requiresModelPath -and -not $ModelPath) {
+    Write-Error "Set -ModelPath or GOLDEVIDENCEBENCH_MODEL before running with llama_cpp adapters."
     exit 1
+}
+if ($ModelPath) {
+    $env:GOLDEVIDENCEBENCH_MODEL = $ModelPath
 }
 
 if (-not $OutRoot) {
@@ -49,13 +54,33 @@ function Add-StepResult {
 
 Write-Host "Trust demo"
 Write-Host "OutRoot: $OutRoot"
+Write-Host "Adapter: $Adapter"
+
+$supportsDriftTrap = $Adapter -like "*retrieval_llama_cpp_adapter*"
+$runRegressionCase = $supportsDriftTrap
+if (-not $runRegressionCase) {
+    Write-Warning "Adapter does not expose retrieval drift diagnostics; skipping regression_case step."
+}
 
 Write-Host "Step 1/4: Regression case (PASS + FAIL)"
 $regOut = Join-Path $OutRoot "regression_case"
-.\scripts\run_regression_case.ps1 -ModelPath $ModelPath -OutRoot $regOut -GenerateReports -ComparePassFail | Out-Host
-$regCode = $LASTEXITCODE
-Add-StepResult -Name "regression_case" -RunDir $regOut -ExitCode $regCode -Required $true
-if ($regCode -ne 0) { Write-Error "Regression case failed."; }
+if ($runRegressionCase) {
+    $regressionArgs = @{
+        Adapter = $Adapter
+        OutRoot = $regOut
+        GenerateReports = $true
+        ComparePassFail = $true
+    }
+    if ($ModelPath) {
+        $regressionArgs.ModelPath = $ModelPath
+    }
+    .\scripts\run_regression_case.ps1 @regressionArgs | Out-Host
+    $regCode = $LASTEXITCODE
+    Add-StepResult -Name "regression_case" -RunDir $regOut -ExitCode $regCode -Required $true
+    if ($regCode -ne 0) { Write-Error "Regression case failed."; }
+} else {
+    Add-StepResult -Name "regression_case" -RunDir $regOut -ExitCode 0 -Required $false
+}
 
 Write-Host "Step 2/4: Internal tooling benchmark"
 $internalOut = Join-Path $OutRoot "internal_tooling_benchmark"
@@ -77,8 +102,11 @@ Write-Host "Step 4/4: RAG benchmarks (lenient + strict)"
 $ragLenientOut = Join-Path $OutRoot "rag_lenient"
 $ragLenientParams = @{
     Preset = "lenient"
-    ModelPath = $ModelPath
+    Adapter = $Adapter
     OutRoot = $ragLenientOut
+}
+if ($ModelPath) {
+    $ragLenientParams.ModelPath = $ModelPath
 }
 if (-not [double]::IsNaN($RagMinValueAcc)) { $ragLenientParams.MinValueAcc = $RagMinValueAcc }
 if (-not [double]::IsNaN($RagMinCiteF1)) { $ragLenientParams.MinCiteF1 = $RagMinCiteF1 }
@@ -90,8 +118,11 @@ if ($ragLenientCode -ne 0) { Write-Error "RAG lenient benchmark failed."; }
 $ragStrictOut = Join-Path $OutRoot "rag_strict"
 $ragStrictParams = @{
     Preset = "strict"
-    ModelPath = $ModelPath
+    Adapter = $Adapter
     OutRoot = $ragStrictOut
+}
+if ($ModelPath) {
+    $ragStrictParams.ModelPath = $ModelPath
 }
 if (-not [double]::IsNaN($RagMinValueAcc)) { $ragStrictParams.MinValueAcc = $RagMinValueAcc }
 if (-not [double]::IsNaN($RagMinCiteF1)) { $ragStrictParams.MinCiteF1 = $RagMinCiteF1 }

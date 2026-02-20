@@ -117,6 +117,22 @@
         "allowed_statuses": [
           "PASS"
         ]
+      },
+      {
+        "id": "persona_amalgamation",
+        "artifact_path": "runs/persona_amalgamation_reliability_latest.json",
+        "stage": "target",
+        "allowed_statuses": [
+          "PASS"
+        ]
+      },
+      {
+        "id": "rag_prompt_injection",
+        "artifact_path": "runs/rag_prompt_injection_reliability_latest.json",
+        "stage": "target",
+        "allowed_statuses": [
+          "PASS"
+        ]
       }
     ],
     "utility_gate": {

@@ -11,13 +11,20 @@ param(
     [string]$FixRerank = "prefer_set_latest",
     [ValidateSet("stale_tab_state", "focus_drift")]
     [string]$HoldoutName = "stale_tab_state",
-    [switch]$AuthorityFilter,
+    [bool]$BaselineAuthorityFilter = $false,
+    [bool]$FixAuthorityFilter = $true,
+    [double]$MinDelta = 0.01,
+    [string]$OutPath = "runs\\drift_holdout_compare_latest.json",
     [string]$RunsDir = ""
 )
 
-if (-not $ModelPath) {
-    Write-Error "Set -ModelPath or GOLDEVIDENCEBENCH_MODEL before running."
+$requiresModelPath = $Adapter -like "*llama_cpp*"
+if ($requiresModelPath -and -not $ModelPath) {
+    Write-Error "Set -ModelPath or GOLDEVIDENCEBENCH_MODEL before running with llama_cpp adapters."
     exit 1
+}
+if ($ModelPath) {
+    $env:GOLDEVIDENCEBENCH_MODEL = $ModelPath
 }
 
 $finalRunsDir = $RunsDir
@@ -26,11 +33,9 @@ if (-not $finalRunsDir) {
     $finalRunsDir = "runs\\drift_holdout_compare_$stamp"
 }
 New-Item -ItemType Directory -Path $finalRunsDir -Force | Out-Null
-
-if ($AuthorityFilter.IsPresent) {
-    $env:GOLDEVIDENCEBENCH_RETRIEVAL_AUTHORITY_FILTER = "1"
-} else {
-    $env:GOLDEVIDENCEBENCH_RETRIEVAL_AUTHORITY_FILTER = "0"
+$outParent = Split-Path -Parent $OutPath
+if (-not [string]::IsNullOrWhiteSpace($outParent)) {
+    New-Item -ItemType Directory -Path $outParent -Force | Out-Null
 }
 
 $holdoutScript = Join-Path $PSScriptRoot "run_drift_holdouts.ps1"
@@ -50,36 +55,96 @@ function Get-DriftRate {
 function Invoke-Holdout {
     param(
         [string]$Label,
-        [string]$Rerank
+        [string]$Rerank,
+        [bool]$AuthorityFilter
     )
+    $env:GOLDEVIDENCEBENCH_RETRIEVAL_AUTHORITY_FILTER = if ($AuthorityFilter) { "1" } else { "0" }
     $outDir = Join-Path $finalRunsDir $Label
-    & $holdoutScript -ModelPath $ModelPath -Steps $Steps -Keys $Keys -Queries $Queries -Seeds $Seeds `
-        -Rerank $Rerank -Adapter $Adapter -RunsDir $outDir -HoldoutName $HoldoutName | Out-Host
+    $holdoutArgs = @{
+        Steps = $Steps
+        Keys = $Keys
+        Queries = $Queries
+        Seeds = $Seeds
+        Rerank = $Rerank
+        Adapter = $Adapter
+        RunsDir = $outDir
+        HoldoutName = $HoldoutName
+    }
+    if ($ModelPath) {
+        $holdoutArgs.ModelPath = $ModelPath
+    }
+    & $holdoutScript @holdoutArgs | Out-Host
     if (-not $?) {
         throw "Holdout run failed for $Label"
     }
     $summaryPath = Join-Path $outDir "summary.json"
-    return Get-DriftRate -SummaryPath $summaryPath
+    return [ordered]@{
+        label = $Label
+        rerank = $Rerank
+        authority_filter = $AuthorityFilter
+        run_dir = $outDir
+        summary_path = $summaryPath
+        drift_step_rate = Get-DriftRate -SummaryPath $summaryPath
+    }
 }
 
 Write-Host "Drift holdout compare"
 Write-Host "RunsDir: $finalRunsDir"
-Write-Host "AuthorityFilter: $($AuthorityFilter.IsPresent)"
+Write-Host ("Baseline: rerank={0} authority_filter={1}" -f $BaselineRerank, $BaselineAuthorityFilter)
+Write-Host ("Fix: rerank={0} authority_filter={1}" -f $FixRerank, $FixAuthorityFilter)
 
-$baselineRate = Invoke-Holdout -Label "baseline_$BaselineRerank" -Rerank $BaselineRerank
-$fixRate = Invoke-Holdout -Label "fix_$FixRerank" -Rerank $FixRerank
-$baselineRateNum = if ($null -ne $baselineRate) { [double]$baselineRate } else { $null }
-$fixRateNum = if ($null -ne $fixRate) { [double]$fixRate } else { $null }
+$baseline = Invoke-Holdout -Label "baseline_$BaselineRerank" -Rerank $BaselineRerank -AuthorityFilter $BaselineAuthorityFilter
+$fix = Invoke-Holdout -Label "fix_$FixRerank" -Rerank $FixRerank -AuthorityFilter $FixAuthorityFilter
+$baselineRateNum = if ($null -ne $baseline.drift_step_rate) { [double]$baseline.drift_step_rate } else { $null }
+$fixRateNum = if ($null -ne $fix.drift_step_rate) { [double]$fix.drift_step_rate } else { $null }
+$delta = $null
+if ($null -ne $baselineRateNum -and $null -ne $fixRateNum) {
+    $delta = $baselineRateNum - $fixRateNum
+}
+$improved = $false
+if ($null -ne $delta) {
+    $improved = $delta -ge $MinDelta
+}
+
+$status = "FAIL"
+$statusReason = "missing_rates"
+if ($null -ne $baselineRateNum -and $null -ne $fixRateNum) {
+    if ($baselineRateNum -le 0.001) {
+        $status = "PASS"
+        $statusReason = "baseline_already_low_drift"
+    } elseif ($improved) {
+        $status = "PASS"
+        $statusReason = "drift_reduced"
+    } else {
+        $status = "FAIL"
+        $statusReason = "drift_not_reduced"
+    }
+}
+
+$payload = [ordered]@{
+    benchmark = "drift_holdout_compare"
+    generated_at_utc = (Get-Date).ToUniversalTime().ToString("o")
+    status = $status
+    status_reason = $statusReason
+    adapter = $Adapter
+    holdout = $HoldoutName
+    min_delta = $MinDelta
+    baseline = $baseline
+    fix = $fix
+    delta = $delta
+    improved = $improved
+    runs_dir = $finalRunsDir
+}
+$payload | ConvertTo-Json -Depth 8 | Set-Content -Path $OutPath -Encoding UTF8
+.\scripts\set_latest_pointer.ps1 -RunDir $OutPath -PointerPath "runs\\latest_drift_holdout_compare" | Out-Host
 
 Write-Host "Baseline rerank: $BaselineRerank drift.step_rate=$baselineRateNum"
 Write-Host "Fix rerank: $FixRerank drift.step_rate=$fixRateNum"
+if ($null -ne $delta) {
+    Write-Host ("Delta (baseline-fix)={0} improved={1}" -f $delta, $improved)
+}
+Write-Host ("drift_holdout_compare status={0} reason={1} out={2}" -f $status, $statusReason, $OutPath)
 
-if ($null -ne $baselineRateNum -and $null -ne $fixRateNum) {
-    if ($baselineRateNum -le 0.001) {
-        Write-Host "Baseline drift already zero; fix not needed."
-    } elseif ($fixRateNum -lt $baselineRateNum) {
-        Write-Host "Drift reduced."
-    } else {
-        Write-Host "Drift not reduced; inspect summary.json for details."
-    }
+if ($status -ne "PASS") {
+    exit 1
 }

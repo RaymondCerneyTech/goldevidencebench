@@ -226,4 +226,10 @@ def test_run_test_check_artifact_audit_covers_full_release_reliability_set(tmp_p
     assert "referential_indexing_suite_reliability" in by_key
     assert "epistemic_calibration_suite_reliability" in by_key
     assert "authority_under_interference_hardening_reliability" in by_key
+    assert "persona_amalgamation_reliability" in by_key
+    assert "drift_holdout_compare_latest" in by_key
+    assert "capability_delta_report" in by_key
+    assert "capability_delta_report_markdown" in by_key
+    assert by_key["capability_delta_report"]["status_enforced"] is False
+    assert by_key["persona_amalgamation_reliability"]["status_enforced"] is False
     assert by_key["drift_holdout_gate"]["status_enforced"] is False

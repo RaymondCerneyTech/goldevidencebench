@@ -42,6 +42,33 @@ param(
     [int]$ServerPreflightTimeoutSeconds = 15
 )
 
+function Resolve-PreferredEnvValue {
+    param([string]$Name)
+    $scopes = @("Process", "User", "Machine")
+    foreach ($scope in $scopes) {
+        $value = [Environment]::GetEnvironmentVariable($Name, $scope)
+        if (-not [string]::IsNullOrWhiteSpace($value)) {
+            return $value.Trim()
+        }
+    }
+    return ""
+}
+
+if (-not $PSBoundParameters.ContainsKey("ModelPath")) {
+    $resolvedModelPath = Resolve-PreferredEnvValue -Name "GOLDEVIDENCEBENCH_MODEL"
+    if (-not [string]::IsNullOrWhiteSpace($resolvedModelPath)) {
+        $ModelPath = $resolvedModelPath
+    }
+}
+if (-not $PSBoundParameters.ContainsKey("GateAdapter")) {
+    $resolvedGateAdapter = Resolve-PreferredEnvValue -Name "GOLDEVIDENCEBENCH_GATE_ADAPTER"
+    if (-not [string]::IsNullOrWhiteSpace($resolvedGateAdapter)) {
+        $GateAdapter = $resolvedGateAdapter
+    }
+}
+
+$overnightUsesExternalModelService = ($GateAdapter -like "*llama_server_adapter*") -or ($GateAdapter -like "*mock_adapter*")
+
 if ($MaxAttempts -lt 1) {
     Write-Error "MaxAttempts must be >= 1."
     exit 1
@@ -62,8 +89,8 @@ if ($StallMinutes -lt 1) {
     Write-Error "StallMinutes must be >= 1."
     exit 1
 }
-if ($RunDriftHoldoutGate -and -not $ModelPath) {
-    Write-Error "RunDriftHoldoutGate requires -ModelPath (drift holdout gate currently depends on it)."
+if ($RunDriftHoldoutGate -and -not $overnightUsesExternalModelService -and -not $ModelPath) {
+    Write-Error ("RunDriftHoldoutGate requires -ModelPath (or GOLDEVIDENCEBENCH_MODEL) for adapter '{0}'." -f $GateAdapter)
     exit 1
 }
 $explicitCycles = $PSBoundParameters.ContainsKey("Cycles")

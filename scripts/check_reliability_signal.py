@@ -181,6 +181,17 @@ def _parse_args() -> argparse.Namespace:
         action="store_true",
         help="Require agency-preserving-substitution reliability summary to exist and PASS.",
     )
+    parser.add_argument(
+        "--rag-prompt-injection-reliability",
+        type=Path,
+        default=Path("runs/rag_prompt_injection_reliability_latest.json"),
+        help="Path to RAG prompt-injection reliability summary JSON.",
+    )
+    parser.add_argument(
+        "--require-rag-prompt-injection",
+        action="store_true",
+        help="Require RAG prompt-injection reliability summary to exist and PASS.",
+    )
     parser.add_argument("--min-value-acc", type=float, default=0.95)
     parser.add_argument("--min-exact-acc", type=float, default=0.95)
     parser.add_argument("--min-cite-f1", type=float, default=0.95)
@@ -534,6 +545,10 @@ def _derive_scores(
                 _normalized_metric(implication_coherence_means, "contradiction_repair_rate"),
                 _normalized_metric(implication_coherence_means, "causal_precision"),
                 _normalized_metric(implication_coherence_means, "implication_break_rate", invert=True),
+                _normalized_metric(implication_coherence_means, "hard_ic_score"),
+                _normalized_metric(implication_coherence_means, "hard_case_value_acc"),
+                _normalized_metric(implication_coherence_means, "hard_case_cite_f1"),
+                _normalized_metric(implication_coherence_means, "hard_implication_break_rate", invert=True),
             ]
             if value is not None
         ]
@@ -796,6 +811,21 @@ def main() -> int:
             f"missing file: {ns.agency_preserving_substitution_reliability}"
         )
 
+    rag_prompt_injection_summary: dict[str, Any] | None = None
+    rag_prompt_injection_read_error = ""
+    probe_rag_prompt_injection = ns.require_rag_prompt_injection or _arg_provided(
+        "--rag-prompt-injection-reliability"
+    )
+    if probe_rag_prompt_injection and ns.rag_prompt_injection_reliability.exists():
+        try:
+            rag_prompt_injection_summary = _read_json(ns.rag_prompt_injection_reliability)
+        except Exception as exc:  # noqa: BLE001
+            rag_prompt_injection_read_error = str(exc)
+    elif ns.require_rag_prompt_injection:
+        rag_prompt_injection_read_error = (
+            f"missing file: {ns.rag_prompt_injection_reliability}"
+        )
+
     lines.append(f"Strict summary: {strict_summary_path}")
     lines.append(f"Compression reliability: {ns.compression_reliability}")
     lines.append(f"Novel continuity reliability: {ns.novel_reliability}")
@@ -814,6 +844,7 @@ def main() -> int:
         "Agency-preserving-substitution reliability: "
         f"{ns.agency_preserving_substitution_reliability}"
     )
+    lines.append(f"RAG prompt-injection reliability: {ns.rag_prompt_injection_reliability}")
 
     def _append_family_status(
         label: str,
@@ -1005,6 +1036,13 @@ def main() -> int:
         required=ns.require_agency_preserving_substitution,
         read_error=agency_preserving_substitution_read_error,
     )
+    _append_family_status(
+        "rag_prompt_injection",
+        rag_prompt_injection_summary,
+        failure_key="rag_prompt_injection_reliability.status != PASS",
+        required=ns.require_rag_prompt_injection,
+        read_error=rag_prompt_injection_read_error,
+    )
 
     novel_holdout_means, novel_holdout_means_error = _holdout_means_from_family_reliability(novel_summary)
     long_horizon_holdout_means, long_horizon_holdout_means_error = _holdout_means_from_family_reliability(
@@ -1154,6 +1192,10 @@ def main() -> int:
             ns.agency_preserving_substitution_reliability
         ),
         "require_agency_preserving_substitution": ns.require_agency_preserving_substitution,
+        "rag_prompt_injection_reliability_path": str(
+            ns.rag_prompt_injection_reliability
+        ),
+        "require_rag_prompt_injection": ns.require_rag_prompt_injection,
         "status": overall,
         "failures": failures,
         "thresholds": {

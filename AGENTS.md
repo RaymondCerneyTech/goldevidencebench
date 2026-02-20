@@ -57,3 +57,5 @@ These rules apply to the entire repository.
 - Adapter schema version: `1.0` (adapter outputs must include `value`, `support_ids` list; extra fields rejected).
 - Results output: `--results-json` writes JSON (object or array); `--out` writes predictions JSONL.
 - Cited memory: memory JSONL entries must be citation-backed and verified at read time; gate summary lives at `runs/release_gates/memory_verify.json`.
+- Capability delta report: release check writes `runs/capability_delta_report_latest.json` and `runs/capability_delta_report_latest.md` from `configs/capability_delta_jobs.json`.
+- Non-trap capability check: `scripts/run_capability_check.ps1` writes `runs/capability_snapshot_latest.json`, `runs/capability_check_latest.json`, and `runs/capability_check_latest.md` from `configs/capability_check_jobs.json`.

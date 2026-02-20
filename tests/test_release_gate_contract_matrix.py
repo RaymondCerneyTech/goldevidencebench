@@ -124,6 +124,8 @@ def test_release_gate_contract_schema_and_family_ids() -> None:
         "noise_escalation",
         "implication_coherence",
         "agency_preserving_substitution",
+        "persona_amalgamation",
+        "rag_prompt_injection",
     ]
     compression_row = payload["strict_release"]["required_reliability_families"][0]
     assert compression_row["id"] == "compression"

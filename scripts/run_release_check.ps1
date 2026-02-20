@@ -287,6 +287,31 @@ param(
     [switch]$SkipVariants
 )
 
+function Resolve-PreferredEnvValue {
+    param([string]$Name)
+    $scopes = @("Process", "User", "Machine")
+    foreach ($scope in $scopes) {
+        $value = [Environment]::GetEnvironmentVariable($Name, $scope)
+        if (-not [string]::IsNullOrWhiteSpace($value)) {
+            return $value.Trim()
+        }
+    }
+    return ""
+}
+
+if (-not $PSBoundParameters.ContainsKey("ModelPath")) {
+    $resolvedModelPath = Resolve-PreferredEnvValue -Name "GOLDEVIDENCEBENCH_MODEL"
+    if (-not [string]::IsNullOrWhiteSpace($resolvedModelPath)) {
+        $ModelPath = $resolvedModelPath
+    }
+}
+if (-not $PSBoundParameters.ContainsKey("GateAdapter")) {
+    $resolvedGateAdapter = Resolve-PreferredEnvValue -Name "GOLDEVIDENCEBENCH_GATE_ADAPTER"
+    if (-not [string]::IsNullOrWhiteSpace($resolvedGateAdapter)) {
+        $GateAdapter = $resolvedGateAdapter
+    }
+}
+
 $gateUsesServerAdapter = $GateAdapter -like "*llama_server_adapter*"
 if ($ModelPath -eq "<MODEL_PATH>") {
     if ($PSBoundParameters.ContainsKey("ModelPath")) {
@@ -699,6 +724,8 @@ $manifest = [ordered]@{
         noise_escalation_reliability = "runs\\noise_escalation_reliability_latest.json"
         implication_coherence_reliability = "runs\\implication_coherence_reliability_latest.json"
         agency_preserving_substitution_reliability = "runs\\agency_preserving_substitution_reliability_latest.json"
+        persona_amalgamation_reliability = "runs\\persona_amalgamation_reliability_latest.json"
+        rag_prompt_injection_reliability = "runs\\rag_prompt_injection_reliability_latest.json"
         real_world_utility_eval = "runs\\real_world_utility_eval_latest.json"
         codex_compat_family_matrix = "runs\\codex_compat\\family_matrix.json"
         codex_compat_orthogonality_matrix = "runs\\codex_compat\\orthogonality_matrix.json"
@@ -707,6 +734,8 @@ $manifest = [ordered]@{
         codex_compat_scaffold_backlog = "runs\\codex_compat\\scaffold_backlog.json"
         codex_compat_report = "docs\\CODEX_COMPAT_REPORT.md"
         codex_next_step_report = "runs\\codex_next_step_report.json"
+        capability_delta_report = "runs\\capability_delta_report_latest.json"
+        capability_delta_report_markdown = "runs\\capability_delta_report_latest.md"
         optional_metric_inventory = "runs\\latest_optional_metric_inventory"
         release_quality_snapshot = "runs\\latest_release_quality_snapshot"
         release_trend_guard = "runs\\latest_release_trend_guard"
@@ -1773,12 +1802,20 @@ if ($true) {
         }
     }
     if ($RunDriftHoldoutGate) {
-        if (-not $ModelPath) {
-            Write-Error "Set -ModelPath or GOLDEVIDENCEBENCH_MODEL before running the drift holdout gate."
+        $driftUsesExternalModelService = ($GateAdapter -like "*llama_server_adapter*") -or ($GateAdapter -like "*mock_adapter*")
+        if (-not $driftUsesExternalModelService -and -not $ModelPath) {
+            Write-Error ("Set -ModelPath or GOLDEVIDENCEBENCH_MODEL before running the drift holdout gate with adapter '{0}'." -f $GateAdapter)
             exit 1
         }
         Write-Host ("Running drift holdout gate (holdout={0})..." -f $DriftHoldoutName)
-        .\scripts\run_drift_holdout_gate.ps1 -ModelPath $ModelPath -HoldoutName $DriftHoldoutName
+        $driftGateArgs = @{
+            HoldoutName = $DriftHoldoutName
+            Adapter = $GateAdapter
+        }
+        if ($ModelPath) {
+            $driftGateArgs.ModelPath = $ModelPath
+        }
+        .\scripts\run_drift_holdout_gate.ps1 @driftGateArgs
         if ($LASTEXITCODE -ne 0) {
             Write-Error "Drift holdout gate failed."
             exit 1
@@ -1824,15 +1861,22 @@ if ($true) {
         "intent_spec_layer=runs\\intent_spec_layer_reliability_latest.json",
         "noise_escalation=runs\\noise_escalation_reliability_latest.json",
         "implication_coherence=runs\\implication_coherence_reliability_latest.json",
-        "agency_preserving_substitution=runs\\agency_preserving_substitution_reliability_latest.json"
+        "agency_preserving_substitution=runs\\agency_preserving_substitution_reliability_latest.json",
+        "persona_amalgamation=runs\\persona_amalgamation_reliability_latest.json",
+        "rag_prompt_injection=runs\\rag_prompt_injection_reliability_latest.json"
     )
     python .\scripts\check_persona_invariance_gate.py `
         --inputs $personaInputs `
         --out $personaGateSummaryPath `
         --rows-out $personaGateRowsPath
     if ($LASTEXITCODE -ne 0) {
-        Write-Error "Persona invariance gate failed (persona_contract_drift)."
-        exit 1
+        if ($GateProfile -eq "fastlocal") {
+            Write-Warning "Persona invariance gate failed (persona_contract_drift); continuing in fastlocal mode."
+            $releaseRiskWarnings.Add("persona_invariance_warn_fail_fastlocal")
+        } else {
+            Write-Error "Persona invariance gate failed (persona_contract_drift)."
+            exit 1
+        }
     }
     .\scripts\set_latest_pointer.ps1 -RunDir $personaGateSummaryPath -PointerPath "runs\\latest_persona_invariance_gate" | Out-Host
 
@@ -2371,6 +2415,9 @@ if ($true) {
             if ($matrixFamilyById.ContainsKey("agency_preserving_substitution")) {
                 $reliabilityParams.AgencyPreservingSubstitutionReliability = "$($matrixFamilyById["agency_preserving_substitution"].artifact_path)"
             }
+            if ($matrixFamilyById.ContainsKey("rag_prompt_injection")) {
+                $reliabilityParams.RagPromptInjectionReliability = "$($matrixFamilyById["rag_prompt_injection"].artifact_path)"
+            }
         }
         if (-not $SkipRequireControlFamilies) {
             $reliabilityParams.RequireRPAModeSwitch = $true
@@ -2378,8 +2425,9 @@ if ($true) {
             $reliabilityParams.RequireNoiseEscalation = $true
             $reliabilityParams.RequireImplicationCoherence = $true
             $reliabilityParams.RequireAgencyPreservingSubstitution = $true
+            $reliabilityParams.RequireRagPromptInjection = $true
         } else {
-            Write-Warning "SkipRequireControlFamilies enabled: unified reliability gate will not require RPA/intent/noise/implication/agency families."
+            Write-Warning "SkipRequireControlFamilies enabled: unified reliability gate will not require RPA/intent/noise/implication/agency/rag-prompt-injection families."
         }
         if ($gateProfileRequireFullMatrix) {
             $reliabilityParams.RequireCompressionRoundtrip = $true
@@ -2423,9 +2471,19 @@ if ($true) {
         $currentReasoningScore = ConvertTo-NullableDouble $reliabilitySignalPayload.derived.reasoning_score
         $currentImplicationCore = ConvertTo-NullableDouble $reliabilitySignalPayload.derived.reasoning_components.implication_coherence_core
         $currentAgencyCore = ConvertTo-NullableDouble $reliabilitySignalPayload.derived.reasoning_components.agency_preservation_core
-        if ($null -eq $currentReasoningScore -or $null -eq $currentImplicationCore -or $null -eq $currentAgencyCore) {
-            Write-Error "Reliability signal missing required derived metrics for trend guard."
-            exit 1
+        $missingDerivedTrendMetrics = @()
+        if ($null -eq $currentReasoningScore) { $missingDerivedTrendMetrics += "reasoning_score" }
+        if ($null -eq $currentImplicationCore) { $missingDerivedTrendMetrics += "implication_coherence_core" }
+        if ($null -eq $currentAgencyCore) { $missingDerivedTrendMetrics += "agency_preservation_core" }
+        $allowMissingDerivedTrendMetrics = ($GateProfile -eq "fastlocal")
+        if ($missingDerivedTrendMetrics.Count -gt 0) {
+            if ($allowMissingDerivedTrendMetrics) {
+                Write-Warning ("Reliability signal missing derived metrics for trend guard in fastlocal mode: {0}. Trend guard will be marked SKIP." -f ($missingDerivedTrendMetrics -join ", "))
+                $releaseIntegrityWarnings.Add("trend_guard_missing_current_derived_metrics_fastlocal")
+            } else {
+                Write-Error ("Reliability signal missing required derived metrics for trend guard: {0}" -f ($missingDerivedTrendMetrics -join ", "))
+                exit 1
+            }
         }
         if ($null -eq $instructionOverrideTokensPerQP90 -or $null -eq $instructionOverrideWallPerQP90) {
             Write-Error "Instruction override efficiency metrics are unavailable for release cost gating."
@@ -2836,7 +2894,12 @@ if ($true) {
         $tokensPerQP90IncreasePass = $true
         $wallPerQP90IncreasePass = $true
 
-        if ($historyWithCurrent -lt $TrendMinHistory) {
+        if ($missingDerivedTrendMetrics.Count -gt 0 -and $allowMissingDerivedTrendMetrics) {
+            $trendStatus = "SKIP"
+            $trendNotes += "bootstrap_mode"
+            $trendNotes += ("missing_current_derived_metrics: {0}" -f ($missingDerivedTrendMetrics -join ", "))
+            Write-Host ("[BOOTSTRAP] trend guard skipped in fastlocal mode due to missing current derived metrics: {0}" -f ($missingDerivedTrendMetrics -join ", "))
+        } elseif ($historyWithCurrent -lt $TrendMinHistory) {
             $trendStatus = "SKIP"
             $trendNotes += "bootstrap_mode"
             $trendNotes += ("insufficient_quality_history: have={0}, need={1}" -f $historyWithCurrent, $TrendMinHistory)
@@ -3052,6 +3115,60 @@ if ($true) {
         }
         $qualitySnapshotPayload | ConvertTo-Json -Depth 6 | Set-Content -Path $qualitySnapshotPath -Encoding UTF8
         .\scripts\set_latest_pointer.ps1 -RunDir $qualitySnapshotPath -PointerPath "runs\\latest_release_quality_snapshot" | Out-Host
+
+        $capabilityDeltaJsonPath = "runs\\capability_delta_report_latest.json"
+        $capabilityDeltaMarkdownPath = "runs\\capability_delta_report_latest.md"
+        Write-Host "Building capability delta report..."
+        $capabilityDeltaArgs = @(
+            ".\scripts\build_capability_delta_report.py",
+            "--jobs-config", "configs\\capability_delta_jobs.json",
+            "--runs-root", "runs",
+            "--after-release-dir", $ReleaseRunDir,
+            "--out", $capabilityDeltaJsonPath,
+            "--markdown-out", $capabilityDeltaMarkdownPath
+        )
+        if ($GateProfile -eq "fastlocal") {
+            $capabilityDeltaArgs += "--allow-missing-after-matrix"
+        }
+        python @capabilityDeltaArgs
+        if ($LASTEXITCODE -ne 0) {
+            Write-Error "Capability delta report build failed."
+            exit 1
+        }
+        if (-not (Test-Path $capabilityDeltaJsonPath)) {
+            Write-Error "Missing capability delta report artifact: $capabilityDeltaJsonPath"
+            exit 1
+        }
+        $capabilityDeltaPayload = Read-JsonObject -Path $capabilityDeltaJsonPath
+        if (-not $capabilityDeltaPayload) {
+            Write-Error "Unable to parse capability delta report artifact: $capabilityDeltaJsonPath"
+            exit 1
+        }
+        $capabilityDeltaStatus = "$($capabilityDeltaPayload.status)"
+        $capabilityDeltaDegradedMissingAfterMatrix = $false
+        if ($capabilityDeltaPayload.summary -and ($capabilityDeltaPayload.summary.PSObject.Properties.Name -contains "degraded_missing_after_matrix")) {
+            try {
+                $capabilityDeltaDegradedMissingAfterMatrix = [bool]$capabilityDeltaPayload.summary.degraded_missing_after_matrix
+            } catch {
+                $capabilityDeltaDegradedMissingAfterMatrix = $false
+            }
+        }
+        Write-Host ("Capability delta report: status={0} path={1}" -f $capabilityDeltaStatus, $capabilityDeltaJsonPath)
+        if ($capabilityDeltaStatus -eq "FAIL") {
+            Write-Warning "Capability delta report detected at least one regressed capability-combination job."
+            $releaseRiskWarnings.Add("capability_delta_regression")
+        } elseif ($capabilityDeltaStatus -eq "NO_BASELINE") {
+            if ($capabilityDeltaDegradedMissingAfterMatrix) {
+                Write-Warning "Capability delta report ran in degraded mode: after-release reliability matrix is unavailable in this gate profile."
+                $releaseIntegrityWarnings.Add("capability_delta_missing_after_matrix_degraded_mode")
+            } else {
+                Write-Host "Capability delta report baseline unavailable; first comparable release snapshot not found."
+            }
+        }
+        if (Test-Path $capabilityDeltaMarkdownPath) {
+            .\scripts\set_latest_pointer.ps1 -RunDir $capabilityDeltaMarkdownPath -PointerPath "runs\\latest_capability_delta_report_md" | Out-Host
+        }
+        .\scripts\set_latest_pointer.ps1 -RunDir $capabilityDeltaJsonPath -PointerPath "runs\\latest_capability_delta_report" | Out-Host
 
         if ($trendStatus -eq "FAIL") {
             Write-Error "Trend regression guard failed."

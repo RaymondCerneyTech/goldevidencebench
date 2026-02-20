@@ -31,7 +31,11 @@ def _norm_value(v: Any) -> str | None:
         return None
     if isinstance(v, str):
         s = v.strip()
-        return s if s else None
+        if not s:
+            return None
+        if s.lower() == "null":
+            return None
+        return s
     return str(v).strip() or None
 
 

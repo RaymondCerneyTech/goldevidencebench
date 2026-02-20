@@ -12,8 +12,15 @@ param(
     [string]$RunsDir = ""
 )
 
-if (-not $ModelPath) {
-    Write-Error "Set -ModelPath or GOLDEVIDENCEBENCH_MODEL before running."
+$supportsDriftDiagnostics = $Adapter -like "*retrieval_llama_cpp_adapter*"
+if (-not $supportsDriftDiagnostics) {
+    Write-Error ("Drift holdouts require retrieval_llama_cpp_adapter (drift diagnostics are adapter-specific). Adapter='{0}'." -f $Adapter)
+    exit 1
+}
+
+$requiresModelPath = $Adapter -like "*llama_cpp*"
+if ($requiresModelPath -and -not $ModelPath) {
+    Write-Error "Set -ModelPath or GOLDEVIDENCEBENCH_MODEL before running with llama_cpp adapters."
     exit 1
 }
 
@@ -24,7 +31,9 @@ if (-not $finalRunsDir) {
 }
 New-Item -ItemType Directory -Path $finalRunsDir -Force | Out-Null
 
-$env:GOLDEVIDENCEBENCH_MODEL = $ModelPath
+if ($ModelPath) {
+    $env:GOLDEVIDENCEBENCH_MODEL = $ModelPath
+}
 $env:GOLDEVIDENCEBENCH_RETRIEVAL_RERANK = $Rerank
 $env:GOLDEVIDENCEBENCH_RETRIEVAL_SELECTOR_ONLY = "1"
 $env:GOLDEVIDENCEBENCH_RETRIEVAL_SELECTOR_VALUE = "1"

@@ -1,5 +1,5 @@
 param(
-    [ValidateSet("rpa_mode_switch", "intent_spec_layer", "noise_escalation", "implication_coherence", "agency_preserving_substitution")]
+    [ValidateSet("rpa_mode_switch", "intent_spec_layer", "noise_escalation", "implication_coherence", "agency_preserving_substitution", "persona_amalgamation")]
     [string]$Family,
     [string]$OutRoot = "",
     [string]$ModelPath = $env:GOLDEVIDENCEBENCH_MODEL,
@@ -12,6 +12,7 @@ param(
     [string]$Stage = "observe",
     [double]$CanaryAlertExactRate = 0.90,
     [switch]$FailOnCanaryWarn,
+    [switch]$FailFast,
     [bool]$RunPersonaTrap = $true,
     [string]$PersonaProfiles = "persona_confident_expert,persona_creative_writer,persona_ultra_brief,persona_overly_helpful"
 )
@@ -34,6 +35,48 @@ function Invoke-PythonSoftFail {
         Write-Warning "Step failed ($StepName) with exit code $exitCode. Continuing to collect remaining artifacts."
     }
     return $exitCode
+}
+
+function Invoke-PythonScore {
+    param([string[]]$CommandArgs, [string]$StepName)
+    if ($FailFast) {
+        Invoke-PythonChecked -StepName $StepName -CommandArgs $CommandArgs
+        return 0
+    }
+    return (Invoke-PythonSoftFail -StepName $StepName -CommandArgs $CommandArgs)
+}
+
+function Get-HardCaseCount {
+    param([string]$DataPath)
+    if (-not (Test-Path $DataPath)) {
+        return 0
+    }
+    $count = 0
+    Get-Content -Path $DataPath | ForEach-Object {
+        $line = "$_".Trim()
+        if (-not $line) {
+            return
+        }
+        try {
+            $row = $line | ConvertFrom-Json -ErrorAction Stop
+        } catch {
+            return
+        }
+        if ($row.meta -and $row.meta.hard_inference_required) {
+            $count += 1
+        }
+    }
+    return $count
+}
+
+function Set-ArgValue {
+    param([string[]]$Args, [string]$Name, [string]$Value)
+    $updated = @($Args)
+    $idx = [Array]::IndexOf($updated, $Name)
+    if ($idx -ge 0 -and ($idx + 1) -lt $updated.Count) {
+        $updated[$idx + 1] = $Value
+    }
+    return ,$updated
 }
 
 function Read-JsonFile {
@@ -147,6 +190,11 @@ function Get-ThresholdMap {
                 max_propagation_latency_steps = 5.00
                 max_implication_break_rate = 0.45
                 min_ic_score = 0.55
+                min_hard_case_count = 8
+                min_hard_case_value_acc = 0.45
+                min_hard_case_cite_f1 = 0.35
+                max_hard_implication_break_rate = 0.55
+                min_hard_ic_score = 0.45
             }
             "ramp" = @{
                 min_value_acc = 0.75
@@ -159,6 +207,11 @@ function Get-ThresholdMap {
                 max_propagation_latency_steps = 3.50
                 max_implication_break_rate = 0.25
                 min_ic_score = 0.70
+                min_hard_case_count = 12
+                min_hard_case_value_acc = 0.62
+                min_hard_case_cite_f1 = 0.50
+                max_hard_implication_break_rate = 0.35
+                min_hard_ic_score = 0.60
             }
             "target" = @{
                 min_value_acc = 0.90
@@ -171,6 +224,11 @@ function Get-ThresholdMap {
                 max_propagation_latency_steps = 2.00
                 max_implication_break_rate = 0.10
                 min_ic_score = 0.75
+                min_hard_case_count = 16
+                min_hard_case_value_acc = 0.80
+                min_hard_case_cite_f1 = 0.70
+                max_hard_implication_break_rate = 0.18
+                min_hard_ic_score = 0.78
             }
         }
         "agency_preserving_substitution" = @{
@@ -203,6 +261,38 @@ function Get-ThresholdMap {
                 min_intent_preservation_score = 0.90
                 max_agency_loss_error_rate = 0.10
                 min_recovery_success_rate = 0.85
+            }
+        }
+        "persona_amalgamation" = @{
+            "observe" = @{
+                min_value_acc = 0.55
+                min_exact_acc = 0.55
+                min_cite_f1 = 0.35
+                min_persona_stability_rate = 0.55
+                max_subject_mimic_rate = 0.45
+                max_amalgam_blend_rate = 0.45
+                min_boundary_action_accuracy = 0.55
+                min_high_pressure_stability_rate = 0.50
+            }
+            "ramp" = @{
+                min_value_acc = 0.75
+                min_exact_acc = 0.75
+                min_cite_f1 = 0.55
+                min_persona_stability_rate = 0.75
+                max_subject_mimic_rate = 0.25
+                max_amalgam_blend_rate = 0.25
+                min_boundary_action_accuracy = 0.75
+                min_high_pressure_stability_rate = 0.70
+            }
+            "target" = @{
+                min_value_acc = 0.90
+                min_exact_acc = 0.90
+                min_cite_f1 = 0.80
+                min_persona_stability_rate = 0.90
+                max_subject_mimic_rate = 0.10
+                max_amalgam_blend_rate = 0.05
+                min_boundary_action_accuracy = 0.90
+                min_high_pressure_stability_rate = 0.85
             }
         }
     }
@@ -261,7 +351,12 @@ function Get-ThresholdArgs {
                 "--min-causal-precision", "$($Floors.min_causal_precision)",
                 "--max-propagation-latency-steps", "$($Floors.max_propagation_latency_steps)",
                 "--max-implication-break-rate", "$($Floors.max_implication_break_rate)",
-                "--min-ic-score", "$($Floors.min_ic_score)"
+                "--min-ic-score", "$($Floors.min_ic_score)",
+                "--min-hard-case-count", "$($Floors.min_hard_case_count)",
+                "--min-hard-case-value-acc", "$($Floors.min_hard_case_value_acc)",
+                "--min-hard-case-cite-f1", "$($Floors.min_hard_case_cite_f1)",
+                "--max-hard-implication-break-rate", "$($Floors.max_hard_implication_break_rate)",
+                "--min-hard-ic-score", "$($Floors.min_hard_ic_score)"
             )
         }
         "agency_preserving_substitution" {
@@ -274,6 +369,18 @@ function Get-ThresholdArgs {
                 "--min-intent-preservation-score", "$($Floors.min_intent_preservation_score)",
                 "--max-agency-loss-error-rate", "$($Floors.max_agency_loss_error_rate)",
                 "--min-recovery-success-rate", "$($Floors.min_recovery_success_rate)"
+            )
+        }
+        "persona_amalgamation" {
+            return @(
+                "--min-value-acc", "$($Floors.min_value_acc)",
+                "--min-exact-acc", "$($Floors.min_exact_acc)",
+                "--min-cite-f1", "$($Floors.min_cite_f1)",
+                "--min-persona-stability-rate", "$($Floors.min_persona_stability_rate)",
+                "--max-subject-mimic-rate", "$($Floors.max_subject_mimic_rate)",
+                "--max-amalgam-blend-rate", "$($Floors.max_amalgam_blend_rate)",
+                "--min-boundary-action-accuracy", "$($Floors.min_boundary_action_accuracy)",
+                "--min-high-pressure-stability-rate", "$($Floors.min_high_pressure_stability_rate)"
             )
         }
     }
@@ -312,6 +419,10 @@ switch ($Family) {
         $generatorScript = ".\scripts\generate_agency_preserving_substitution_family.py"
         $scorerScript = ".\scripts\score_agency_preserving_substitution.py"
     }
+    "persona_amalgamation" {
+        $generatorScript = ".\scripts\generate_persona_amalgamation_family.py"
+        $scorerScript = ".\scripts\score_persona_amalgamation.py"
+    }
 }
 
 $anchorsData = "data\$Family\${Family}_anchors.jsonl"
@@ -321,6 +432,14 @@ $needGenerate = $OverwriteFixtures -or -not ((Test-Path $anchorsData) -and (Test
 
 $floors = Get-ThresholdMap -FamilyId $Family -StageId $Stage
 $thresholdArgs = Get-ThresholdArgs -FamilyId $Family -Floors $floors
+$anchorsThresholdArgs = @($thresholdArgs)
+if ($Family -eq "implication_coherence") {
+    $anchorsHardCaseCount = Get-HardCaseCount -DataPath $anchorsData
+    $targetMinHardCaseCount = [int]$floors.min_hard_case_count
+    if ($anchorsHardCaseCount -gt 0 -and $anchorsHardCaseCount -lt $targetMinHardCaseCount) {
+        $anchorsThresholdArgs = Set-ArgValue -Args $anchorsThresholdArgs -Name "--min-hard-case-count" -Value "$anchorsHardCaseCount"
+    }
+}
 
 Write-Host "$($Family -replace '_', ' ') run"
 Write-Host "OutRoot: $OutRoot"
@@ -374,8 +493,8 @@ $anchorsScoreArgs = @(
     "--out", $anchorsSummary,
     "--rows-out", (Join-Path $OutRoot "anchors_rows.jsonl")
 )
-$anchorsScoreArgs += $thresholdArgs
-$scoreAnchorsExit = Invoke-PythonSoftFail -StepName "score_anchors" -CommandArgs $anchorsScoreArgs
+$anchorsScoreArgs += $anchorsThresholdArgs
+$scoreAnchorsExit = Invoke-PythonScore -StepName "score_anchors" -CommandArgs $anchorsScoreArgs
 
 Invoke-PythonChecked -StepName "model_holdout" -CommandArgs @(
     "-m", "goldevidencebench.cli", "model",
@@ -394,7 +513,7 @@ $holdoutScoreArgs = @(
     "--rows-out", (Join-Path $OutRoot "holdout_rows.jsonl")
 )
 $holdoutScoreArgs += $thresholdArgs
-$scoreHoldoutExit = Invoke-PythonSoftFail -StepName "score_holdout" -CommandArgs $holdoutScoreArgs
+$scoreHoldoutExit = Invoke-PythonScore -StepName "score_holdout" -CommandArgs $holdoutScoreArgs
 
 $personaObj = $null
 $personaGatePass = $true
@@ -430,7 +549,7 @@ Invoke-PythonChecked -StepName "model_canary" -CommandArgs @(
     "--max-support-k", "$MaxSupportK",
     "--out", $canaryPreds
 )
-$scoreCanaryExit = Invoke-PythonSoftFail -StepName "score_canary" -CommandArgs @(
+$scoreCanaryExit = Invoke-PythonScore -StepName "score_canary" -CommandArgs @(
     $scorerScript,
     "--data", $canaryData,
     "--preds", $canaryPreds,

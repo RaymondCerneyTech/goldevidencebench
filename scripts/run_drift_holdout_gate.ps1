@@ -18,9 +18,19 @@ param(
     [int]$AuthoritySpoofSeed = 0
 )
 
-if (-not $ModelPath) {
-    Write-Error "Set -ModelPath or GOLDEVIDENCEBENCH_MODEL before running."
+$supportsDriftDiagnostics = $Adapter -like "*retrieval_llama_cpp_adapter*"
+if (-not $supportsDriftDiagnostics) {
+    Write-Error ("Drift holdout gate requires retrieval_llama_cpp_adapter (drift diagnostics are adapter-specific). Adapter='{0}'." -f $Adapter)
     exit 1
+}
+
+$requiresModelPath = $Adapter -like "*llama_cpp*"
+if ($requiresModelPath -and -not $ModelPath) {
+    Write-Error "Set -ModelPath or GOLDEVIDENCEBENCH_MODEL before running with llama_cpp adapters."
+    exit 1
+}
+if ($ModelPath) {
+    $env:GOLDEVIDENCEBENCH_MODEL = $ModelPath
 }
 
 $finalRunsDir = $RunsDir
@@ -78,14 +88,30 @@ function Get-CanaryMin {
 
 function Get-DriftRate {
     param([string]$SummaryPath)
-    if (-not (Test-Path $SummaryPath)) {
+    $summaryDir = Split-Path -Parent $SummaryPath
+    if (Test-Path $SummaryPath) {
+        try {
+            $data = Get-Content -Raw -Path $SummaryPath | ConvertFrom-Json
+            if ($null -ne $data -and $null -ne $data.drift -and $null -ne $data.drift.step_rate) {
+                return [double]$data.drift.step_rate
+            }
+        } catch {
+            # Fall back to compact summary parse.
+        }
+    }
+    $compactSummaryPath = Join-Path $summaryDir "summary_compact.json"
+    if (-not (Test-Path $compactSummaryPath)) {
         return $null
     }
-    $data = Get-Content -Raw -Path $SummaryPath | ConvertFrom-Json
-    if ($null -eq $data.drift) {
+    try {
+        $compact = Get-Content -Raw -Path $compactSummaryPath | ConvertFrom-Json
+        if ($null -ne $compact -and $null -ne $compact.drift_step_rate) {
+            return [double]$compact.drift_step_rate
+        }
+    } catch {
         return $null
     }
-    return $data.drift.step_rate
+    return $null
 }
 
 $holdoutScript = Join-Path $PSScriptRoot "run_drift_holdouts.ps1"
@@ -106,8 +132,20 @@ function Invoke-Variant {
     $env:GOLDEVIDENCEBENCH_RETRIEVAL_AUTHORITY_SPOOF_RATE = "$AuthoritySpoofRate"
     $env:GOLDEVIDENCEBENCH_RETRIEVAL_AUTHORITY_SPOOF_SEED = "$AuthoritySpoofSeed"
     $outDir = Join-Path $finalRunsDir $Label
-    & $holdoutScript -ModelPath $ModelPath -Steps $Steps -Keys $Keys -Queries $Queries -Seeds $Seeds `
-        -Rerank $Rerank -Adapter $Adapter -RunsDir $outDir -HoldoutName $HoldoutName | Out-Host
+    $holdoutArgs = @{
+        Steps = $Steps
+        Keys = $Keys
+        Queries = $Queries
+        Seeds = $Seeds
+        Rerank = $Rerank
+        Adapter = $Adapter
+        RunsDir = $outDir
+        HoldoutName = $HoldoutName
+    }
+    if ($ModelPath) {
+        $holdoutArgs.ModelPath = $ModelPath
+    }
+    & $holdoutScript @holdoutArgs | Out-Host
     if (-not $?) {
         throw "Holdout run failed for $Label"
     }

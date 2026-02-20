@@ -10,6 +10,7 @@ param(
     [string]$Stage = "observe",
     [double]$CanaryAlertExactRate = 0.90,
     [switch]$FailOnCanaryWarn,
+    [switch]$FailFast,
     [bool]$RunPersonaTrap = $true,
     [string]$PersonaProfiles = "persona_confident_expert,persona_creative_writer,persona_ultra_brief,persona_overly_helpful"
 )
@@ -26,6 +27,7 @@ param(
     -Stage $Stage `
     -CanaryAlertExactRate $CanaryAlertExactRate `
     -FailOnCanaryWarn:$FailOnCanaryWarn `
+    -FailFast:$FailFast `
     -RunPersonaTrap $RunPersonaTrap `
     -PersonaProfiles $PersonaProfiles
 

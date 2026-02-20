@@ -97,3 +97,27 @@ def test_instruction_override_skips_matching_instruction_value() -> None:
     assert res.instr_conflict_present_rate == 0.0
     assert res.instr_conflict_present_count == 0
     assert res.state_integrity_rate == 1.0
+
+
+def test_null_string_and_json_null_are_equivalent_for_value_match() -> None:
+    data = [
+        {
+            "id": "Q1",
+            "gold": {"value": "null", "support_ids": []},
+            "meta": {"requires_citation": False, "key": "tag.00"},
+            "document": "# Ep\n\n## Episode Log\n- [U0A1A1A] UPDATE step=1 CLEAR tag.00\n",
+        },
+        {
+            "id": "Q2",
+            "gold": {"value": None, "support_ids": []},
+            "meta": {"requires_citation": False, "key": "tag.01"},
+            "document": "# Ep\n\n## Episode Log\n- [U0B2B2B] UPDATE step=1 CLEAR tag.01\n",
+        },
+    ]
+    preds = {
+        "Q1": {"value": None, "support_ids": []},
+        "Q2": {"value": "null", "support_ids": []},
+    }
+    res = grade_rows(data_rows=data, pred_by_id=preds, citations="off", entailment_check=False)
+    assert res.value_acc == 1.0
+    assert res.exact_acc == 1.0

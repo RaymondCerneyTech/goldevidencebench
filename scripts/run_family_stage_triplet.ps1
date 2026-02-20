@@ -12,7 +12,10 @@ param(
         "intent_spec_layer",
         "noise_escalation",
         "implication_coherence",
-        "agency_preserving_substitution"
+        "agency_preserving_substitution",
+        "persona_amalgamation",
+        "social_pressure_self_doubt",
+        "rag_prompt_injection"
     )]
     [string]$Family,
     [ValidateSet("observe", "ramp", "target", "custom")]
@@ -47,6 +50,9 @@ $runScriptMap = @{
     "noise_escalation" = ".\scripts\run_noise_escalation_family.ps1"
     "implication_coherence" = ".\scripts\run_implication_coherence_family.ps1"
     "agency_preserving_substitution" = ".\scripts\run_agency_preserving_substitution_family.ps1"
+    "persona_amalgamation" = ".\scripts\run_persona_amalgamation_family.ps1"
+    "social_pressure_self_doubt" = ".\scripts\run_social_pressure_self_doubt_family.ps1"
+    "rag_prompt_injection" = ".\scripts\run_rag_prompt_injection_family.ps1"
 }
 
 $checkerMap = @{
@@ -63,6 +69,9 @@ $checkerMap = @{
     "noise_escalation" = ".\scripts\check_noise_escalation_reliability.py"
     "implication_coherence" = ".\scripts\check_implication_coherence_reliability.py"
     "agency_preserving_substitution" = ".\scripts\check_agency_preserving_substitution_reliability.py"
+    "persona_amalgamation" = ".\scripts\check_persona_amalgamation_reliability.py"
+    "social_pressure_self_doubt" = ".\scripts\check_social_pressure_self_doubt_reliability.py"
+    "rag_prompt_injection" = ".\scripts\check_rag_prompt_injection_reliability.py"
 }
 
 $latestMap = @{
@@ -79,6 +88,9 @@ $latestMap = @{
     "noise_escalation" = "runs\noise_escalation_reliability_latest.json"
     "implication_coherence" = "runs\implication_coherence_reliability_latest.json"
     "agency_preserving_substitution" = "runs\agency_preserving_substitution_reliability_latest.json"
+    "persona_amalgamation" = "runs\persona_amalgamation_reliability_latest.json"
+    "social_pressure_self_doubt" = "runs\social_pressure_self_doubt_reliability_latest.json"
+    "rag_prompt_injection" = "runs\rag_prompt_injection_reliability_latest.json"
 }
 
 $stageModeMap = @{
@@ -95,6 +107,9 @@ $stageModeMap = @{
     "noise_escalation" = "stage"
     "implication_coherence" = "stage"
     "agency_preserving_substitution" = "stage"
+    "persona_amalgamation" = "stage"
+    "social_pressure_self_doubt" = "stage"
+    "rag_prompt_injection" = "stage"
 }
 
 $runner = $runScriptMap[$Family]
@@ -175,7 +190,10 @@ if ($MaxJitter -ge 0.0) {
         "intent_spec_layer",
         "noise_escalation",
         "implication_coherence",
-        "agency_preserving_substitution"
+        "agency_preserving_substitution",
+        "persona_amalgamation",
+        "social_pressure_self_doubt",
+        "rag_prompt_injection"
     )
     if ($baseJitterFamilies -contains $Family) {
         $checkerArgs += @("--max-value-acc-jitter", "$MaxJitter")
@@ -213,12 +231,42 @@ if ($MaxJitter -ge 0.0) {
         $checkerArgs += @("--max-propagation-latency-jitter", "$MaxJitter")
         $checkerArgs += @("--max-implication-break-jitter", "$MaxJitter")
         $checkerArgs += @("--max-ic-score-jitter", "$MaxJitter")
+        $checkerArgs += @("--max-hard-case-value-acc-jitter", "$MaxJitter")
+        $checkerArgs += @("--max-hard-case-cite-f1-jitter", "$MaxJitter")
+        $checkerArgs += @("--max-hard-implication-break-jitter", "$MaxJitter")
+        $checkerArgs += @("--max-hard-ic-score-jitter", "$MaxJitter")
     } elseif ($Family -eq "agency_preserving_substitution") {
         $checkerArgs += @("--max-substitution-transparency-jitter", "$MaxJitter")
         $checkerArgs += @("--max-unauthorized-substitution-jitter", "$MaxJitter")
         $checkerArgs += @("--max-intent-preservation-jitter", "$MaxJitter")
         $checkerArgs += @("--max-agency-loss-error-jitter", "$MaxJitter")
         $checkerArgs += @("--max-recovery-success-jitter", "$MaxJitter")
+    } elseif ($Family -eq "persona_amalgamation") {
+        $checkerArgs += @("--max-persona-stability-jitter", "$MaxJitter")
+        $checkerArgs += @("--max-subject-mimic-jitter", "$MaxJitter")
+        $checkerArgs += @("--max-amalgam-blend-jitter", "$MaxJitter")
+        $checkerArgs += @("--max-boundary-action-jitter", "$MaxJitter")
+        $checkerArgs += @("--max-high-pressure-stability-jitter", "$MaxJitter")
+    } elseif ($Family -eq "social_pressure_self_doubt") {
+        $checkerArgs += @("--max-baseline-correct-rate-jitter", "$MaxJitter")
+        $checkerArgs += @("--max-flip-rate-jitter", "$MaxJitter")
+        $checkerArgs += @("--max-unnecessary-revision-rate-jitter", "$MaxJitter")
+        $checkerArgs += @("--max-citation-drift-rate-jitter", "$MaxJitter")
+        $checkerArgs += @("--max-per-attack-flip-rate-jitter", "$MaxJitter")
+        $checkerArgs += @("--max-capitulation-rate-jitter", "$MaxJitter")
+        $checkerArgs += @("--max-responsiveness-rate-jitter", "$MaxJitter")
+        $checkerArgs += @("--max-suggestion-hijacking-goal-drift-rate-jitter", "$MaxJitter")
+        $checkerArgs += @("--max-suggestion-hijacking-instruction-violation-rate-jitter", "$MaxJitter")
+        $checkerArgs += @("--max-emotional-capitulation-rate-jitter", "$MaxJitter")
+        $checkerArgs += @("--max-fatigue-degradation-jitter", "$MaxJitter")
+    } elseif ($Family -eq "rag_prompt_injection") {
+        $checkerArgs += @("--max-baseline-correct-rate-jitter", "$MaxJitter")
+        $checkerArgs += @("--max-flip-rate-jitter", "$MaxJitter")
+        $checkerArgs += @("--max-unnecessary-revision-rate-jitter", "$MaxJitter")
+        $checkerArgs += @("--max-citation-drift-rate-jitter", "$MaxJitter")
+        $checkerArgs += @("--max-per-variant-flip-rate-jitter", "$MaxJitter")
+        $checkerArgs += @("--max-suggestion-hijacking-goal-drift-rate-jitter", "$MaxJitter")
+        $checkerArgs += @("--max-suggestion-hijacking-instruction-violation-rate-jitter", "$MaxJitter")
     }
 }
 if ($CheckerExtraArgs.Count -gt 0) {

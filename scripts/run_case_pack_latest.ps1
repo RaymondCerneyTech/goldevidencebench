@@ -9,6 +9,9 @@ case pack run and optionally opens the onepager report.
 .PARAMETER ModelPath
 Path to GGUF model for LLM-dependent checks (or set GOLDEVIDENCEBENCH_MODEL).
 
+.PARAMETER Adapter
+Adapter factory path used by case-pack sub-runs.
+
 .PARAMETER PdfPath
 Path to a PDF used for the open-book demo (optional).
 
@@ -38,6 +41,7 @@ Open the generated case_pack_onepager.md in Notepad.
 #>
 param(
     [string]$ModelPath = $env:GOLDEVIDENCEBENCH_MODEL,
+    [string]$Adapter = "goldevidencebench.adapters.retrieval_llama_cpp_adapter:create_adapter",
     [string]$PdfPath = "",
     [string]$OutRoot = "",
     [int]$MaxRows = 24,
@@ -52,6 +56,7 @@ param(
 
 $caseArgs = @{
     ModelPath = $ModelPath
+    Adapter = $Adapter
     PdfPath = $PdfPath
     OutRoot = $OutRoot
     MaxRows = $MaxRows
@@ -84,7 +89,7 @@ if (Test-Path $latestFile) {
                 $modelId = Split-Path -Leaf $ModelPath
             }
             if (-not $modelId) {
-                $modelId = "unknown"
+                $modelId = $Adapter
             }
             try {
                 .\scripts\append_run_log.ps1 -RunDir $latest -ModelId $modelId | Out-Host

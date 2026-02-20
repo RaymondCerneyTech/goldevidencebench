@@ -24,6 +24,7 @@ param(
     [double]$HoldoutMaxAuthorityViolationRate = 0.05,
     [double]$CanaryAlertExactRate = 0.85,
     [switch]$FailOnCanaryWarn,
+    [switch]$FailFast,
     [bool]$RunPersonaTrap = $true,
     [string]$PersonaProfiles = "persona_confident_expert,persona_creative_writer,persona_ultra_brief,persona_overly_helpful"
 )
@@ -46,6 +47,15 @@ function Invoke-PythonSoftFail {
         Write-Warning "Step failed ($StepName) with exit code $exitCode. Continuing to collect remaining artifacts."
     }
     return $exitCode
+}
+
+function Invoke-PythonScore {
+    param([string[]]$CommandArgs, [string]$StepName)
+    if ($FailFast) {
+        Invoke-PythonChecked -StepName $StepName -CommandArgs $CommandArgs
+        return 0
+    }
+    return (Invoke-PythonSoftFail -StepName $StepName -CommandArgs $CommandArgs)
 }
 
 function Read-JsonFile {
@@ -112,7 +122,7 @@ Invoke-PythonChecked -StepName "model_anchors" -CommandArgs @(
     "--max-support-k", "$MaxSupportK",
     "--out", $anchorsPreds
 )
-$scoreAnchorsExit = Invoke-PythonSoftFail -StepName "score_anchors" -CommandArgs @(
+$scoreAnchorsExit = Invoke-PythonScore -StepName "score_anchors" -CommandArgs @(
     ".\scripts\score_authority_under_interference.py",
     "--data", $anchorsData,
     "--preds", $anchorsPreds,
@@ -136,7 +146,7 @@ Invoke-PythonChecked -StepName "model_holdout" -CommandArgs @(
     "--max-support-k", "$MaxSupportK",
     "--out", $holdoutPreds
 )
-$scoreHoldoutExit = Invoke-PythonSoftFail -StepName "score_holdout" -CommandArgs @(
+$scoreHoldoutExit = Invoke-PythonScore -StepName "score_holdout" -CommandArgs @(
     ".\scripts\score_authority_under_interference.py",
     "--data", $holdoutData,
     "--preds", $holdoutPreds,
@@ -185,7 +195,7 @@ Invoke-PythonChecked -StepName "model_canary" -CommandArgs @(
     "--max-support-k", "$MaxSupportK",
     "--out", $canaryPreds
 )
-$scoreCanaryExit = Invoke-PythonSoftFail -StepName "score_canary" -CommandArgs @(
+$scoreCanaryExit = Invoke-PythonScore -StepName "score_canary" -CommandArgs @(
     ".\scripts\score_authority_under_interference.py",
     "--data", $canaryData,
     "--preds", $canaryPreds,
